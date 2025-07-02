@@ -25,6 +25,7 @@ c-----------------------------------------------------------------------
       real(r8), parameter :: one = 1.0_r8
       real(r8), parameter :: two = 2.0_r8
       real(r8), parameter :: half = 0.5_r8
+      real(r8), parameter :: six = 6.0_r8
       integer, parameter :: bin_unit = 10
       integer, parameter :: out_unit = 11
 
@@ -41,10 +42,10 @@ c-----------------------------------------------------------------------
       INTEGER, INTENT(IN) :: mode,unit
       REAL(r4), INTENT(OUT), OPTIONAL :: op_cpuseconds,op_wallseconds
 
-      INTEGER(8), SAVE :: count_rate, wall_start
+      INTEGER(i8), SAVE :: count_rate, wall_start
       REAL(r4), SAVE :: start
       REAL(r4) :: seconds
-      INTEGER(8) :: hrs,mins,secs, wall_seconds, count_max
+      INTEGER(i8) :: hrs,mins,secs, wall_seconds, count_max
 c-----------------------------------------------------------------------
 c     format statements.
 c-----------------------------------------------------------------------
@@ -82,7 +83,7 @@ c-----------------------------------------------------------------------
          ENDIF
          ! report wall time
          CALL SYSTEM_CLOCK(wall_seconds, count_rate, count_max)
-         seconds=(wall_seconds-wall_start)/REAL(count_rate, 8)
+         seconds=REAL(wall_seconds-wall_start, r4)/REAL(count_rate, r4)
          secs = int(seconds)
          hrs = secs/(60*60)
          mins = (secs-hrs*60*60)/60

@@ -657,7 +657,7 @@ c-----------------------------------------------------------------------
       INTEGER, INTENT(IN) :: mode
 
       INTEGER :: i,iqty,iside
-      REAL(r8) :: dx,dy,xx,yy,g,gx,gy,gxx,gyy,gxy,xfac,yfac
+      REAL(r8) :: dx,dy,xx,yy,g,gx,gy,xfac,yfac
       REAL(r8), DIMENSION (4,4,bcs%nqty) :: c
 
       INTEGER, INTENT(INOUT) :: b_ix,b_iy

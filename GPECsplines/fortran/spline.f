@@ -1120,7 +1120,7 @@ c     formats.
 c-----------------------------------------------------------------------
  10   FORMAT('(/3x,"ix",',i2.2,'(4x,a6,1x)/)')
  20   FORMAT('(i5,1p,',i2.2,'e11.3)')
- 30   FORMAT('(/3x,"ix",2x,"j",',i2.2,'(4x,a6,1x)/)')
+!  30   FORMAT('(/3x,"ix",2x,"j",',i2.2,'(4x,a6,1x)/)')
 c-----------------------------------------------------------------------
 c     abort.
 c-----------------------------------------------------------------------
@@ -1197,20 +1197,20 @@ c-----------------------------------------------------------------------
       CHARACTER(30) :: format1,format2
       INTEGER :: i,j,iz
       REAL(r8) :: x,dx,z
-      REAL(r8), DIMENSION(spl%mx,spl%nqty) :: f
+      REAL(r8), DIMENSION(spl%mx,spl%nqty) :: f, f1,f2,f3
       REAL(r8), DIMENSION(0:4*spl%mx,spl%nqty) :: g
 c-----------------------------------------------------------------------
 c     formats.
 c-----------------------------------------------------------------------
  10   FORMAT('(/4x,"i",',i2.2,'(4x,a6,1x)/)')
  20   FORMAT('(i5,1p,',i2.2,'e11.3)')
- 30   FORMAT('(/4x,"i",2x,"j",',i2.2,'(4x,a6,1x)/)')
+!  30   FORMAT('(/4x,"i",2x,"j",',i2.2,'(4x,a6,1x)/)')
 c-----------------------------------------------------------------------
 c     compute values.
 c-----------------------------------------------------------------------
       z=0
       DO iz=0,3
-         CALL spline_all_eval(spl,z,f,f,f,f,0)
+         CALL spline_all_eval(spl,z,f,f1,f2,f3,0)
          g(iz:4*spl%mx-1:4,:)=f
          z=z+.25_r8
       ENDDO
@@ -1281,7 +1281,7 @@ c-----------------------------------------------------------------------
 
       INTEGER :: ix,iqty,ig
       REAL(r8), DIMENSION(spl%mx) :: dx
-      REAL(r8), DIMENSION(spl%mx,spl%nqty) :: term,f
+      REAL(r8), DIMENSION(spl%mx,spl%nqty) :: term,f,f1,f2,f3
 
       INTEGER, PARAMETER :: mg=4
       REAL(r8), DIMENSION(mg) :: xg=(1+(/-0.861136311594053_r8,
@@ -1306,7 +1306,7 @@ c-----------------------------------------------------------------------
      $           +dx*(spl%fs1(0:spl%mx-1,iqty)-spl%fs1(1:spl%mx,iqty)))
          ELSE
             DO ig=1,mg
-               CALL spline_all_eval(spl,xg(ig),f,f,f,f,0)
+               CALL spline_all_eval(spl,xg(ig),f,f1,f2,f3,0)
                term(:,iqty)=term(:,iqty)+dx*wg(ig)*f(:,iqty)
             ENDDO
          ENDIF
@@ -1610,7 +1610,8 @@ c-----------------------------------------------------------------------
       TYPE(spline_type), INTENT(INOUT) :: spl
       INTEGER, INTENT(IN):: iqty
       INTEGER, INTENT(OUT) :: nroots
-      REAL(r8), DIMENSION(*), INTENT(OUT):: roots ! should be DIMENSION(1:spl%mx*3)
+      REAL(r8), DIMENSION(*), INTENT(OUT):: roots 
+      !^^^^ should be DIMENSION(1:spl%mx*3) ^^^^
       LOGICAL, INTENT(IN), OPTIONAL :: op_extrap
       REAL(r8), INTENT(IN), OPTIONAL :: op_eps
 
@@ -1728,7 +1729,8 @@ c-----------------------------------------------------------------------
          x1 = spl%xs(ix) + z1 * dx
          x2 = spl%xs(ix) + z2 * dx
          x3 = spl%xs(ix) + z3 * dx
-         ! check if they are in the knot interval (exclude repeats if perioic)
+         ! check if they are in the knot interval
+         ! (exclude repeats if periodic)
          IF(debug .AND. (f_0*f_1 <= 0))THEN
             PRINT *," > f zero crossing between",spl%xs(ix),spl%xs(ix+1)
             PRINT *,"  >> f_0, f_1 =",f_0,f_1
@@ -1742,7 +1744,8 @@ c-----------------------------------------------------------------------
      $            'I3,a1,I3,a11,es13.4e3,a1,es13.4)',
      $            "  > Found z1",z1,", x1",x1," between knots ",ix,",",
      $            ix+1," where x =",spl%xs(ix),",",spl%xs(ix+1)
-               ! refine solution numerically (analytics vs reality of interp)
+               ! refine solution numerically 
+               ! (analytics vs reality of interp)
                CALL spline_refine_root(spl,iqty,x1)
                ! avoid repeated left/right solutions at a f=0 knot
                IF(abs(last1-x1)>tol .AND. abs(last2-x1)>tol .AND.
@@ -1758,7 +1761,8 @@ c-----------------------------------------------------------------------
      $            'I3,a1,I3,a11,es13.4e3,a1,es13.4)',
      $            "  > Found z2",z2,", x2",x2," between knots ",ix,
      $            ",",ix+1," where x =",spl%xs(ix),",",spl%xs(ix+1)
-               ! refine solution numerically (analytics vs reality of interp)
+               ! refine solution numerically
+               ! (analytics vs reality of interp)
                CALL spline_refine_root(spl,iqty,x2)
                ! avoid double roots or repeats right at a knot location
                IF(abs(last1-x2)>tol .AND. abs(last2-x2)>tol .AND.
@@ -1774,7 +1778,8 @@ c-----------------------------------------------------------------------
      $            'I3,a1,I3,a11,es13.4e3,a1,es13.4)',
      $            "  > Found z3",z3,", x3",x3," between knots ",ix,
      $            ",",ix+1," where x =",spl%xs(ix),",",spl%xs(ix+1)
-               ! refine solution numerically (analytics vs reality of interp)
+               ! refine solution numerically
+               ! (analytics vs reality of interp)
                CALL spline_refine_root(spl,iqty,x3)
                ! avoid double roots or repeats right at a knot location
                IF(abs(last1-x3)>tol .AND. abs(last2-x3)>tol .AND.
@@ -1824,7 +1829,7 @@ c-----------------------------------------------------------------------
       REAL(r8), INTENT(INOUT) :: x
       REAL(r8), INTENT(IN), OPTIONAL :: op_tol
       ! declare variables
-      INTEGER :: iroot,it,nroots
+      INTEGER :: it
       INTEGER, PARAMETER :: itmax=500
       REAL(r8) :: tol=1e-12
       REAL(r8) :: dx,lx,lf,f,df
@@ -1845,7 +1850,7 @@ c-----------------------------------------------------------------------
       DO
          CALL spline_eval(spl,x,1)
          df=spl%f(iqty)-f
-         !IF(abs(dx) < tol*lx .OR. abs(df) < tol*lf .OR. it >= itmax)EXIT
+        !IF(abs(dx) < tol*lx .OR. abs(df) < tol*lf .OR. it >= itmax)EXIT
          IF(abs(dx) <= abs(tol*lx) .OR. it >= itmax)EXIT
          it=it+1
          f=spl%f(iqty)

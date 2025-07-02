@@ -181,7 +181,7 @@ c-----------------------------------------------------------------------
       REAL(r8), DIMENSION(0:spl%mx) :: xfac
 
       INTEGER :: iside,iqty,i
-      REAL(r8),DIMENSION(spl%nqty) :: bs,cs,ds
+      COMPLEX(r8),DIMENSION(spl%nqty) :: bs,cs,ds
 c-----------------------------------------------------------------------
 c     extract powers.
 c-----------------------------------------------------------------------
@@ -221,7 +221,7 @@ c-----------------------------------------------------------------------
       r(0,:)=0
       DO i=1,spl%mx-1
          r(i,:)=( (spl%fs(i+1,:)-spl%fs(i,:))/h(i)
-     $           -(spl%fs(i,:)-spl%fs(i-1,:))/h(i-1) )*6
+     $           -(spl%fs(i,:)-spl%fs(i-1,:))/h(i-1) )*six
       ENDDO
       r(spl%mx,:)=0
 
@@ -235,9 +235,9 @@ c-----------------------------------------------------------------------
          d(spl%mx)=2*h(spl%mx-1)
          u(1)=h(0)
          l(spl%mx)=h(spl%mx-1)
-         r(0,:)=( (spl%fs(1,:)-spl%fs(0,:))/h(0) - r(0,:) )*6
+         r(0,:)=( (spl%fs(1,:)-spl%fs(0,:))/h(0) - r(0,:) )*six
          r(spl%mx,:)=( r(spl%mx,:)
-     $  -(spl%fs(spl%mx,:)-spl%fs(spl%mx-1,:))/h(spl%mx-1) )*6
+     $  -(spl%fs(spl%mx,:)-spl%fs(spl%mx-1,:))/h(spl%mx-1) )*six
 
       ENDIF
 c-----------------------------------------------------------------------
@@ -248,16 +248,16 @@ c-----------------------------------------------------------------------
 
       DO i=0, spl%mx-1
          bs=(spl%fs(i+1,:)-spl%fs(i,:))/h(i)
-     $    - 0.5*h(i)*r(i,:)
-     $    - h(i)*(r(i+1,:)-r(i,:))/6
+     $    - half*h(i)*r(i,:)
+     $    - h(i)*(r(i+1,:)-r(i,:))/six
          spl%fs1(i,:)=bs
       ENDDO
-      ds=(r(spl%mx,:)-r(spl%mx-1,:))/(h(spl%mx-1)*6)
-      cs=r(spl%mx-1,:)*0.5
+      ds=(r(spl%mx,:)-r(spl%mx-1,:))/(h(spl%mx-1)*six)
+      cs=r(spl%mx-1,:)*half
       i=spl%mx-1
       bs=(spl%fs(i+1,:)-spl%fs(i,:))/h(i)
-     $    - 0.5*h(i)*r(i,:)
-     $    - h(i)*(r(i+1,:)-r(i,:))/6
+     $    - half*h(i)*r(i,:)
+     $    - h(i)*(r(i+1,:)-r(i,:))/six
       i=spl%mx
       spl%fs1(i,:)=bs+h(i-1)*(cs*2+h(i-1)*ds*3)
       DEALLOCATE (d,l,u,r,h)
@@ -827,7 +827,7 @@ c     formats.
 c-----------------------------------------------------------------------
  10   FORMAT('(/4x,"i",4x,a6,1x,',i2.2,'(2x,"re ",a6,2x,"im ",a6)/)')
  20   FORMAT('(i5,1p,',i2.2,'e11.3)')
- 30   FORMAT('(/4x,"i",2x,"j",',i2.2,'(4x,a6,1x)/)')
+!  30   FORMAT('(/4x,"i",2x,"j",',i2.2,'(4x,a6,1x)/)')
 c-----------------------------------------------------------------------
 c     abort.
 c-----------------------------------------------------------------------
@@ -1057,7 +1057,7 @@ c-----------------------------------------------------------------------
 
       INTEGER :: ix,iqty,ig
       REAL(r8), DIMENSION(spl%mx) :: dx
-      COMPLEX(r8), DIMENSION(spl%mx,spl%nqty) :: term,f
+      COMPLEX(r8), DIMENSION(spl%mx,spl%nqty) :: term,f,f1,f2,f3
 
       INTEGER, PARAMETER :: mg=4
       REAL(r8), DIMENSION(mg) :: xg=(1+(/-0.861136311594053_r8,
@@ -1082,7 +1082,7 @@ c-----------------------------------------------------------------------
      $           +dx*(spl%fs1(0:spl%mx-1,iqty)-spl%fs1(1:spl%mx,iqty)))
          ELSE
             DO ig=1,mg
-               CALL cspline_all_eval(spl,xg(ig),f,f,f,f,0)
+               CALL cspline_all_eval(spl,xg(ig),f,f1,f2,f3,0)
                term(:,iqty)=term(:,iqty)+dx*wg(ig)*f(:,iqty)
             ENDDO
          ENDIF
@@ -1198,7 +1198,7 @@ c-----------------------------------------------------------------------
       u=RESHAPE((/one,(zero,j=2,n-1),one/),SHAPE(u))
       CALL cspline_triluf(a)
       CALL cspline_trilus(a,u)
-      a(-1,1)=a(-1,1)/(1+a(-1,1)*(u(1,1)+u(n,1)))
+      a(-1,1)=REAL(a(-1,1)/(1+a(-1,1)*(u(1,1)+u(n,1))),r8)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
