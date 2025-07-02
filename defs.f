@@ -17,14 +17,16 @@ c-----------------------------------------------------------------------
      $     i4=selected_int_kind(9),
      $     i8=selected_int_kind(18)
 
-      real(r8) :: pi = 3.14159265358979323846_r8
-      real(r8) :: twopi = 6.28318530717958647692_r8
-      real(r8) :: zero = 0.0_r8
-      real(r8) :: one = 1.0_r8
-      real(r8) :: two = 2.0_r8
-      real(r8) :: half = 0.5_r8
-      integer :: bin_unit = 10
-      integer :: out_unit = 11
+      real(r8), parameter :: pi = 3.14159265358979323846_r8
+      real(r8), parameter :: twopi = 6.28318530717958647692_r8
+      real(r8), parameter :: alog10 = 2.3025850929940459_r8
+      real(r8), parameter :: rtod = 180.0_r8 / pi
+      real(r8), parameter :: zero = 0.0_r8
+      real(r8), parameter :: one = 1.0_r8
+      real(r8), parameter :: two = 2.0_r8
+      real(r8), parameter :: half = 0.5_r8
+      integer, parameter :: bin_unit = 10
+      integer, parameter :: out_unit = 11
 
       contains
 c-----------------------------------------------------------------------
