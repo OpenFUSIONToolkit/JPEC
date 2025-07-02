@@ -47,7 +47,7 @@ c-----------------------------------------------------------------------
          type(c_ptr) :: obj
       end type spline_handle
 
-      logical :: debug = .true.
+      logical :: debug = .false.
 
       contains
 

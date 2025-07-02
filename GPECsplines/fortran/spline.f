@@ -254,20 +254,6 @@ c-----------------------------------------------------------------------
       CASE DEFAULT
          CALL program_stop("Cannot recognize endmode = "//TRIM(endmode))
       END SELECT
-      print *, "successfully fitted spline."
-      print *, "spline coefficients:"
-      print *, spl%fs1
-      print *, "spl%fs(1,:):"
-      print *, spl%fs(1,:)
-      print *, "spl%fs(0,:):"
-      print *, spl%fs(0,:)
-      print *, "b(1):"
-      print *, b(1)
-      print *, "spl%fs(spl%mx-1,:):"
-      print *, spl%fs(spl%mx-1,:)
-      print *, "b(spl%mx):"
-      print *, b(spl%mx)
-
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -688,8 +674,6 @@ c-----------------------------------------------------------------------
 c     compute interior matrix.
 c-----------------------------------------------------------------------
       b=1/(spl%xs(1:spl%mx)-spl%xs(0:spl%mx-1))
-      print *, "b:"
-      print *, b
       DO j=1,spl%mx-1
          a(-1,j)=b(j)
          a(0,j)=2*(b(j)+b(j+1))
