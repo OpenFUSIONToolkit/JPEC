@@ -18,6 +18,7 @@ OBJS = \
 	defs.o \
 	spline.o \
 	cspline.o \
+	bicube.o \
 	spline_c_api.o
 
 # targets
@@ -36,4 +37,5 @@ clean:
 
 spline.o: defs.o
 cspline.o: defs.o spline.o
-spline_c_api.o: defs.o spline.o cspline.o
+bicube.o: defs.o spline.o
+spline_c_api.o: defs.o spline.o cspline.o bicube.o
