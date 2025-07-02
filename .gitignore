@@ -1,3 +1,5 @@
 *.mod
 *.dylib
 .vscode
+*.o
+*.DS_Store
