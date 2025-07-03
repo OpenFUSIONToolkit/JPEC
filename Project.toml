@@ -1,0 +1,10 @@
+name = "JPEC"
+uuid = "462872dd-e066-4d2e-b993-6468b5239634"
+authors = ["Matthew Pharr <matthewcpharr@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+
+[compat]
+Plots = "1.40.15"
