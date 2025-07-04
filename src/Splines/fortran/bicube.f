@@ -650,18 +650,19 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       SUBROUTINE bicube_eval_external(bcs, x, y, mode,
-     $     b_ix, b_iy, b_f, b_fx, b_fy)
+     $     b_ix, b_iy, b_f, b_fx, b_fy, b_fxx, b_fxy, b_fyy)
 
       TYPE(bicube_type), INTENT(IN) :: bcs
       REAL(r8), INTENT(IN) :: x,y
       INTEGER, INTENT(IN) :: mode
 
       INTEGER :: i,iqty,iside
-      REAL(r8) :: dx,dy,xx,yy,g,gx,gy,xfac,yfac
+      REAL(r8) :: dx,dy,xx,yy,g,gx,gy,gxx,gxy,gyy,xfac,yfac
       REAL(r8), DIMENSION (4,4,bcs%nqty) :: c
 
       INTEGER, INTENT(INOUT) :: b_ix,b_iy
       REAL(r8), DIMENSION(:), INTENT(INOUT) :: b_f,b_fx,b_fy
+      REAL(r8), DIMENSION(:), INTENT(INOUT) :: b_fxx,b_fxy,b_fyy
 c-----------------------------------------------------------------------
 c     error-check for mode number--external array is limited.
 c-----------------------------------------------------------------------
@@ -764,6 +765,28 @@ c-----------------------------------------------------------------------
          ENDDO
       ENDIF
 c-----------------------------------------------------------------------
+c     evaluate second derivatives of f
+c-----------------------------------------------------------------------
+      IF(mode > 1)THEN
+         b_fxx=0
+         b_fyy=0
+         b_fxy=0
+         DO i=4,1,-1
+            b_fyy=b_fyy*dx
+     $           +(c(i,4,:)*3*dy
+     $           +c(i,3,:))*2
+            b_fxx=b_fxx*dy
+     $           +(c(4,i,:)*3*dx
+     $           +c(3,i,:))*2
+         ENDDO
+         DO i=4,2,-1
+            b_fxy=b_fxy*dx
+     $           +((c(i,4,:)*3*dy
+     $           +c(i,3,:)*2)*dy
+     $           +c(i,2,:))*(i-1)
+         ENDDO
+      ENDIF
+c-----------------------------------------------------------------------
 c     restore x powers.
 c-----------------------------------------------------------------------
       DO iside=1,2
@@ -777,10 +800,23 @@ c-----------------------------------------------------------------------
      $              *bcs%xpower(iside,iqty)/dx)*xfac
                gy=b_fy(iqty)*xfac
             ENDIF
+            IF(mode > 1)THEN
+               gxx=(b_fxx(iqty)+bcs%xpower(iside,iqty)/dx
+     $              *(2*bcs%fx(iqty)+(bcs%xpower(iside,iqty)-1)
+     $              *b_f(iqty)/dx))*xfac
+               gxy=(b_fxy(iqty)+bcs%fy(iqty)
+     $              *bcs%xpower(iside,iqty)/dx)*xfac
+               gyy=b_fyy(iqty)*xfac
+            ENDIF
             b_f(iqty)=g
             IF(mode > 0)THEN
                b_fx(iqty)=gx
                b_fy(iqty)=gy
+            ENDIF
+            IF(mode > 1)THEN
+               b_fxx(iqty)=gxx
+               b_fxy(iqty)=gxy
+               b_fyy(iqty)=gyy
             ENDIF
          ENDDO
       ENDDO
@@ -798,10 +834,23 @@ c-----------------------------------------------------------------------
                gy=(b_fy(iqty)+b_f(iqty)
      $              *bcs%ypower(iside,iqty)/dy)*yfac
             ENDIF
+            IF(mode > 1)THEN
+               gxx=b_fxx(iqty)*yfac
+               gxy=(b_fxy(iqty)+b_fy(iqty)
+     $              *bcs%ypower(iside,iqty)/dy)*yfac
+               gyy=(b_fyy(iqty)+bcs%ypower(iside,iqty)/dy
+     $              *(2*bcs%fy(iqty)+(bcs%ypower(iside,iqty)-1)
+     $              *b_f(iqty)/dy))*yfac
+            ENDIF
             b_f(iqty)=g
             IF(mode > 0)THEN
                b_fx(iqty)=gx
                b_fy(iqty)=gy
+            ENDIF
+            IF(mode > 1)THEN
+               b_fxx(iqty)=gxx
+               b_fxy(iqty)=gxy
+               b_fyy(iqty)=gyy
             ENDIF
          ENDDO
       ENDDO

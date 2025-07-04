@@ -75,36 +75,112 @@ function bicube_setup(xs, ys, fs, bctypex::Int=1, bctypey::Int=1)
 	return bicube
 end
 
-function _bicube_eval(bicube::BicubicSplineType, x::Float64, y::Float64)
+function _bicube_eval(bicube::BicubicSplineType, x::Float64, y::Float64, derivs::Int=0)
 	# x -> Float64
 	# y -> Float64
 	# Returns a vector of Float64 (nqty)
 	f = Vector{Float64}(undef, bicube.nqty)
-	ccall((:bicube_c_eval, libspline), Cvoid,
-		(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Int32, Int32),
-		bicube.handle, x, y, f, bicube.ix, bicube.iy)
-	return f
+	fx = Vector{Float64}(undef, bicube.nqty)
+	fy = Vector{Float64}(undef, bicube.nqty)
+	fxx = Vector{Float64}(undef, bicube.nqty)
+	fxy = Vector{Float64}(undef, bicube.nqty)
+	fyy = Vector{Float64}(undef, bicube.nqty)
+	if derivs == 0
+		ccall((:bicube_c_eval, libspline), Cvoid,
+			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Int32, Int32),
+			bicube.handle, x, y, f, bicube.ix, bicube.iy)
+	elseif derivs == 1
+		ccall((:bicube_c_eval_deriv, libspline), Cvoid,
+			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32, Int32),
+			bicube.handle, x, y, f, fx, fy, bicube.ix, bicube.iy)
+	elseif derivs == 2
+		ccall((:bicube_c_eval_deriv2, libspline), Cvoid,
+			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32, Int32),
+			bicube.handle, x, y, f, fx, fy, fxx, fxy, fyy, bicube.ix, bicube.iy)
+	else
+		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
+	end
+	if derivs == 0
+		return f
+	elseif derivs == 1
+		return f, fx, fy
+	elseif derivs == 2
+		return f, fx, fy, fxx, fxy, fyy
+	else
+		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
+	end
 end
 
-function _bicube_eval(bicube::BicubicSplineType, xs::Vector{Float64}, ys::Vector{Float64})
+function _bicube_eval(bicube::BicubicSplineType, xs::Vector{Float64}, ys::Vector{Float64}, derivs::Int=0)
 	# xs -> Float64 (any length)
 	# ys -> Float64 (any length)
 	# Returns a matrix of Float64 (length(xs), length(ys), nqty)
 
 	n = length(xs)
 	m = length(ys)
+	# fs = Array{Float64}(undef, n, m, bicube.nqty)
+	# fsx = Array{Float64}(undef, n, m, bicube.nqty)
+	# fsy = Array{Float64}(undef, n, m, bicube.nqty)
+	# fsxx = Array{Float64}(undef, n, m, bicube.nqty)
+	# fsxy = Array{Float64}(undef, n, m, bicube.nqty)
+	# fsyy = Array{Float64}(undef, n, m, bicube.nqty)
+	# f = Vector{Float64}(undef, bicube.nqty)
+	# fx = Vector{Float64}(undef, bicube.nqty)
+	# fy = Vector{Float64}(undef, bicube.nqty)
+	# fxx = Vector{Float64}(undef, bicube.nqty)
+	# fxy = Vector{Float64}(undef, bicube.nqty)
+	# fyy = Vector{Float64}(undef, bicube.nqty)
 	fs = Array{Float64}(undef, n, m, bicube.nqty)
 	f = Vector{Float64}(undef, bicube.nqty)
+	if derivs > 0
+		fsx = Array{Float64}(undef, n, m, bicube.nqty)
+		fsy = Array{Float64}(undef, n, m, bicube.nqty)
+		fx = Vector{Float64}(undef, bicube.nqty)
+		fy = Vector{Float64}(undef, bicube.nqty)
+	end
+	if derivs > 1
+		fsxx = Array{Float64}(undef, n, m, bicube.nqty)
+		fsxy = Array{Float64}(undef, n, m, bicube.nqty)
+		fsyy = Array{Float64}(undef, n, m, bicube.nqty)
+		fxx = Vector{Float64}(undef, bicube.nqty)
+		fxy = Vector{Float64}(undef, bicube.nqty)
+		fyy = Vector{Float64}(undef, bicube.nqty)
+	end
 	for i in 1:n
 		for j in 1:m
-			f = _bicube_eval(bicube, xs[i], ys[j])
-			fs[i, j, :] = f
+			if derivs == 0
+				f = _bicube_eval(bicube, xs[i], ys[j], 0)
+				fs[i, j, :] = f
+			elseif derivs == 1
+				f, fx, fy = _bicube_eval(bicube, xs[i], ys[j], 1)
+				fs[i, j, :] = f
+				fsx[i, j, :] = fx
+				fsy[i, j, :] = fy
+			elseif derivs == 2
+				f, fx, fy, fxx, fxy, fyy = _bicube_eval(bicube, xs[i], ys[j], 2)
+				fs[i, j, :] = f
+				fsx[i, j, :] = fx
+				fsy[i, j, :] = fy
+				fsxx[i, j, :] = fxx
+				fsxy[i, j, :] = fxy
+				fsyy[i, j, :] = fyy
+			else
+				error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
+			end
 		end
 	end
-	return fs
+	if derivs == 0
+		return fs
+	elseif derivs == 1
+		return fs, fsx, fsy
+	elseif derivs == 2
+		return fs, fsx, fsy, fsxx, fsxy, fsyy
+	else
+		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
+	end
 end
 
-function bicube_eval(bicube::BicubicSplineType, x, y)
+function bicube_eval(bicube::BicubicSplineType, x, y, derivs::Int=0)
 	"""
 	# bicube_eval(bicube, x, y)
 	## Arguments:
@@ -116,7 +192,7 @@ function bicube_eval(bicube::BicubicSplineType, x, y)
 	- If `x` and `y` are vectors of Float64 values, returns a 3D array of Float64 values where each slice corresponds to the function values at
 	the respective (x,y) coordinates in `x` and `y`.
 	"""
-	return _bicube_eval(bicube, x, y)
+	return _bicube_eval(bicube, x, y, derivs)
 end
 
 end # module BicubicSpline

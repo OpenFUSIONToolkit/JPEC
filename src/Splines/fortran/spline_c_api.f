@@ -29,7 +29,6 @@ c     20. bicube_c_fit
 c     21. bicube_c_eval
 c     22. bicube_c_eval_deriv
 c     23. bicube_c_eval_deriv2
-c     24. bicube_c_eval_deriv3
 c-----------------------------------------------------------------------
 c     subprogram 0. spline_c_api_mod
 c     module declarations.
@@ -911,7 +910,7 @@ c-----------------------------------------------------------------------
       integer(i4) :: ix ! index of x position in the spline
       integer(i4) :: iy ! index of y position in the spline
       real(c_double), pointer :: fi(:)
-      real(r8), pointer :: fix(:), fiy(:)
+      real(r8), pointer :: fix(:), fiy(:), fxy(:), fxx(:), fyy(:)
       type(bicube_type), pointer :: bicube
 c-----------------------------------------------------------------------
 c     work.
@@ -925,6 +924,7 @@ c-----------------------------------------------------------------------
 
       call c_f_pointer(f, fi, [bicube%nqty])
       allocate(fix(bicube%nqty), fiy(bicube%nqty))
+      allocate(fxy(bicube%nqty), fxx(bicube%nqty), fyy(bicube%nqty))
       if (present(ix_op)) then
          ix = ix_op
       else
@@ -937,7 +937,8 @@ c-----------------------------------------------------------------------
          iy = 0
       end if
 
-      call bicube_eval_external(bicube, x, y, 0, ix, iy, fi, fix, fiy)
+      call bicube_eval_external(bicube, x, y, 0, ix, iy, fi, fix, fiy,
+     $                                                    fxy, fxx, fyy)
       deallocate(fix, fiy)
 c-----------------------------------------------------------------------
 c     copy results back to the C pointer.
@@ -965,13 +966,14 @@ c-----------------------------------------------------------------------
       integer(i4) :: ix ! index of x position in the spline
       integer(i4) :: iy ! index of y position in the spline
       real(c_double), pointer :: fi(:), f1xi(:), f1yi(:)
+      real(r8), pointer :: fxy(:), fxx(:), fyy(:)
       type(bicube_type), pointer :: bicube
 c-----------------------------------------------------------------------
 c     work.
 c-----------------------------------------------------------------------
       call c_f_pointer(handle%obj, bicube)
       if (.not. associated(bicube)) then
-         print *, "bicube_c_eval: handle is not associated "
+         print *, "bicube_c_eval_deriv: handle is not associated "
      $       // "with a valid bicubic spline object."
          return
       end if
@@ -979,6 +981,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f, fi, [bicube%nqty])
       call c_f_pointer(f1x, f1xi, [bicube%nqty])
       call c_f_pointer(f1y, f1yi, [bicube%nqty])
+      allocate(fxy(bicube%nqty), fxx(bicube%nqty), fyy(bicube%nqty))
 
       if (present(ix_op)) then
          ix = ix_op
@@ -992,7 +995,9 @@ c-----------------------------------------------------------------------
          iy = 0
       end if
 
-      call bicube_eval_external(bicube, x, y, 1, ix, iy, fi, f1xi, f1yi)
+      call bicube_eval_external(bicube, x, y, 1, ix, iy, fi, f1xi, f1yi,
+     $                                                    fxy, fxx, fyy)
+      deallocate(fxy, fxx, fyy)
 c-----------------------------------------------------------------------
 c     copy results back to the C pointer.
 c-----------------------------------------------------------------------
@@ -1005,6 +1010,71 @@ c     terminate.
 c-----------------------------------------------------------------------
       return
       end subroutine bicube_c_eval_deriv
+c-----------------------------------------------------------------------
+c     subprogram 23. bicube_c_eval_deriv2
+c     evaluates the bicube and its derivatives at a given point.
+c-----------------------------------------------------------------------
+      subroutine bicube_c_eval_deriv2(handle, x, y, f, f1x, f1y,
+     $                           f2xx, f2xy, f2yy, ix_op, iy_op) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value :: handle
+      real(c_double), value :: x, y
+      type(c_ptr), value :: f, f1x, f1y, f2xx, f2xy, f2yy
+      integer(c_int), intent(in), optional :: ix_op, iy_op
+
+      integer(i4) :: ix ! index of x position in the spline
+      integer(i4) :: iy ! index of y position in the spline
+      real(c_double), pointer :: fi(:), f1xi(:), f1yi(:)
+      real(c_double), pointer :: f2xxi(:), f2xyi(:), f2yyi(:)
+      type(bicube_type), pointer :: bicube
+c-----------------------------------------------------------------------
+c     work.
+c-----------------------------------------------------------------------
+      call c_f_pointer(handle%obj, bicube)
+      if (.not. associated(bicube)) then
+         print *, "bicube_c_eval_deriv2: handle is not associated "
+     $       // "with a valid bicubic spline object."
+         return
+      end if
+
+      call c_f_pointer(f, fi, [bicube%nqty])
+      call c_f_pointer(f1x, f1xi, [bicube%nqty])
+      call c_f_pointer(f1y, f1yi, [bicube%nqty])
+      call c_f_pointer(f2xx, f2xxi, [bicube%nqty])
+      call c_f_pointer(f2xy, f2xyi, [bicube%nqty])
+      call c_f_pointer(f2yy, f2yyi, [bicube%nqty])
+
+      if (present(ix_op)) then
+         ix = ix_op
+      else
+         ix = 0
+      end if
+
+      if (present(iy_op)) then
+         iy = iy_op
+      else
+         iy = 0
+      end if
+
+      call bicube_eval_external(bicube, x, y, 2, ix, iy, fi, f1xi, f1yi,
+     $                                              f2xxi, f2xyi, f2yyi)
+c-----------------------------------------------------------------------
+c     copy results back to the C pointer.
+c-----------------------------------------------------------------------
+      call c_f_pointer(f, fi, [bicube%nqty])
+      call c_f_pointer(f1x, f1xi, [bicube%nqty])
+      call c_f_pointer(f1y, f1yi, [bicube%nqty])
+      call c_f_pointer(f2xx, f2xxi, [bicube%nqty])
+      call c_f_pointer(f2xy, f2xyi, [bicube%nqty])
+      call c_f_pointer(f2yy, f2yyi, [bicube%nqty])
+
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine bicube_c_eval_deriv2
 
 c-----------------------------------------------------------------------
       end module spline_c_api_mod
