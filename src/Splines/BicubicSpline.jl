@@ -17,14 +17,41 @@ mutable struct BicubicSplineType
 	iy::Int32  # Index of y position in the spline
 	bctypex::Int32  # Boundary condition type for x
 	bctypey::Int32  # Boundary condition type for y
+
+
+	fsx::Array{Float64, 3}
+	fsy::Array{Float64, 3}
+	fsxy::Array{Float64, 3}
+
+
+	#output save
+	f::Vector{Float64}
+    fx::Vector{Float64}
+    fy::Vector{Float64}
+    fxx::Vector{Float64}
+	fxy::Vector{Float64}
+	fyy::Vector{Float64}
 end
 
 function _MakeBicubicSpline(mx::Int64, my::Int64, nqty::Int64)
 	h = Ref{Ptr{Cvoid}}()
 	ccall((:bicube_c_create, libspline), Cvoid,
 		(Int64, Int64, Int64, Ref{Ptr{Cvoid}}), mx, my, nqty, h)
+
+	fsx = Array{Float64, 3}(undef, mx+1, my+1, nqty)
+	fsy = Array{Float64, 3}(undef, mx+1, my+1, nqty)
+	fsxy = Array{Float64, 3}(undef, mx+1, my+1, nqty)
+
+	f = Vector{Float64}(undef, nqty)
+	fx = Vector{Float64}(undef, nqty)
+	fy = Vector{Float64}(undef, nqty)
+	fxx = Vector{Float64}(undef, nqty)
+	fxy = Vector{Float64}(undef, nqty)
+	fyy = Vector{Float64}(undef, nqty)
+
+
 	return BicubicSplineType(h[], Vector{Float64}(undef, mx), Vector{Float64}(undef, my), 
-		Array{Float64,3}(undef, mx, my, nqty), mx, my, nqty, 0, 0, 0, 0)
+		Array{Float64,3}(undef, mx, my, nqty), mx, my, nqty, 0, 0, 0, 0,fsx,fsy, fsxy, f, fx, fy, fxx, fxy, fyy)
 end
 
 
@@ -45,12 +72,15 @@ function _bicube_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
 	bicube.bctypex = Int32(bctypex)
 	bicube.bctypey = Int32(bctypey)
 
+
+
 	ccall((:bicube_c_setup, libspline), Cvoid,
 		(Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
 		bicube.handle, xs, ys, fs)
 
 	ccall((:bicube_c_fit, libspline), Cvoid,
-		(Ptr{Cvoid}, Int32, Int32), bicube.handle, bctypex, bctypey)
+		(Ptr{Cvoid}, Int32, Int32, Ptr{Float64}, Ptr{Float64}, Ptr{Float64})
+		, bicube.handle, bctypex, bctypey, bicube.fsx, bicube.fsy, bicube.fsxy)
 	return bicube
 end
 

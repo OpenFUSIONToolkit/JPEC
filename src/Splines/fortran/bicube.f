@@ -666,9 +666,10 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     error-check for mode number--external array is limited.
 c-----------------------------------------------------------------------
-      IF (mode > 1) THEN
-         CALL program_stop("Set bicube_eval_external mode <=1 !")
-      ENDIF
+c      IF (mode > 1) THEN
+c         CALL program_stop("Set bicube_eval_external mode <=1 !")
+c      ENDIF
+c      ????
 c-----------------------------------------------------------------------
 c     preliminary computations.
 c-----------------------------------------------------------------------
