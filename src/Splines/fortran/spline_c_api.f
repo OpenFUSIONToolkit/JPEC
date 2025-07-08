@@ -926,7 +926,7 @@ c-----------------------------------------------------------------------
 
       call c_f_pointer(f, fi, [bicube%nqty])
       allocate(fix(bicube%nqty), fiy(bicube%nqty))
-      
+      allocate(fxy(bicube%nqty), fxx(bicube%nqty), fyy(bicube%nqty))
       if (ix_op>0) then
          ix = ix_op
       else
