@@ -90,7 +90,6 @@ end
 function _spline_setup(xs::Vector{Float64}, fs::Vector{ComplexF64}, bctype::Int32)
 	# xs -> Float64 (mx)
 	# fs -> ComplexF64 (mx, nqty)
-	print("hi")
 	if length(xs) != length(fs)
 		error("Length of xs must match length of fs")
 	end
@@ -128,7 +127,6 @@ function _spline_setup(xs::Vector{Float64}, fs::Matrix{ComplexF64}, bctype::Int3
 	ccall((:cspline_c_setup, libspline), Cvoid,
 		(Ptr{Cvoid}, Ptr{Float64}, Ptr{ComplexF64}),
 		spline.handle, xs, fs)
-
     ccall((:cspline_c_fit, libspline), Cvoid,
         (Ptr{Cvoid}, Int32), spline.handle, bctype)
 	return spline

@@ -148,16 +148,17 @@ c-----------------------------------------------------------------------
       SUBROUTINE cspline_fit(spl,endmode)
 
       TYPE(cspline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      INTEGER, INTENT(IN) :: endmode
 c-----------------------------------------------------------------------
 c     switch between csplines.
 c-----------------------------------------------------------------------
-      IF (use_classic_splines .AND.
-     $    (endmode.EQ."extrap".OR.endmode.EQ."natural"))THEN
-         CALL cspline_fit_classic(spl,endmode)
-      ELSE
+
+c      IF (use_classic_splines .AND.
+c     $    (endmode == 3 .OR. endmode == 1))THEN
+c         CALL cspline_fit_classic(spl,endmode)
+c      ELSE
          CALL cspline_fit_ahg(spl,endmode)
-      ENDIF
+c      ENDIF
 
 c-----------------------------------------------------------------------
 c     terminate.
@@ -175,7 +176,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       SUBROUTINE cspline_fit_classic(spl,endmode)
       TYPE(cspline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      INTEGER, INTENT(IN) :: endmode
       REAL(r8), DIMENSION(:),ALLOCATABLE :: d,l,u,h
       COMPLEX(r8), DIMENSION(:,:),ALLOCATABLE :: r
       REAL(r8), DIMENSION(0:spl%mx) :: xfac
@@ -225,7 +226,7 @@ c-----------------------------------------------------------------------
       ENDDO
       r(spl%mx,:)=0
 
-      IF (endmode=="extrap") THEN
+      IF (endmode==3) THEN
          CALL cspline_get_yp(spl%xs(0:3),spl%fs(0:3,:),
      $                      spl%xs(0),r(0,:),spl%nqty)
          CALL cspline_get_yp(spl%xs(spl%mx-3:spl%mx),
@@ -276,7 +277,7 @@ c-----------------------------------------------------------------------
       SUBROUTINE cspline_fit_ahg(spl,endmode)
       
       TYPE(cspline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      INTEGER, INTENT(IN) :: endmode
       
       INTEGER :: iqty,iside
       REAL(r8), DIMENSION(-1:1,0:spl%mx) :: a
@@ -312,7 +313,7 @@ c-----------------------------------------------------------------------
 c     extrapolation boundary conditions.
 c-----------------------------------------------------------------------
       SELECT CASE(endmode)
-      CASE("extrap")
+      CASE(3)
          DO iqty=1,spl%nqty
             spl%fs1(0,iqty)=SUM(cl(1:4)*spl%fs(0:3,iqty))
             spl%fs1(spl%mx,iqty)=SUM(cr(1:4)
@@ -327,7 +328,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("not-a-knot")
+      CASE(4)
          spl%fs1(1,:)=spl%fs1(1,:)-(2*spl%fs(1,:)
      $        -spl%fs(0,:)-spl%fs(2,:))*2*b(1)
          spl%fs1(spl%mx-1,:)=spl%fs1(spl%mx-1,:)
@@ -348,7 +349,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("periodic")
+      CASE(2)
          spl%periodic=.TRUE.
          spl%fs1(0,:)=3*((spl%fs(1,:)-spl%fs(0,:))*b(1)
      $        +(spl%fs(0,:)-spl%fs(spl%mx-1,:))*b(spl%mx))
@@ -358,7 +359,7 @@ c-----------------------------------------------------------------------
 c     unrecognized boundary condition.
 c-----------------------------------------------------------------------
       CASE DEFAULT
-         CALL program_stop("Cannot recognize endmode = "//TRIM(endmode))
+         CALL program_stop("Cannot recognize endmode")
       END SELECT
 c-----------------------------------------------------------------------
 c     terminate.
@@ -378,7 +379,7 @@ c-----------------------------------------------------------------------
       REAL(r8), DIMENSION(-1:1,0:spl%mx), INTENT(OUT) :: a
       REAL(r8), DIMENSION(spl%mx), INTENT(OUT) :: b
       REAL(r8), DIMENSION(4), INTENT(OUT) :: cl,cr
-      CHARACTER(*), INTENT(IN) :: endmode
+      INTEGER, INTENT(IN) :: endmode
       
       INTEGER :: j
 c-----------------------------------------------------------------------
@@ -394,7 +395,7 @@ c-----------------------------------------------------------------------
 c     extrapolation boundary conditions.
 c-----------------------------------------------------------------------
       SELECT CASE(endmode)
-      CASE("extrap")
+      CASE(3)
          b=b*b
          cl(1)=(spl%xs(0)*(3*spl%xs(0)
      $        -2*(spl%xs(1)+spl%xs(2)+spl%xs(3)))
@@ -438,7 +439,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("not-a-knot")
+      CASE(4)
          b=b*b
          a(0,1)=a(0,1)+(spl%xs(2)+spl%xs(0)-2*spl%xs(1))*b(1)
          a(1,1)=a(1,1)+(spl%xs(2)-spl%xs(1))*b(1)
@@ -451,7 +452,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("periodic")
+      CASE(2)
          a(0,0:spl%mx:spl%mx)=2*(b(spl%mx)+b(1))
          a(1,0)=b(1)
          a(-1,0)=b(spl%mx)
@@ -461,7 +462,7 @@ c-----------------------------------------------------------------------
 c     unrecognized boundary condition.
 c-----------------------------------------------------------------------
       CASE DEFAULT
-         CALL program_stop("Cannot recognize endmode = "//TRIM(endmode))
+         CALL program_stop("Cannot recognize endmode")
       END SELECT
 c-----------------------------------------------------------------------
 c     terminate.
@@ -1195,7 +1196,8 @@ c-----------------------------------------------------------------------
       n=SIZE(a,2)
       a(0,1)=a(0,1)-a(-1,1)
       a(0,n)=a(0,n)-a(-1,1)
-      u=RESHAPE((/one,(zero,j=2,n-1),one/),SHAPE(u))
+      u=RESHAPE((/(1.0_r8, 0.0_r8),((0.0_r8, 0.0_r8),j=2,n-1)
+     $      ,(1.0_r8, 0.0_r8)/),SHAPE(u))
       CALL cspline_triluf(a)
       CALL cspline_trilus(a,u)
       a(-1,1)=REAL(a(-1,1)/(1+a(-1,1)*(u(1,1)+u(n,1))),r8)

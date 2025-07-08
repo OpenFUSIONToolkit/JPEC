@@ -145,12 +145,12 @@ c-----------------------------------------------------------------------
       SUBROUTINE spline_fit(spl,endmode)
 
       TYPE(spline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      INTEGER, INTENT(IN) :: endmode
 c-----------------------------------------------------------------------
 c     switch between two spline_fit.
 c-----------------------------------------------------------------------
       IF (use_classic_splines .AND.
-     $    (endmode.EQ."extrap".OR.endmode.EQ."natural"))THEN
+     $    (endmode  == 3 .OR. endmode == 1))THEN
          CALL spline_fit_classic(spl,endmode)
       ELSE
          CALL spline_fit_ahg(spl,endmode)
@@ -170,7 +170,7 @@ c-----------------------------------------------------------------------
       SUBROUTINE spline_fit_ahg(spl,endmode)
 
       TYPE(spline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      INTEGER, INTENT(IN) :: endmode
 
       INTEGER :: iqty,iside
       REAL(r8), DIMENSION(-1:1,0:spl%mx) :: a
@@ -206,7 +206,7 @@ c-----------------------------------------------------------------------
 c     extrapolation boundary conditions.
 c-----------------------------------------------------------------------
       SELECT CASE(endmode)
-      CASE("extrap")
+      CASE(3)
          DO iqty=1,spl%nqty
             spl%fs1(0,iqty)=SUM(cl(1:4)*spl%fs(0:3,iqty))
             spl%fs1(spl%mx,iqty)=SUM(cr(1:4)
@@ -221,7 +221,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("not-a-knot")
+      CASE(4)
          spl%fs1(1,:)=spl%fs1(1,:)-(2*spl%fs(1,:)
      $        -spl%fs(0,:)-spl%fs(2,:))*2*b(1)
          spl%fs1(spl%mx-1,:)=spl%fs1(spl%mx-1,:)
@@ -242,7 +242,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boudary conditions.
 c-----------------------------------------------------------------------
-      CASE("periodic")
+      CASE(2)
          spl%periodic=.TRUE.
          spl%fs1(0,:)=3*((spl%fs(1,:)-spl%fs(0,:))*b(1)
      $        +(spl%fs(0,:)-spl%fs(spl%mx-1,:))*b(spl%mx))
@@ -252,7 +252,7 @@ c-----------------------------------------------------------------------
 c     unrecognized boundary condition.
 c-----------------------------------------------------------------------
       CASE DEFAULT
-         CALL program_stop("Cannot recognize endmode = "//TRIM(endmode))
+         CALL program_stop("Cannot recognize endmode")
       END SELECT
 c-----------------------------------------------------------------------
 c     terminate.
@@ -270,7 +270,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       SUBROUTINE spline_fit_classic(spl,endmode)
       TYPE(spline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      INTEGER, INTENT(IN) :: endmode
       REAL(r8), DIMENSION(:),ALLOCATABLE :: d,l,u,h
       REAL(r8), DIMENSION(:,:),ALLOCATABLE :: r
       REAL(r8), DIMENSION(0:spl%mx) :: xfac
@@ -320,7 +320,7 @@ c-----------------------------------------------------------------------
       ENDDO
       r(spl%mx,:)=0
 
-      IF (endmode=="extrap") THEN
+      IF (endmode==3) THEN
          CALL spline_get_yp(spl%xs(0:3),spl%fs(0:3,:),
      $                      spl%xs(0),r(0,:),spl%nqty)
          CALL spline_get_yp(spl%xs(spl%mx-3:spl%mx),
@@ -372,7 +372,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       SUBROUTINE spline_fit_ha(spl,endmode)
       TYPE(spline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      INTEGER, INTENT(IN) :: endmode
 
       INTEGER ::icount,icoef,imx,iqty,istart,jstart,info,iside
       INTEGER :: ndim,nqty,kl,ku,ldab,nvar
@@ -513,7 +513,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("not-a-knot")
+      CASE(4)
          locmat0(1,nvar+1)=6
          locmat0(1,2*nvar+1)=-6
          locmat0(5,nvar+5)=1
@@ -528,7 +528,7 @@ c-----------------------------------------------------------------------
 c     extrap boudary conditions, use first and last four points to
 c     calculate y'(0) and y'(1).
 c-----------------------------------------------------------------------
-      CASE("extrap")
+      CASE(3)
          locmat0(1,nvar+3)=1
          CALL spline_get_yp(spl%xs(0:3),spl%fs(0:3,:),
      $                      spl%xs(0),locrhs0(1,:),nqty)
@@ -548,7 +548,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     natural boudary conditions.
 c-----------------------------------------------------------------------
-      CASE("natural")
+      CASE(1)
          locmat0(1,nvar+2)=2
 
          locmat0(5,nvar+5)=1
@@ -563,7 +563,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boudary conditions.
 c-----------------------------------------------------------------------
-      CASE("periodic")
+      CASE(2)
 c-----------------------------------------------------------------------
 c     s'0(x0)=s'm-1(xm).
 c-----------------------------------------------------------------------
@@ -571,8 +571,8 @@ c-----------------------------------------------------------------------
             IF (ABS(spl%fs(0,iqty)-spl%fs(spl%mx,iqty)) > 1E-15) THEN
                WRITE(*,*)
      $             "Warning: first and last points are different.
-     $              IQTY= ",IQTY,",  averaged value is used."//
-     $              TRIM(endmode)
+     $              IQTY= ",IQTY,",  averaged value is used."
+c                    ,endmode
               spl%fs(0,iqty)=(spl%fs(0,iqty)+spl%fs(spl%mx,iqty))*0.5
               spl%fs(spl%mx,iqty)=spl%fs(0,iqty)
             ENDIF
@@ -600,7 +600,7 @@ c     unrecognized boundary condition.
 c-----------------------------------------------------------------------
       CASE DEFAULT
          CALL program_stop
-     $       ("Cannot recognize endmode = "//TRIM(endmode))
+     $       ("Cannot recognize endmode")
       END SELECT
 c-----------------------------------------------------------------------
 c     fill global matrix at x0
@@ -667,7 +667,7 @@ c-----------------------------------------------------------------------
       REAL(r8), DIMENSION(-1:1,0:spl%mx), INTENT(OUT) :: a
       REAL(r8), DIMENSION(spl%mx), INTENT(OUT) :: b
       REAL(r8), DIMENSION(4), INTENT(OUT) :: cl,cr
-      CHARACTER(*), INTENT(IN) :: endmode
+      INTEGER, INTENT(IN) :: endmode
 
       INTEGER :: j
 c-----------------------------------------------------------------------
@@ -683,7 +683,7 @@ c-----------------------------------------------------------------------
 c     extrapolation boundary conditions.
 c-----------------------------------------------------------------------
       SELECT CASE(endmode)
-      CASE("extrap")
+      CASE(3)
          b=b*b
          cl(1)=(spl%xs(0)*(3*spl%xs(0)
      $        -2*(spl%xs(1)+spl%xs(2)+spl%xs(3)))
@@ -727,7 +727,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("not-a-knot")
+      CASE(4)
          b=b*b
          a(0,1)=a(0,1)+(spl%xs(2)+spl%xs(0)-2*spl%xs(1))*b(1)
          a(1,1)=a(1,1)+(spl%xs(2)-spl%xs(1))*b(1)
@@ -740,7 +740,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("periodic")
+      CASE(2)
          a(0,0:spl%mx:spl%mx)=2*(b(spl%mx)+b(1))
          a(1,0)=b(1)
          a(-1,0)=b(spl%mx)
@@ -750,7 +750,7 @@ c-----------------------------------------------------------------------
 c     unrecognized boundary condition.
 c-----------------------------------------------------------------------
       CASE DEFAULT
-         CALL program_stop("Cannot recognize endmode = "//TRIM(endmode))
+         CALL program_stop("Cannot recognize endmode")
       END SELECT
 c-----------------------------------------------------------------------
 c     terminate.

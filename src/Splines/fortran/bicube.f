@@ -150,7 +150,7 @@ c-----------------------------------------------------------------------
       SUBROUTINE bicube_fit(bcs,endmode1,endmode2)
 
       TYPE(bicube_type), INTENT(INOUT), TARGET :: bcs
-      CHARACTER(*), INTENT(IN) :: endmode1,endmode2
+      INTEGER, INTENT(IN) :: endmode1,endmode2
 
       INTEGER :: iqty,iside,ix,iy
       REAL(r8), DIMENSION(0:bcs%mx) :: xfac
@@ -194,7 +194,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     set periodicity.
 c-----------------------------------------------------------------------
-      bcs%periodic=(/endmode1 == "periodic",endmode2 == "periodic"/)
+      bcs%periodic=(/endmode1 == 2,endmode2 == 2/)
       IF(bcs%periodic(1))bcs%fs(bcs%mx,:,:)=bcs%fs(0,:,:)
       IF(bcs%periodic(2))bcs%fs(:,bcs%my,:)=bcs%fs(:,0,:)
 c-----------------------------------------------------------------------

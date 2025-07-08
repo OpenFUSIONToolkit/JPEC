@@ -178,21 +178,22 @@ c-----------------------------------------------------------------------
             return
       end if
 
-      select case(endmode)
-      case(1)
-         endmode_str = "natural"
-      case(2)
-         endmode_str = "periodic"
-      case(3)
-         endmode_str = "extrap"
-      case(4)
-         endmode_str = "not-a-knot"
-      end select
-      if (debug) then
-         print *, "spline_c_fit: fitting spline with endmode = "
-     $       // TRIM(endmode_str)
-      end if
-      call spline_fit(spl, TRIM(endmode_str))
+c      select case(endmode)
+c      case(1)
+c         endmode_str = "natural"
+c      case(2)
+c         endmode_str = "periodic"
+c      case(3)
+c         endmode_str = "extrap"
+c      case(4)
+c         endmode_str = "not-a-knot"
+c      end select
+      
+c      if (debug) then
+c         print *, "spline_c_fit: fitting spline with endmode = "
+c     $       // TRIM(endmode_str)
+c      end if
+      call spline_fit(spl, endmode)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -209,7 +210,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f
-      integer(c_int), intent(in), optional :: ix_op
+      integer(c_int), intent(in), value :: ix_op
 
       integer(i4) :: ix ! index of x position in the spline
       real(c_double), pointer :: fi(:)
@@ -226,7 +227,7 @@ c-----------------------------------------------------------------------
 
       call c_f_pointer(f, fi, [spl%nqty])
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
@@ -253,7 +254,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1
-      integer(c_int), intent(in), optional :: ix_op
+      integer(c_int), intent(in), value :: ix_op
 
       integer(i4) :: ix ! index of x position in the spline
       real(c_double), pointer :: fi(:), f1i(:)
@@ -271,7 +272,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f, fi, [spl%nqty])
       call c_f_pointer(f1, f1i, [spl%nqty])
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
@@ -302,7 +303,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1, f2
-      integer(c_int), intent(in), optional :: ix_op
+      integer(c_int), intent(in), value :: ix_op
 
       integer(i4) :: ix ! index of x position in the spline
       real(c_double), pointer :: fi(:), f1i(:), f2i(:)
@@ -321,7 +322,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f1, f1i, [spl%nqty])
       call c_f_pointer(f2, f2i, [spl%nqty])
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
@@ -352,7 +353,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1, f2, f3
-      integer(c_int), intent(in), optional :: ix_op
+      integer(c_int), intent(in), value :: ix_op
 
       integer(i4) :: ix ! index of x position in the spline
       real(c_double), pointer :: fi(:), f1i(:), f2i(:), f3i(:)
@@ -372,7 +373,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f2, f2i, [spl%nqty])
       call c_f_pointer(f3, f3i, [spl%nqty])
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
@@ -510,6 +511,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     work.
 c-----------------------------------------------------------------------
+      
       call c_f_pointer(handle%obj, cspl)
       if (.not. associated(cspl)) then
             print *, "cspline_c_fit: handle is not associated "
@@ -517,21 +519,21 @@ c-----------------------------------------------------------------------
             return
       end if
 
-      select case(endmode)
-      case(1)
-         endmode_str = "natural"
-      case(2)
-         endmode_str = "periodic"
-      case(3)
-         endmode_str = "extrap"
-      case(4)
-         endmode_str = "not-a-knot"
-      end select
-      if (debug) then
-         print *, "cspline_c_fit: fitting spline with endmode = "
-     $       // TRIM(endmode_str)
-      end if
-      call cspline_fit(cspl, TRIM(endmode_str))
+c      select case(endmode)
+c      case(1)
+c         endmode_str = "natural"
+c      case(2)
+c         endmode_str = "periodic"
+c      case(3)
+c         endmode_str = "extrap"
+c      case(4)
+c         endmode_str = "not-a-knot"
+c      end select
+c      if (debug) then
+c         print *, "cspline_c_fit: fitting spline with endmode = "
+c     $       // TRIM(endmode_str)
+c      end if
+      call cspline_fit(cspl, endmode)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -548,7 +550,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f
-      integer(c_int), intent(in), optional :: ix_op
+      integer(c_int), intent(in), value :: ix_op
 
       integer(i4) :: ix ! index of x position in the spline
       complex(c_double), pointer :: fi(:)
@@ -565,7 +567,7 @@ c-----------------------------------------------------------------------
 
       call c_f_pointer(f, fi, [cspl%nqty])
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
@@ -592,7 +594,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1
-      integer(c_int), intent(in), optional :: ix_op
+      integer(c_int), intent(in), value :: ix_op
 
       integer(i4) :: ix ! index of x position in the spline
       complex(c_double), pointer :: fi(:), f1i(:)
@@ -610,7 +612,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f, fi, [cspl%nqty])
       call c_f_pointer(f1, f1i, [cspl%nqty])
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
@@ -641,7 +643,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1, f2
-      integer(c_int), intent(in), optional :: ix_op
+      integer(c_int), intent(in), value :: ix_op
 
       integer(i4) :: ix ! index of x position in the spline
       complex(c_double), pointer :: fi(:), f1i(:), f2i(:)
@@ -660,7 +662,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f1, f1i, [cspl%nqty])
       call c_f_pointer(f2, f2i, [cspl%nqty])
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
@@ -691,7 +693,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1, f2, f3
-      integer(c_int), intent(in), optional :: ix_op
+      integer(c_int), intent(in), value :: ix_op
 
       integer(i4) :: ix ! index of x position in the spline
       complex(c_double), pointer :: fi(:), f1i(:), f2i(:), f3i(:)
@@ -711,7 +713,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f2, f2i, [cspl%nqty])
       call c_f_pointer(f3, f3i, [cspl%nqty])
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
@@ -862,33 +864,33 @@ c-----------------------------------------------------------------------
             return
       end if
 
-      select case(endmode1)
-      case(1)
-         endmode1_str = "natural"
-      case(2)
-         endmode1_str = "periodic"
-      case(3)
-         endmode1_str = "extrap"
-      case(4)
-         endmode1_str = "not-a-knot"
-      end select
-      select case(endmode2)
-      case(1)
-         endmode2_str = "natural"
-      case(2)
-         endmode2_str = "periodic"
-      case(3)
-         endmode2_str = "extrap"
-      case(4)
-         endmode2_str = "not-a-knot"
-      end select
+c      select case(endmode1)
+c      case(1)
+c         endmode1_str = "natural"
+c      case(2)
+c         endmode1_str = "periodic"
+c      case(3)
+c         endmode1_str = "extrap"
+c      case(4)
+c         endmode1_str = "not-a-knot"
+c      end select
+c      select case(endmode2)
+c      case(1)
+c         endmode2_str = "natural"
+c      case(2)
+c         endmode2_str = "periodic"
+c      case(3)
+c         endmode2_str = "extrap"
+c      case(4)
+c         endmode2_str = "not-a-knot"
+c      end select
 
-      if (debug) then
-         print *, "bicube_c_fit: fitting spline with endmode1 = "
-     $       // TRIM(endmode1_str) // " and endmode2 = "
-     $       // TRIM(endmode2_str)
-      end if
-      call bicube_fit(bicube, TRIM(endmode1_str), TRIM(endmode2_str))
+c      if (debug) then
+c         print *, "bicube_c_fit: fitting spline with endmode1 = "
+c     $       // TRIM(endmode1_str) // " and endmode2 = "
+c     $       // TRIM(endmode2_str)
+c      end if
+      call bicube_fit(bicube, endmode1, endmode2)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -905,7 +907,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f
-      integer(c_int), intent(in), optional :: ix_op, iy_op
+      integer(c_int), intent(in), value :: ix_op, iy_op
 
       integer(i4) :: ix ! index of x position in the spline
       integer(i4) :: iy ! index of y position in the spline
@@ -924,14 +926,14 @@ c-----------------------------------------------------------------------
 
       call c_f_pointer(f, fi, [bicube%nqty])
       allocate(fix(bicube%nqty), fiy(bicube%nqty))
-      allocate(fxy(bicube%nqty), fxx(bicube%nqty), fyy(bicube%nqty))
-      if (present(ix_op)) then
+      
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
       end if
-
-      if (present(iy_op)) then
+      
+      if (iy_op>0) then
          iy = iy_op
       else
          iy = 0
@@ -940,6 +942,7 @@ c-----------------------------------------------------------------------
       call bicube_eval_external(bicube, x, y, 0, ix, iy, fi, fix, fiy,
      $                                                    fxy, fxx, fyy)
       deallocate(fix, fiy)
+
 c-----------------------------------------------------------------------
 c     copy results back to the C pointer.
 c-----------------------------------------------------------------------
@@ -961,7 +964,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f, f1x, f1y
-      integer(c_int), intent(in), optional :: ix_op, iy_op
+      integer(c_int), intent(in), value :: ix_op, iy_op
 
       integer(i4) :: ix ! index of x position in the spline
       integer(i4) :: iy ! index of y position in the spline
@@ -983,13 +986,13 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f1y, f1yi, [bicube%nqty])
       allocate(fxy(bicube%nqty), fxx(bicube%nqty), fyy(bicube%nqty))
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
       end if
 
-      if (present(iy_op)) then
+      if (iy_op>0) then
          iy = iy_op
       else
          iy = 0
@@ -1022,7 +1025,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f, f1x, f1y, f2xx, f2xy, f2yy
-      integer(c_int), intent(in), optional :: ix_op, iy_op
+      integer(c_int), intent(in), value :: ix_op, iy_op
 
       integer(i4) :: ix ! index of x position in the spline
       integer(i4) :: iy ! index of y position in the spline
@@ -1046,13 +1049,13 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f2xy, f2xyi, [bicube%nqty])
       call c_f_pointer(f2yy, f2yyi, [bicube%nqty])
 
-      if (present(ix_op)) then
+      if (ix_op>0) then
          ix = ix_op
       else
          ix = 0
       end if
 
-      if (present(iy_op)) then
+      if (iy_op>0) then
          iy = iy_op
       else
          iy = 0

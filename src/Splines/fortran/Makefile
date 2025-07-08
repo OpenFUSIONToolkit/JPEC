@@ -4,8 +4,8 @@
 FC = gfortran  # You can override this: `make FC=ifort`
 FFLAGS ?= -fPIC
 LDFLAGS ?= -shared
-LIBS ?= -framework Accelerate
-OUTLIB = libspline.dylib
+LIBS ?= -llapack -lblas
+OUTLIB = libspline.dll
 RECURSFLAG ?= -frecursive
 
 F90 = $(FC) $(FFLAGS) $(RECURSFLAG)
