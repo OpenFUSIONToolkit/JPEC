@@ -31,6 +31,14 @@ c     22. bicube_c_fit
 c     23. bicube_c_eval
 c     24. bicube_c_eval_deriv
 c     25. bicube_c_eval_deriv2
+c     26. fspline_c_create
+c     27. fspline_c_destroy
+c     28. fspline_c_setup
+c     29. fspline_c_fit_1
+c     30. fspline_c_fit_2
+c     31. fspline_c_eval
+c     32. fspline_c_eval_deriv
+c     33. fspline_c_eval_deriv2
 c-----------------------------------------------------------------------
 c     subprogram 0. spline_c_api_mod
 c     module declarations.
@@ -40,6 +48,7 @@ c-----------------------------------------------------------------------
       use spline_mod
       use cspline_mod
       use bicube_mod
+      use fspline_mod
       implicit none
 c-----------------------------------------------------------------------
 c     declarations.
@@ -965,7 +974,6 @@ c-----------------------------------------------------------------------
       fsx_f = bicube%fsx
       fsy_f = bicube%fsy
       fsxy_f = bicube%fsxy
-      print *, "copy success"
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -1135,7 +1143,6 @@ c-----------------------------------------------------------------------
       else
          iy = 0
       end if
-      flush(6)
       call bicube_eval_external(bicube, x, y, 2, ix, iy, fi, f1xi, f1yi,
      $                                              f2xxi, f2xyi, f2yyi)
       
@@ -1154,6 +1161,289 @@ c     terminate.
 c-----------------------------------------------------------------------
       return
       end subroutine bicube_c_eval_deriv2
+
+
+
+c-----------------------------------------------------------------------
+c     Fourier Spline API
+c     This section includes the C API for fspline.f.
+c-----------------------------------------------------------------------
+
+c-----------------------------------------------------------------------
+c     subprogram 26. fspline_c_create
+c     allocates a fourier spline object
+c-----------------------------------------------------------------------
+      subroutine fspline_c_create(mx, my, mband, nqty, handle) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      integer(c_int), value :: mx, my, mband, nqty
+      type(spline_handle), intent(out) :: handle
+      type(fspline_type), pointer :: fst
+
+      allocate(fst)
+      call fspline_alloc(fst, mx, my, mband, nqty)
+      handle%obj = c_loc(fst)
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine fspline_c_create
+
+c-----------------------------------------------------------------------
+c     subprogram 27. fspline_c_destroy
+c     deallocates a fourier spline object
+c-----------------------------------------------------------------------
+      subroutine fspline_c_destroy(handle) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value :: handle
+      type(fspline_type), pointer :: fst
+
+      call c_f_pointer(handle%obj, fst)
+      if (associated(fst)) then
+         call fspline_dealloc(fst)
+         deallocate(fst)
+      else
+         print *, "fspline_c_destroy: handle is not associated "
+     $       // "with a valid fourier spline object."
+      end if
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine fspline_c_destroy
+
+c-----------------------------------------------------------------------
+c     subprogram 28. fspline_c_setup
+c     sets up the fourier spline object with data.
+c-----------------------------------------------------------------------
+      subroutine fspline_c_setup(handle, xs, ys, fs) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value :: handle
+      type(c_ptr), value :: xs, ys, fs
+
+      type(fspline_type), pointer :: fst
+      real(c_double), pointer :: x_c(:), y_c(:)
+      real(c_double), pointer :: f_c(:, :, :)
+      integer :: mx, my, nqty
+c-----------------------------------------------------------------------
+c     work.
+c-----------------------------------------------------------------------
+      call c_f_pointer(handle%obj, fst)
+      if (.not. associated(fst)) then
+         print *, "fspline_c_setup: handle is not associated."
+         return
+      end if
+
+      mx = fst%mx
+      my = fst%my
+      nqty = fst%nqty
+
+      call c_f_pointer(xs, x_c, [mx+1])
+      call c_f_pointer(ys, y_c, [my+1])
+      call c_f_pointer(fs, f_c, [mx+1, my+1, nqty])
+
+      ! NOTE: The data is COPIED from the C pointers to the Fortran
+      ! allocated arrays. This is the safe and correct way to handle memory,
+      ! preventing crashes on deallocation.
+      fst%xs(0:mx) = x_c(1:mx+1)
+      fst%ys(0:my) = y_c(1:my+1)
+      fst%fs(0:mx, 0:my, 1:nqty) = f_c(1:mx+1, 1:my+1, 1:nqty)
+c------------------------------------------------------------------------
+c     terminate.
+c------------------------------------------------------------------------
+      return
+      end subroutine fspline_c_setup
+
+c-----------------------------------------------------------------------
+c     subprogram 29. fspline_c_fit_1
+c     fits the fourier spline using method 1.
+c-----------------------------------------------------------------------
+      subroutine fspline_c_fit_1(handle, endmode, fit_flag_c) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value :: handle
+      integer(c_int), value :: endmode
+      logical(c_bool), value :: fit_flag_c
+
+      type(fspline_type), pointer :: fst
+      logical :: fit_flag
+c-----------------------------------------------------------------------
+c     work.
+c-----------------------------------------------------------------------
+      call c_f_pointer(handle%obj, fst)
+      if (.not. associated(fst)) then
+            print *, "fspline_c_fit_1: handle is not associated."
+            return
+      end if
+      
+      fit_flag = fit_flag_c
+      call fspline_fit_1(fst, endmode, fit_flag)
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine fspline_c_fit_1
+
+c-----------------------------------------------------------------------
+c     subprogram 30. fspline_c_fit_2
+c     fits the fourier spline using method 2 (FFT).
+c-----------------------------------------------------------------------
+      subroutine fspline_c_fit_2(handle, endmode, fit_flag_c) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value :: handle
+      integer(c_int), value :: endmode
+      logical(c_bool), value :: fit_flag_c
+
+      type(fspline_type), pointer :: fst
+      logical :: fit_flag
+c-----------------------------------------------------------------------
+c     work.
+c-----------------------------------------------------------------------
+      call c_f_pointer(handle%obj, fst)
+      if (.not. associated(fst)) then
+            print *, "fspline_c_fit_2: handle is not associated."
+            return
+      end if
+      
+      fit_flag = fit_flag_c
+      call fspline_fit_2(fst, endmode, fit_flag)
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine fspline_c_fit_2
+
+c-----------------------------------------------------------------------
+c     subprogram 31. fspline_c_eval
+c     evaluates the fourier spline at a given point.
+c-----------------------------------------------------------------------
+      subroutine fspline_c_eval(handle, x, y, f_out) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value :: handle
+      real(c_double), value :: x, y
+      type(c_ptr), value :: f_out
+
+      type(fspline_type), pointer :: fst
+      real(c_double), pointer :: f_out_fort(:)
+c-----------------------------------------------------------------------
+c     work.
+c-----------------------------------------------------------------------
+      call c_f_pointer(handle%obj, fst)
+      if (.not. associated(fst)) then
+         print *, "fspline_c_eval: handle is not associated."
+         return
+      end if
+
+      call fspline_eval(fst, x, y, 0)
+      
+      call c_f_pointer(f_out, f_out_fort, [fst%nqty])
+      f_out_fort = fst%f
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine fspline_c_eval
+
+c-----------------------------------------------------------------------
+c     subprogram 32. fspline_c_eval_deriv
+c     evaluates the fourier spline and its first derivatives.
+c-----------------------------------------------------------------------
+      subroutine fspline_c_eval_deriv(handle, x, y
+     $ , f_out, fx_out, fy_out) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value :: handle
+      real(c_double), value :: x, y
+      type(c_ptr), value :: f_out, fx_out, fy_out
+
+      type(fspline_type), pointer :: fst
+      real(c_double), pointer :: f_out_fort(:)
+      real(c_double), pointer :: fx_out_fort(:)
+      real(c_double), pointer :: fy_out_fort(:)
+c-----------------------------------------------------------------------
+c     work.
+c-----------------------------------------------------------------------
+      call c_f_pointer(handle%obj, fst)
+      if (.not. associated(fst)) then
+         print *, "fspline_c_eval_deriv: handle is not associated."
+         return
+      end if
+
+      call fspline_eval(fst, x, y, 1)
+      
+      call c_f_pointer(f_out, f_out_fort, [fst%nqty])
+      call c_f_pointer(fx_out, fx_out_fort, [fst%nqty])
+      call c_f_pointer(fy_out, fy_out_fort, [fst%nqty])
+      
+      f_out_fort = fst%f
+      fx_out_fort = fst%fx
+      fy_out_fort = fst%fy
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine fspline_c_eval_deriv
+
+c-----------------------------------------------------------------------
+c     subprogram 33. fspline_c_eval_deriv2
+c     evaluates the fourier spline and its second derivatives.
+c-----------------------------------------------------------------------
+      subroutine fspline_c_eval_deriv2(handle, x, y, f_out, fx_out,
+     $     fy_out, fxx_out, fxy_out, fyy_out) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value :: handle
+      real(c_double), value :: x, y
+      type(c_ptr), value :: f_out, fx_out, fy_out
+      type(c_ptr), value :: fxx_out, fxy_out, fyy_out
+
+      type(fspline_type), pointer :: fst
+      real(c_double), pointer :: f_out_fort(:), 
+     $ fx_out_fort(:), fy_out_fort(:)
+      
+      real(c_double), pointer :: fxx_out_fort(:),
+     $ fxy_out_fort(:), fyy_out_fort(:)
+c-----------------------------------------------------------------------
+c     work.
+c-----------------------------------------------------------------------
+      call c_f_pointer(handle%obj, fst)
+      if (.not. associated(fst)) then
+         print *, "fspline_c_eval_deriv2: handle is not associated."
+         return
+      end if
+
+      call fspline_eval(fst, x, y, 2)
+      
+      call c_f_pointer(f_out, f_out_fort, [fst%nqty])
+      call c_f_pointer(fx_out, fx_out_fort, [fst%nqty])
+      call c_f_pointer(fy_out, fy_out_fort, [fst%nqty])
+      call c_f_pointer(fxx_out, fxx_out_fort, [fst%nqty])
+      call c_f_pointer(fxy_out, fxy_out_fort, [fst%nqty])
+      call c_f_pointer(fyy_out, fyy_out_fort, [fst%nqty])
+      
+      f_out_fort = fst%f
+      fx_out_fort = fst%fx
+      fy_out_fort = fst%fy
+      fxx_out_fort = fst%fxx
+      fxy_out_fort = fst%fxy
+      fyy_out_fort = fst%fyy
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine fspline_c_eval_deriv2
 
 c-----------------------------------------------------------------------
       end module spline_c_api_mod

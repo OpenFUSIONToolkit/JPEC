@@ -2,7 +2,7 @@
 
 # === CONFIGURABLE ===
 FC = gfortran  # You can override this: `make FC=ifort`
-FFLAGS ?= -fPIC
+FFLAGS ?= -fPIC -g -O0 -fcheck=all -fbacktrace
 LDFLAGS ?= -shared
 LIBS ?= -llapack -lblas
 OUTLIB = libspline.dll
@@ -19,6 +19,8 @@ OBJS = \
 	spline.o \
 	cspline.o \
 	bicube.o \
+	fft.o \
+	fspline.o \
 	spline_c_api.o
 
 # targets
@@ -37,4 +39,6 @@ clean:
 spline.o: defs.o
 cspline.o: defs.o spline.o
 bicube.o: defs.o spline.o
+fft.o: defs.o
+fspline.o: defs.o spline.o cspline.o fft.o
 spline_c_api.o: defs.o spline.o cspline.o bicube.o

@@ -152,7 +152,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     switch between csplines.
 c-----------------------------------------------------------------------
-
+c      - use_classic_splines is always False
 c      IF (use_classic_splines .AND.
 c     $    (endmode == 3 .OR. endmode == 1))THEN
 c         CALL cspline_fit_classic(spl,endmode)

@@ -28,6 +28,8 @@ c-----------------------------------------------------------------------
       real(r8), parameter :: six = 6.0_r8
       integer, parameter :: bin_unit = 10
       integer, parameter :: out_unit = 11
+      
+      COMPLEX(r8), PARAMETER :: ifac=(0,1)
 
       contains
 c-----------------------------------------------------------------------

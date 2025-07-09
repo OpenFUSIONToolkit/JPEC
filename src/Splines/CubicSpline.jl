@@ -45,6 +45,23 @@ mutable struct ComplexSplineType <: CubicSplineType
     f3::Vector{ComplexF64}
 end
 
+
+
+function _destroy_spline(spline::CubicSplineType)
+    if spline.handle != C_NULL
+        ccall((:spline_c_destroy, libspline), Cvoid, (Ptr{Cvoid},), spline.handle)
+        spline.handle = C_NULL 
+    end
+end
+
+function _destroy_spline(spline::ComplexSplineType)
+    if spline.handle != C_NULL
+        ccall((:cspline_c_destroy, libspline), Cvoid, (Ptr{Cvoid},), spline.handle)
+        spline.handle = C_NULL
+    end
+end
+
+
 function _MakeSpline(mx::Int64, nqty::Int64)
 	h = Ref{Ptr{Cvoid}}()
 	ccall((:spline_c_create, libspline), Cvoid,
@@ -58,9 +75,8 @@ function _MakeSpline(mx::Int64, nqty::Int64)
 	f1 = Vector{Float64}(undef, nqty)
 	f2 = Vector{Float64}(undef, nqty)
 	f3 = Vector{Float64}(undef, nqty)
-	return RealSplineType(h[], Vector{Float64}(undef, mx), Matrix{Float64}(undef, mx, nqty), mx, nqty, 0, 0,
-	fsi, fs1,
-	 f, f1, f2, f3)
+	return RealSplineType(h[], Vector{Float64}(undef, 0), Matrix{Float64}(undef, 0, 0)
+	, mx, nqty, 0, 0, fsi, fs1, f, f1, f2, f3)
 end
 
 function _MakeCSpline(mx::Int64, nqty::Int64)
@@ -75,10 +91,13 @@ function _MakeCSpline(mx::Int64, nqty::Int64)
 	f1 = Vector{ComplexF64}(undef, nqty)
 	f2 = Vector{ComplexF64}(undef, nqty)
 	f3 = Vector{ComplexF64}(undef, nqty)
-	return ComplexSplineType(h[], Vector{Float64}(undef, mx), Matrix{ComplexF64}(undef, mx, nqty), mx, nqty,  0, 0,
-	fsi, fs1,
-	 f, f1, f2, f3)
+	return ComplexSplineType(h[], Vector{Float64}(undef, 0), Matrix{ComplexF64}(undef, 0, 0),
+	 mx, nqty,  0, 0, fsi, fs1, f, f1, f2, f3)
 end
+
+
+
+
 
 function _spline_setup(xs::Vector{Float64}, fs::Vector{Float64}, bctype::Int32)
 	# xs -> Float64 (mx)
@@ -96,14 +115,14 @@ function _spline_setup(xs::Vector{Float64}, fs::Vector{Float64}, bctype::Int32)
     spline.bctype = Int32(bctype)
 	spline.fs1 = Matrix{Float64}(undef, mx+1, nqty)
 
-	print("spline_setup")
 	ccall((:spline_c_setup, libspline), Cvoid,
 		(Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}),
 		spline.handle, xs, fs_matrix)
-	print("setup_fin")
-    ccall((:spline_c_fit, libspline), Cvoid, 
+
+	ccall((:spline_c_fit, libspline), Cvoid, 
         (Ptr{Cvoid}, Int32, Ptr{Float64}), spline.handle, bctype, spline.fs1)
-	print("fit_fin")
+
+
 	return spline
 end
 
@@ -199,8 +218,15 @@ function spline_setup(xs, fs, bctype::Int=1)
 	if !isa(fs, Vector{Float64}) && !isa(fs, Matrix{Float64}) && !isa(fs, Vector{ComplexF64}) && !isa(fs, Matrix{ComplexF64})
 		error("fs must be a vector or matrix of Float64 or ComplexF64")
 	end
+
+	if  isa(fs, Matrix{ComplexF64}) && bctype == 1
+		error("Complex spline doesn't have natural spline. (bctype = 1)")
+	end
     spline = _spline_setup(xs, fs, Int32(bctype))
-    return spline
+	
+	finalizer(_destroy_spline, spline)
+    
+	return spline
 end
 
 
@@ -453,18 +479,6 @@ end
 
 
 
-function spline_eval!(spline::CubicSplineType, x, derivs::Int=0)
-	"""
-	# spline_eval(spline, x)
-	## Arguments:
-	- `spline`: A `Spline` object created by `spline_setup`.
-	- `x`: A Float64 value. it cannot get vector value.
-	## Returns:
-	  the respective x-coordinate in `x` will be saved in spline.f, f1, ..f3
-	"""
-	_spline_eval!(spline, x, derivs)
-end
-
 
 
 function spline_eval(spline::CubicSplineType, x, derivs::Int=0)
@@ -482,6 +496,18 @@ function spline_eval(spline::CubicSplineType, x, derivs::Int=0)
 	return _spline_eval(spline, x, derivs)
 end
 
+
+function spline_eval!(spline::CubicSplineType, x, derivs::Int=0)
+	"""
+	# spline_eval(spline, x)
+	## Arguments:
+	- `spline`: A `Spline` object created by `spline_setup`.
+	- `x`: A Float64 value. it cannot get vector value.
+	## Returns:
+	  the respective x-coordinate in `x` will be saved in spline.f, f1, ..f3
+	"""
+	_spline_eval!(spline, x, derivs)
+end
 
 
 
