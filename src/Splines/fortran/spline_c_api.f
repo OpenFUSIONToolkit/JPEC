@@ -1177,7 +1177,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(ys, y_c, [my+1])
       call c_f_pointer(fs, f_c, [mx+1, my+1, nqty])
 
-      ! NOTE: The data is COPIED from the C pointers to the Fortran
+      ! notE: The data is COPIED from the C pointers to the Fortran
       ! allocated arrays. This is the safe and correct way to handle memory,
       ! preventing crashes on deallocation.
       fst%xs(0:mx) = x_c(1:mx+1)

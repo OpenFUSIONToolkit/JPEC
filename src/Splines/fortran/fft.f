@@ -15,11 +15,11 @@ c-----------------------------------------------------------------------
 c     subprogram 0. fft_mod.
 c     module declarations.
 c-----------------------------------------------------------------------
-      MODULE fft_mod
-      USE defs_mod
-      IMPLICIT NONE
+      module fft_mod
+      use defs_mod
+      implicit none
 
-      CONTAINS
+      contains
 c-----------------------------------------------------------------------
 c     subprogram 1. fft_run.
 c     performs fast fourier transform.
@@ -29,69 +29,69 @@ c     declarations.
 c-----------------------------------------------------------------------
       FUNCTION fft_run(f,sign) RESULT(g)
 
-      COMPLEX(r8), DIMENSION(:,:), INTENT(IN) :: f
-      COMPLEX(r8), DIMENSION(SIZE(f,1),SIZE(f,2)) :: g
-      INTEGER, INTENT(IN) :: sign
+      complex(r8), dimension(:,:), intent(in) :: f
+      complex(r8), dimension(SIZE(f,1),SIZE(f,2)) :: g
+      integer, intent(in) :: sign
 
-      INTEGER :: i,istep,j,m,mmax,n
-      COMPLEX(r8) :: w,wp
-      COMPLEX(r8), DIMENSION(SIZE(f,2)) :: temp
+      integer :: i,istep,j,m,mmax,n
+      complex(r8) :: w,wp
+      complex(r8), dimension(SIZE(f,2)) :: temp
 c-----------------------------------------------------------------------
 c     preliminary computations.
 c-----------------------------------------------------------------------
       n=SIZE(f,1)
-      SELECT CASE(sign)
-      CASE(-1)
+      select case(sign)
+      case(-1)
          g=f/n
-      CASE(1)
+      case(1)
          g=f
-      CASE DEFAULT
-         WRITE(*,'(a,i2,a)')"sign = ",sign," is illegal, must be +/- 1"
-         STOP
-      END SELECT
+      case default
+         write(*,'(a,i2,a)')"sign = ",sign," is illegal, must be +/- 1"
+         stop
+      end select
 c-----------------------------------------------------------------------
 c     bit reversal.
 c-----------------------------------------------------------------------
       j=1
-      DO i=1,n
-         IF(j > i)THEN
+      do i=1,n
+         if(j > i)then
             temp(:)=g(j,:)
             g(j,:)=g(i,:)
             g(i,:)=temp
-         ENDIF
+         endif
          m=n/2
-         DO
-            IF(m < 1 .OR. j <= m)EXIT
+         do
+            if(m < 1 .OR. j <= m)EXIT
             j=j-m
             m=m/2
-         ENDDO
+         enddo
          j=j+m
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     Danielson-Lanczos loop.
 c-----------------------------------------------------------------------
       mmax=1
-      DO
-         IF(n <= mmax)EXIT
+      do
+         if(n <= mmax)EXIT
          istep=2*mmax
          wp=EXP(pi*ifac/(sign*mmax))
          w=1
-         DO m=1,mmax
-            DO i=m,n,istep
+         do m=1,mmax
+            do i=m,n,istep
                j=i+mmax
                temp=w*g(j,:)
                g(j,:)=g(i,:)-temp
                g(i,:)=g(i,:)+temp
-            ENDDO
+            enddo
             w=w*wp
-         ENDDO
+         enddo
          mmax=istep
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END FUNCTION fft_run
+      return
+      end FUNCTION fft_run
 c-----------------------------------------------------------------------
 c     subprogram 2. fft_write.
 c     ascii and binary output of fast fourier transform.
@@ -99,27 +99,27 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE fft_write(t,f,g,h,out,bin,out_unit,bin_unit)
+      subroutine fft_write(t,f,g,h,out,bin,out_unit,bin_unit)
 
-      REAL(r8), DIMENSION(:), INTENT(IN) :: t
-      COMPLEX(r8), DIMENSION(:,:), INTENT(IN) :: f,g,h
-      LOGICAL :: out,bin
-      INTEGER :: out_unit,bin_unit
+      real(r8), dimension(:), intent(in) :: t
+      complex(r8), dimension(:,:), intent(in) :: f,g,h
+      logical :: out,bin
+      integer :: out_unit,bin_unit
 
-      INTEGER :: i,k,n
-      REAL(r8) :: dt,tperiod,dfreq,freqmax
+      integer :: i,k,n
+      real(r8) :: dt,tperiod,dfreq,freqmax
 
-      INTEGER, DIMENSION(SIZE(t)) :: m
-      REAL(r8), DIMENSION(SIZE(t)) :: freq
-      COMPLEX(r8), DIMENSION(SIZE(g,1),SIZE(g,2)) :: gg
+      integer, dimension(SIZE(t)) :: m
+      real(r8), dimension(SIZE(t)) :: freq
+      complex(r8), dimension(SIZE(g,1),SIZE(g,2)) :: gg
 c-----------------------------------------------------------------------
 c     format statements.
 c-----------------------------------------------------------------------
- 10   FORMAT(/6x,"n",7x,"dt",6x,"tperiod",5x,"dfreq",5x,"freqmax"
+ 10   format(/6x,"n",7x,"dt",6x,"tperiod",5x,"dfreq",5x,"freqmax"
      $     //i8,1p,4e11.3/)
- 20   FORMAT(/7x,"i",6x,"m",7x,"t",9x,"freq",7x,"re f",7x,"im f",7x,
+ 20   format(/7x,"i",6x,"m",7x,"t",9x,"freq",7x,"re f",7x,"im f",7x,
      $     "re g",7x,"im g",7x,"re h",7x,"im h"/)
- 30   FORMAT(2i8,1p,8e11.3)
+ 30   format(2i8,1p,8e11.3)
 c-----------------------------------------------------------------------
 c     compute scalars.
 c-----------------------------------------------------------------------
@@ -139,27 +139,27 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     diagnose fft.
 c-----------------------------------------------------------------------
-      WRITE(out_unit,10)n,dt,tperiod,dfreq,freqmax
-      DO k=1,SIZE(f,2)
-         IF(out)THEN
-            WRITE(out_unit,'(/a,i3)')"k = ",k
-            WRITE(out_unit,20)
-         ENDIF
-         DO i=1,n
-            IF(out)WRITE(out_unit,30)i-1,m(i),t(i),freq(i),
+      write(out_unit,10)n,dt,tperiod,dfreq,freqmax
+      do k=1,SIZE(f,2)
+         if(out)then
+            write(out_unit,'(/a,i3)')"k = ",k
+            write(out_unit,20)
+         endif
+         do i=1,n
+            if(out)write(out_unit,30)i-1,m(i),t(i),freq(i),
      $           f(i,k),gg(i,k),h(i,k)
-            IF(bin)WRITE(bin_unit)
-     $           REAL(i-1,4),REAL(m(i),4),REAL(t(i),4),REAL(freq(i),4),
-     $           REAL(REAL(f(i,k)),4),REAL(AIMAG(f(i,k)),4),
-     $           REAL(REAL(gg(i,k)),4),REAL(AIMAG(gg(i,k)),4),
-     $           REAL(REAL(h(i,k)),4),REAL(AIMAG(h(i,k)),4)
-         ENDDO
-         IF(out)WRITE(out_unit,20)
-         IF(bin)WRITE(bin_unit)
-      ENDDO
+            if(bin)write(bin_unit)
+     $           real(i-1,4),real(m(i),4),real(t(i),4),real(freq(i),4),
+     $           real(real(f(i,k)),4),real(AIMAG(f(i,k)),4),
+     $           real(real(gg(i,k)),4),real(AIMAG(gg(i,k)),4),
+     $           real(real(h(i,k)),4),real(AIMAG(h(i,k)),4)
+         enddo
+         if(out)write(out_unit,20)
+         if(bin)write(bin_unit)
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE fft_write
-      END MODULE fft_mod
+      return
+      end subroutine fft_write
+      end module fft_mod
