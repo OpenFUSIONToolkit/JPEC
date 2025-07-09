@@ -19,11 +19,6 @@ mutable struct RealSplineType <: CubicSplineType
 	fsi::Matrix{Float64} # To store integrals at gridpoint
 	fs1::Matrix{Float64} # To store 1-deriv at gridpoint
 
-	#output save (for internal eval)
-	f::Vector{Float64}
-    f1::Vector{Float64}
-    f2::Vector{Float64}
-    f3::Vector{Float64}
 end
 
 mutable struct ComplexSplineType <: CubicSplineType
@@ -38,11 +33,6 @@ mutable struct ComplexSplineType <: CubicSplineType
 	fsi::Matrix{ComplexF64} # To store integrals at gridpoint
 	fs1::Matrix{ComplexF64} # To store 1-deriv at gridpoint
 
-	#output save (for internal eval)
-	f::Vector{ComplexF64}
-    f1::Vector{ComplexF64}
-    f2::Vector{ComplexF64}
-    f3::Vector{ComplexF64}
 end
 
 
@@ -76,7 +66,7 @@ function _MakeSpline(mx::Int64, nqty::Int64)
 	f2 = Vector{Float64}(undef, nqty)
 	f3 = Vector{Float64}(undef, nqty)
 	return RealSplineType(h[], Vector{Float64}(undef, 0), Matrix{Float64}(undef, 0, 0)
-	, mx, nqty, 0, 0, fsi, fs1, f, f1, f2, f3)
+	, mx, nqty, 0, 0, fsi, fs1)
 end
 
 function _MakeCSpline(mx::Int64, nqty::Int64)
@@ -92,7 +82,7 @@ function _MakeCSpline(mx::Int64, nqty::Int64)
 	f2 = Vector{ComplexF64}(undef, nqty)
 	f3 = Vector{ComplexF64}(undef, nqty)
 	return ComplexSplineType(h[], Vector{Float64}(undef, 0), Matrix{ComplexF64}(undef, 0, 0),
-	 mx, nqty,  0, 0, fsi, fs1, f, f1, f2, f3)
+	 mx, nqty,  0, 0, fsi, fs1)
 end
 
 
@@ -325,34 +315,6 @@ function _spline_eval(spline::RealSplineType, xs::Vector{Float64}, derivs::Int=0
 end
 
 
-#internal version
-
-function _spline_eval!(spline::RealSplineType, x::Float64, derivs::Int=0)
-	# x -> Float64
-	# Returns a vector of Float64 (nqty)
-	if derivs == 0
-		
-		ccall((:spline_c_eval, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{Float64}, Int32),
-			spline.handle, x, spline.f, spline.ix)
-
-	elseif derivs == 1
-		ccall((:spline_c_eval_deriv, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{Float64}, Ptr{Float64}, Int32),
-			spline.handle, x, spline.f, spline.f1, spline.ix)
-	elseif derivs == 2
-		ccall((:spline_c_eval_deriv2, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32),
-			spline.handle, x, spline.f, spline.f1, spline.f2, spline.ix)
-	elseif derivs == 3
-		ccall((:spline_c_eval_deriv3, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32),
-			spline.handle, x, spline.f, spline.f1, spline.f2, spline.f3, spline.ix)
-	else
-		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3.")
-	end
-end
-
 function _spline_eval(spline::ComplexSplineType, x::Float64, derivs::Int=0)
 	# x -> Float64
 	# Returns a vector of ComplexF64 (nqty)
@@ -453,31 +415,6 @@ end
 
 #internal version
 
-function _spline_eval!(spline::ComplexSplineType, x::Float64, derivs::Int=0)
-	# x -> Float64
-	if derivs == 0
-		ccall((:cspline_c_eval, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Int32),
-			spline.handle, x, spline.f, spline.ix)
-	elseif derivs == 1
-		ccall((:cspline_c_eval_deriv, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Ptr{ComplexF64}, Int32),
-			spline.handle, x, spline.f, spline.f1, spline.ix)
-
-	elseif derivs == 2
-		ccall((:cspline_c_eval_deriv2, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Ptr{ComplexF64}, Ptr{ComplexF64}, Int32),
-			spline.handle, x, spline.f, spline.f1, spline.f2, spline.ix)
-	elseif derivs == 3
-		ccall((:cspline_c_eval_deriv3, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Ptr{ComplexF64}, Ptr{ComplexF64}, Ptr{ComplexF64}, Int32),
-			spline.handle, x, spline.f, spline.f1, spline.f2, spline.f3, spline.ix)
-	else
-		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3.")
-	end
-end
-
-
 
 
 
@@ -494,19 +431,6 @@ function spline_eval(spline::CubicSplineType, x, derivs::Int=0)
 	- Depending on the derivatives requested, it may return additional vectors for the first, second, or third derivatives.
 	"""
 	return _spline_eval(spline, x, derivs)
-end
-
-
-function spline_eval!(spline::CubicSplineType, x, derivs::Int=0)
-	"""
-	# spline_eval(spline, x)
-	## Arguments:
-	- `spline`: A `Spline` object created by `spline_setup`.
-	- `x`: A Float64 value. it cannot get vector value.
-	## Returns:
-	  the respective x-coordinate in `x` will be saved in spline.f, f1, ..f3
-	"""
-	_spline_eval!(spline, x, derivs)
 end
 
 

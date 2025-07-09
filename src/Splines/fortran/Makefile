@@ -2,10 +2,10 @@
 
 # === CONFIGURABLE ===
 FC = gfortran  # You can override this: `make FC=ifort`
-FFLAGS ?= -fPIC -g -O0 -fcheck=all -fbacktrace
+FFLAGS ?= -fPIC
 LDFLAGS ?= -shared
-LIBS ?= -llapack -lblas
-OUTLIB = libspline.dll
+LIBS ?= -framework Accelerate
+OUTLIB = libspline.dylib
 RECURSFLAG ?= -frecursive
 
 F90 = $(FC) $(FFLAGS) $(RECURSFLAG)

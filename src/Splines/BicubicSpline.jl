@@ -24,13 +24,7 @@ mutable struct BicubicSplineType
 	fsxy::Array{Float64, 3}
 
 
-	#output save
-	f::Vector{Float64}
-    fx::Vector{Float64}
-    fy::Vector{Float64}
-    fxx::Vector{Float64}
-	fxy::Vector{Float64}
-	fyy::Vector{Float64}
+
 end
 
 function _destroy_bicubic_spline(bicube::BicubicSplineType)
@@ -49,17 +43,12 @@ function _MakeBicubicSpline(mx::Int64, my::Int64, nqty::Int64)
 	fsy = Array{Float64, 3}(undef, 0,0,0)
 	fsxy = Array{Float64, 3}(undef, 0,0,0)
 
-	f = Vector{Float64}(undef, nqty)
-	fx = Vector{Float64}(undef, nqty)
-	fy = Vector{Float64}(undef, nqty)
-	fxx = Vector{Float64}(undef, nqty)
-	fxy = Vector{Float64}(undef, nqty)
-	fyy = Vector{Float64}(undef, nqty)
+
 
 
 	return BicubicSplineType(h[], Vector{Float64}(undef, 0), Vector{Float64}(undef, 0), 
 		Array{Float64,3}(undef, 0, 0, 0), mx, my, nqty, 0, 0, 0, 0
-		,fsx,fsy, fsxy, f, fx, fy, fxx, fxy, fyy)
+		,fsx,fsy, fsxy)
 end
 
 
@@ -233,27 +222,6 @@ end
 
 
 
-function _bicube_eval!(bicube::BicubicSplineType, x::Float64, y::Float64, derivs::Int=0)
-	# x -> Float64
-	# y -> Float64
-    # Modifies bicube.f, .fx, .fy, etc. in place.
-	if derivs == 0
-		ccall((:bicube_c_eval, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Int32, Int32),
-			bicube.handle, x, y, bicube.f, bicube.ix, bicube.iy)
-	elseif derivs == 1
-		ccall((:bicube_c_eval_deriv, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32, Int32),
-			bicube.handle, x, y, bicube.f, bicube.fx, bicube.fy, bicube.ix, bicube.iy)
-	elseif derivs == 2
-		ccall((:bicube_c_eval_deriv2, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32, Int32),
-			bicube.handle, x, y, bicube.f, bicube.fx, bicube.fy, bicube.fxx, bicube.fxy, bicube.fyy, bicube.ix, bicube.iy)
-	else
-		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
-	end
-    return
-end
 
 function bicube_eval(bicube::BicubicSplineType, x, y, derivs::Int=0)
 	"""
@@ -271,21 +239,5 @@ function bicube_eval(bicube::BicubicSplineType, x, y, derivs::Int=0)
 end
 
 
-function bicube_eval!(bicube::BicubicSplineType, x::Float64, y::Float64, derivs::Int=0)
-    """
-    # bicube_eval!(bicube, x, y; derivs=0)
-
-    Evaluates the bicubic spline at a point (x, y) and stores the result
-    in-place in the `bicube` object's fields (`.f`, `.fx`, etc.).
-    This method avoids memory allocation and is suitable for performance-critical code.
-
-    ## Arguments:
-    - `bicube`: A `BicubicSpline` object from `bicube_setup`.
-    - `x`: A `Float64` x-coordinate.
-    - `y`: A `Float64` y-coordinate.
-    - `derivs`: Number of derivatives to compute (0, 1, or 2).
-    """
-    _bicube_eval!(bicube, x, y, derivs)
-end
 
 end # module BicubicSpline

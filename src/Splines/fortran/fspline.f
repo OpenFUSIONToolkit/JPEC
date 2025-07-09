@@ -437,6 +437,116 @@ c-----------------------------------------------------------------------
       RETURN
       END SUBROUTINE fspline_eval
 c-----------------------------------------------------------------------
+c     subprogram 5a. fspline_eval_external.
+c     evaluates fspline function (parallel), preserving original logic.
+c-----------------------------------------------------------------------
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      SUBROUTINE fspline_eval_external(fst, x, y, mode, s_ix, f_f,
+     $                       f_fx, f_fy, f_fxx, f_fxy, f_fyy)
+
+      TYPE(fspline_type), INTENT(IN) :: fst
+      REAL(r8), INTENT(IN) :: x, y
+      INTEGER, INTENT(IN) :: mode
+      INTEGER, INTENT(INOUT) :: s_ix
+
+      INTEGER :: m
+      COMPLEX(r8) :: expfac, expfac0
+      COMPLEX(r8), DIMENSION(fst%nqty) :: term, termx, termxx
+      COMPLEX(r8), DIMENSION(0:fst%mband, fst%nqty) :: c, cx, cxx
+
+      ! Local arrays
+      COMPLEX(r8), DIMENSION(fst%cs%nqty) :: cs_f, cs_f1, cs_f2
+
+      ! Output arrays
+      REAL(r8), DIMENSION(fst%nqty), INTENT(OUT) :: f_f
+      REAL(r8), DIMENSION(fst%nqty), INTENT(OUT), OPTIONAL :: f_fx,
+     $  f_fy
+      REAL(r8), DIMENSION(fst%nqty), INTENT(OUT), OPTIONAL :: f_fxx,
+     $  f_fxy, f_fyy
+
+c-----------------------------------------------------------------------
+c     zero out output arrays
+c-----------------------------------------------------------------------
+      f_f = 0.0_r8
+      IF (PRESENT(f_fx)) f_fx = 0.0_r8
+      IF (PRESENT(f_fy)) f_fy = 0.0_r8
+      IF (PRESENT(f_fxx)) f_fxx = 0.0_r8
+      IF (PRESENT(f_fxy)) f_fxy = 0.0_r8
+      IF (PRESENT(f_fyy)) f_fyy = 0.0_r8
+
+c-----------------------------------------------------------------------
+c     evaluate cubic splines
+c-----------------------------------------------------------------------
+      SELECT CASE(mode)
+      CASE (0)
+          CALL cspline_eval_external(fst%cs, x, s_ix,
+     $      cs_f)
+      CASE (1)
+          CALL cspline_eval_external(fst%cs, x, s_ix,
+     $      cs_f, cs_f1)
+      CASE (2)
+          CALL cspline_eval_external(fst%cs, x, s_ix, cs_f,
+     $      cs_f1, cs_f2)
+      END SELECT
+
+c-----------------------------------------------------------------------
+c     evaluate m = 0 terms for functions.
+c-----------------------------------------------------------------------
+      c = RESHAPE(cs_f, (/fst%mband + 1, fst%nqty/))
+      f_f = REAL(c(0, :))
+
+c-----------------------------------------------------------------------
+c     evaluate m = 0 terms for first derivatives.
+c-----------------------------------------------------------------------
+      IF (mode > 0) THEN
+         cx = RESHAPE(cs_f1, (/fst%mband + 1, fst%nqty/))
+         f_fx = REAL(cx(0, :))
+         f_fy = 0.0_r8
+      ENDIF
+
+c-----------------------------------------------------------------------
+c     evaluate m = 0 terms for second derivatives.
+c-----------------------------------------------------------------------
+      IF (mode > 1) THEN
+         cxx = RESHAPE(cs_f2, (/fst%mband + 1, fst%nqty/))
+         f_fxx = REAL(cxx(0, :))
+         f_fyy = 0.0_r8
+         f_fxy = 0.0_r8
+      ENDIF
+c-----------------------------------------------------------------------
+c     evaluate m > 1 for functions
+c-----------------------------------------------------------------------
+      expfac0 = EXP(ifac * y)
+      expfac = 2.0_r8 
+      DO m = 1, fst%mband
+         expfac = expfac * expfac0
+         term = c(m, :) * expfac
+
+         f_f = f_f + REAL(term)
+         IF (mode < 1) CYCLE
+c-----------------------------------------------------------------------
+c     evaluate m > 1 for first derivatives.
+c-----------------------------------------------------------------------
+         termx = cx(m, :) * expfac
+         f_fx = f_fx + REAL(termx)
+         f_fy = f_fy + REAL(term * ifac * m)
+         IF (mode < 2) CYCLE
+c-----------------------------------------------------------------------
+c     evaluate m > 1 for second derivatives.
+c-----------------------------------------------------------------------
+         termxx = cxx(m, :) * expfac
+         f_fxx = f_fxx + REAL(termxx)
+         f_fxy = f_fxy + REAL(termx * ifac * m)
+         f_fyy = f_fyy - REAL(term) * m * m
+      ENDDO
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      RETURN
+      END SUBROUTINE fspline_eval_external
+c-----------------------------------------------------------------------
 c     subprogram 6. fspline_all_eval.
 c     evaluates fsplines in all intervals.
 c-----------------------------------------------------------------------

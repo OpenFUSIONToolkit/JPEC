@@ -16,14 +16,9 @@ mutable struct FourierSplineType
     nqty::Int64
     bctype::Int32
     fit_method::Int32
+    s_ix::Int32
 
-    # output save
-    f::Vector{Float64}
-    fx::Vector{Float64}
-    fy::Vector{Float64}
-    fxx::Vector{Float64}
-    fxy::Vector{Float64}
-    fyy::Vector{Float64}
+
 end
 
 function _destroy_fspline(fourier::FourierSplineType)
@@ -44,21 +39,12 @@ function _MakeFourierSpline(mx::Int, my::Int, mband::Int, nqty::Int)
         error("Failed to create fspline handle in Fortran library.")
     end
 
-
-    f = Vector{Float64}(undef, nqty)
-    fx = Vector{Float64}(undef, nqty)
-    fy = Vector{Float64}(undef, nqty)
-    fxx = Vector{Float64}(undef, nqty)
-    fxy = Vector{Float64}(undef, nqty)
-    fyy = Vector{Float64}(undef, nqty)
-
     # Return a partially initialized struct with empty data arrays
     return FourierSplineType(handle,
                              Vector{Float64}(undef, 0),
                              Vector{Float64}(undef, 0),
                              Array{Float64, 3}(undef, 0, 0, 0),
-                             mx, my, mband, nqty, 0, 0,
-                             f, fx, fy, fxx, fxy, fyy)
+                             mx, my, mband, nqty, 0, 0, 0)
 end
 
 function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3}
@@ -149,111 +135,102 @@ function fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
     return fourier
 end
 
-function _fspline_eval(fourier::FourierSplineType, x::Float64, y::Float64, derivs::Int)
+function _fspline_eval(spl::FourierSplineType, x::Float64, y::Float64, derivs::Int=0)
     if derivs == 0
-        f = Vector{Float64}(undef, fourier.nqty)
+        f = Vector{Float64}(undef, spl.nqty)
         ccall((:fspline_c_eval, libspline), Cvoid,
-              (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}),
-              fourier.handle, x, y, f)
+            # (handle,      x,       y,      f_out,      s_ix_op)
+            (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Int32),
+            spl.handle, x, y, f, spl.s_ix)
         return f
+
     elseif derivs == 1
-        f = Vector{Float64}(undef, fourier.nqty)
-        fx = Vector{Float64}(undef, fourier.nqty)
-        fy = Vector{Float64}(undef, fourier.nqty)
+        f = Vector{Float64}(undef, spl.nqty)
+        fx = Vector{Float64}(undef, spl.nqty)
+        fy = Vector{Float64}(undef, spl.nqty)
         ccall((:fspline_c_eval_deriv, libspline), Cvoid,
-              (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-              fourier.handle, x, y, f, fx, fy)
+            # (handle,      x,       y,      f_out,      fx_out,      fy_out,      s_ix_op)
+            (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32),
+            spl.handle, x, y, f, fx, fy, spl.s_ix)
         return f, fx, fy
+
     elseif derivs == 2
-        f = Vector{Float64}(undef, fourier.nqty)
-        fx = Vector{Float64}(undef, fourier.nqty)
-        fy = Vector{Float64}(undef, fourier.nqty)
-        fxx = Vector{Float64}(undef, fourier.nqty)
-        fxy = Vector{Float64}(undef, fourier.nqty)
-        fyy = Vector{Float64}(undef, fourier.nqty)
+        f = Vector{Float64}(undef, spl.nqty)
+        fx = Vector{Float64}(undef, spl.nqty)
+        fy = Vector{Float64}(undef, spl.nqty)
+        fxx = Vector{Float64}(undef, spl.nqty)
+        fxy = Vector{Float64}(undef, spl.nqty)
+        fyy = Vector{Float64}(undef, spl.nqty)
         ccall((:fspline_c_eval_deriv2, libspline), Cvoid,
-              (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-              fourier.handle, x, y, f, fx, fy, fxx, fxy, fyy)
+            # (handle,      x,       y,      f_out,      fx_out,      fy_out,      fxx_out,     fxy_out,     fyy_out,     s_ix_op)
+            (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32),
+            spl.handle, x, y, f, fx, fy, fxx, fxy, fyy, spl.s_ix)
         return f, fx, fy, fxx, fxy, fyy
+        
     else
         error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
     end
 end
 
 
+function _fspline_eval(fspline::FourierSplineType, xs::Vector{Float64}, ys::Vector{Float64}, derivs::Int=0)
+	# xs -> Float64 (any length)
+	# ys -> Float64 (any length)
+	# Returns a matrix of Float64 (length(xs), length(ys), nqty)
 
-
-
-
-function _fspline_eval(fourier::FourierSplineType, xs::Vector{Float64}, ys::Vector{Float64}, derivs::Int)
-    nx = length(xs)
-    ny = length(ys)
-
-    # Pre-allocate output arrays
-    f_grid = Array{Float64, 3}(undef, nx, ny, fourier.nqty)
-    if derivs > 0
-        fx_grid = Array{Float64, 3}(undef, nx, ny, fourier.nqty)
-        fy_grid = Array{Float64, 3}(undef, nx, ny, fourier.nqty)
-    end
-    if derivs > 1
-        fxx_grid = Array{Float64, 3}(undef, nx, ny, fourier.nqty)
-        fxy_grid = Array{Float64, 3}(undef, nx, ny, fourier.nqty)
-        fyy_grid = Array{Float64, 3}(undef, nx, ny, fourier.nqty)
-    end
-
-    for j in 1:ny, i in 1:nx
-        if derivs == 0
-            f = _fspline_eval(fourier, xs[i], ys[j], 0)
-            f_grid[i, j, :] = f
-        elseif derivs == 1
-            f, fx, fy = _fspline_eval(fourier, xs[i], ys[j], 1)
-            f_grid[i, j, :] = f
-            fx_grid[i, j, :] = fx
-            fy_grid[i, j, :] = fy
-        elseif derivs == 2
-            f, fx, fy, fxx, fxy, fyy = _fspline_eval(fourier, xs[i], ys[j], 2)
-            f_grid[i, j, :] = f
-            fx_grid[i, j, :] = fx
-            fy_grid[i, j, :] = fy
-            fxx_grid[i, j, :] = fxx
-            fxy_grid[i, j, :] = fxy
-            fyy_grid[i, j, :] = fyy
-        end
-    end
-
-    if derivs == 0
-        return f_grid
-    elseif derivs == 1
-        return f_grid, fx_grid, fy_grid
-    elseif derivs == 2
-        return f_grid, fx_grid, fy_grid, fxx_grid, fxy_grid, fyy_grid
-    else
-        # This branch is technically unreachable due to checks in the public function
-        error("Internal error during evaluation.")
-    end
+	n = length(xs)
+	m = length(ys)
+	fs = Array{Float64}(undef, n, m, fspline.nqty)
+	f = Vector{Float64}(undef, fspline.nqty)
+	if derivs > 0
+		fsx = Array{Float64}(undef, n, m, fspline.nqty)
+		fsy = Array{Float64}(undef, n, m, fspline.nqty)
+		fx = Vector{Float64}(undef, fspline.nqty)
+		fy = Vector{Float64}(undef, fspline.nqty)
+	end
+	if derivs > 1
+		fsxx = Array{Float64}(undef, n, m, fspline.nqty)
+		fsxy = Array{Float64}(undef, n, m, fspline.nqty)
+		fsyy = Array{Float64}(undef, n, m, fspline.nqty)
+		fxx = Vector{Float64}(undef, fspline.nqty)
+		fxy = Vector{Float64}(undef, fspline.nqty)
+		fyy = Vector{Float64}(undef, fspline.nqty)
+	end
+	for i in 1:n
+		for j in 1:m
+			if derivs == 0
+				f = _fspline_eval(fspline, xs[i], ys[j], 0)
+				fs[i, j, :] = f
+			elseif derivs == 1
+				f, fx, fy = _fspline_eval(fspline, xs[i], ys[j], 1)
+				fs[i, j, :] = f
+				fsx[i, j, :] = fx
+				fsy[i, j, :] = fy
+			elseif derivs == 2
+				f, fx, fy, fxx, fxy, fyy = _fspline_eval(fspline, xs[i], ys[j], 2)
+				fs[i, j, :] = f
+				fsx[i, j, :] = fx
+				fsy[i, j, :] = fy
+				fsxx[i, j, :] = fxx
+				fsxy[i, j, :] = fxy
+				fsyy[i, j, :] = fyy
+			else
+				error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
+			end
+		end
+	end
+	if derivs == 0
+		return fs
+	elseif derivs == 1
+		return fs, fsx, fsy
+	elseif derivs == 2
+		return fs, fsx, fsy, fsxx, fsxy, fsyy
+	else
+		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
+	end
 end
 
-function _fspline_eval!(fourier::FourierSplineType, x::Float64, y::Float64, derivs::Int=0)
-    # Modifies fourier.f, .fx, .fy, etc. in place.
-    if derivs == 0
-        ccall((:fspline_c_eval, libspline), Cvoid,
-              (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}),
-              fourier.handle, x, y, fourier.f)
-    elseif derivs == 1
-        ccall((:fspline_c_eval_deriv, libspline), Cvoid,
-              (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-              fourier.handle, x, y, fourier.f, fourier.fx, fourier.fy)
-    elseif derivs == 2
-        ccall((:fspline_c_eval_deriv2, libspline), Cvoid,
-              (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-              fourier.handle, x, y, fourier.f, fourier.fx, fourier.fy, fourier.fxx, fourier.fxy, fourier.fyy)
-    else
-        error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
-    end
-    return
-end
-
-function fspline_eval(fourier::FourierSplineType, x, y; derivs::Int=0)
+function fspline_eval(fourier::FourierSplineType, x, y, derivs::Int=0)
     """
     # fspline_eval(spl, x, y; derivs=0)
 
@@ -264,12 +241,6 @@ function fspline_eval(fourier::FourierSplineType, x, y; derivs::Int=0)
     - `x`: A `Float64` or a `Vector{Float64}` of x-coordinates.
     - `y`: A `Float64` or a `Vector{Float64}` of y-coordinates.
 
-    ## Keyword Arguments:
-    - `derivs`: Number of derivatives to compute.
-        - 0: Function value `f` (default).
-        - 1: `f`, `fx`, `fy`.
-        - 2: `f`, `fx`, `fy`, `fxx`, `fxy`, `fyy`.
-
     ## Returns:
     - If `x`, `y` are scalars: A tuple containing the function value(s) and any requested derivatives. If nqty=1, the results are scalars, otherwise they are vectors.
     - If `x`, `y` are vectors: A tuple of 3D arrays for the function values and derivatives on the grid defined by `x` and `y`.
@@ -278,10 +249,10 @@ function fspline_eval(fourier::FourierSplineType, x, y; derivs::Int=0)
         error("Keyword `derivs` must be 0, 1, or 2.")
     end
 
-    # Handle evaluation for single points or grids
+    
     results = _fspline_eval(fourier, x, y, derivs)
     
-    # Squeeze the result if nqty is 1 and inputs were scalars
+    
     if fourier.nqty == 1 && isa(x, Real) && isa(y, Real)
         if isa(results, Tuple)
             return map(vec -> vec[1], results)
@@ -292,28 +263,6 @@ function fspline_eval(fourier::FourierSplineType, x, y; derivs::Int=0)
 
     return results
 end
-
-
-function fspline_eval!(fourier::FourierSplineType, x::Float64, y::Float64, derivs::Int=0)
-    """
-    # fspline_eval!(fourier, x, y; derivs=0)
-
-    Evaluates the Fourier-spline at a point (x, y) and stores the result
-    in-place in the `fourier` object's fields (`.f`, `.fx`, etc.).
-    This method avoids memory allocation.
-
-    ## Arguments:
-    - `fourier`: A `FourierSplineType` object from `fspline_setup`.
-    - `x`: A `Float64` x-coordinate.
-    - `y`: A `Float64` y-coordinate.
-    - `derivs`: Number of derivatives to compute (0, 1, or 2).
-    """
-    if derivs < 0 || derivs > 2
-        error("Keyword `derivs` must be 0, 1, or 2.")
-    end
-    _fspline_eval!(fourier, x, y, derivs)
-end
-
 
 
 end # module FourierSpline

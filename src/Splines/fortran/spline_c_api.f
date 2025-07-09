@@ -249,10 +249,6 @@ c-----------------------------------------------------------------------
 
       call spline_eval_external(spl, x, ix, fi)
 c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [spl%nqty])
-c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
       return
@@ -293,12 +289,6 @@ c-----------------------------------------------------------------------
       end if
 
       call spline_eval_external(spl, x, ix, fi, f1i)
-c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [spl%nqty])
-      call c_f_pointer(f1, f1i, [spl%nqty])
-
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -344,13 +334,6 @@ c-----------------------------------------------------------------------
 
       call spline_eval_external(spl, x, ix, fi, f1i, f2i)
 c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [spl%nqty])
-      call c_f_pointer(f1, f1i, [spl%nqty])
-      call c_f_pointer(f2, f2i, [spl%nqty])
-
-c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
       return
@@ -394,13 +377,6 @@ c-----------------------------------------------------------------------
       end if
 
       call spline_eval_external(spl, x, ix, fi, f1i, f2i, f3i)
-c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [spl%nqty])
-      call c_f_pointer(f1, f1i, [spl%nqty])
-      call c_f_pointer(f2, f2i, [spl%nqty])
-      call c_f_pointer(f3, f3i, [spl%nqty])
 
 c-----------------------------------------------------------------------
 c     terminate.
@@ -619,10 +595,6 @@ c-----------------------------------------------------------------------
 
       call cspline_eval_external(cspl, x, ix, fi)
 c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [cspl%nqty])
-c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
       return
@@ -663,12 +635,6 @@ c-----------------------------------------------------------------------
       end if
 
       call cspline_eval_external(cspl, x, ix, fi, f1i)
-c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [cspl%nqty])
-      call c_f_pointer(f1, f1i, [cspl%nqty])
-
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -714,13 +680,6 @@ c-----------------------------------------------------------------------
 
       call cspline_eval_external(cspl, x, ix, fi, f1i, f2i)
 c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [cspl%nqty])
-      call c_f_pointer(f1, f1i, [cspl%nqty])
-      call c_f_pointer(f2, f2i, [cspl%nqty])
-
-c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
       return
@@ -764,14 +723,6 @@ c-----------------------------------------------------------------------
       end if
 
       call cspline_eval_external(cspl, x, ix, fi, f1i, f2i, f3i)
-c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [cspl%nqty])
-      call c_f_pointer(f1, f1i, [cspl%nqty])
-      call c_f_pointer(f2, f2i, [cspl%nqty])
-      call c_f_pointer(f3, f3i, [cspl%nqty])
-
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -1025,11 +976,6 @@ c-----------------------------------------------------------------------
       call bicube_eval_external(bicube, x, y, 0, ix, iy, fi, fix, fiy,
      $                                                    fxy, fxx, fyy)
       deallocate(fix, fiy)
-
-c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [bicube%nqty])
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -1084,12 +1030,6 @@ c-----------------------------------------------------------------------
       call bicube_eval_external(bicube, x, y, 1, ix, iy, fi, f1xi, f1yi,
      $                                                    fxy, fxx, fyy)
       deallocate(fxy, fxx, fyy)
-c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [bicube%nqty])
-      call c_f_pointer(f1x, f1xi, [bicube%nqty])
-      call c_f_pointer(f1y, f1yi, [bicube%nqty])
 
 c-----------------------------------------------------------------------
 c     terminate.
@@ -1145,16 +1085,6 @@ c-----------------------------------------------------------------------
       end if
       call bicube_eval_external(bicube, x, y, 2, ix, iy, fi, f1xi, f1yi,
      $                                              f2xxi, f2xyi, f2yyi)
-      
-c-----------------------------------------------------------------------
-c     copy results back to the C pointer.
-c-----------------------------------------------------------------------
-      call c_f_pointer(f, fi, [bicube%nqty])
-      call c_f_pointer(f1x, f1xi, [bicube%nqty])
-      call c_f_pointer(f1y, f1yi, [bicube%nqty])
-      call c_f_pointer(f2xx, f2xxi, [bicube%nqty])
-      call c_f_pointer(f2xy, f2xyi, [bicube%nqty])
-      call c_f_pointer(f2yy, f2yyi, [bicube%nqty])
 
 c-----------------------------------------------------------------------
 c     terminate.
@@ -1320,21 +1250,23 @@ c     terminate.
 c-----------------------------------------------------------------------
       return
       end subroutine fspline_c_fit_2
-
 c-----------------------------------------------------------------------
 c     subprogram 31. fspline_c_eval
 c     evaluates the fourier spline at a given point.
 c-----------------------------------------------------------------------
-      subroutine fspline_c_eval(handle, x, y, f_out) bind(C)
+      subroutine fspline_c_eval(handle, x, y, f_out, s_ix_op) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f_out
+      integer(c_int), value :: s_ix_op
+      
 
+      integer(i4) :: s_ix ! index of x position in the cspline
+      real(c_double), pointer :: f_f(:)
       type(fspline_type), pointer :: fst
-      real(c_double), pointer :: f_out_fort(:)
 c-----------------------------------------------------------------------
 c     work.
 c-----------------------------------------------------------------------
@@ -1344,10 +1276,15 @@ c-----------------------------------------------------------------------
          return
       end if
 
-      call fspline_eval(fst, x, y, 0)
+      call c_f_pointer(f_out, f_f, [fst%nqty])
       
-      call c_f_pointer(f_out, f_out_fort, [fst%nqty])
-      f_out_fort = fst%f
+      if (s_ix_op > 0) then
+         s_ix = s_ix_op
+      else
+         s_ix = 0
+      end if
+
+      call fspline_eval_external(fst, x, y, 0, s_ix, f_f)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -1358,19 +1295,19 @@ c-----------------------------------------------------------------------
 c     subprogram 32. fspline_c_eval_deriv
 c     evaluates the fourier spline and its first derivatives.
 c-----------------------------------------------------------------------
-      subroutine fspline_c_eval_deriv(handle, x, y
-     $ , f_out, fx_out, fy_out) bind(C)
+      subroutine fspline_c_eval_deriv(handle, x, y, f_out, 
+     $                                fx_out, fy_out, s_ix_op) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f_out, fx_out, fy_out
+      integer(c_int), value :: s_ix_op
 
       type(fspline_type), pointer :: fst
-      real(c_double), pointer :: f_out_fort(:)
-      real(c_double), pointer :: fx_out_fort(:)
-      real(c_double), pointer :: fy_out_fort(:)
+      integer(i4) :: s_ix
+      real(c_double), pointer :: f_f(:), f_fx(:), f_fy(:)
 c-----------------------------------------------------------------------
 c     work.
 c-----------------------------------------------------------------------
@@ -1380,15 +1317,17 @@ c-----------------------------------------------------------------------
          return
       end if
 
-      call fspline_eval(fst, x, y, 1)
-      
-      call c_f_pointer(f_out, f_out_fort, [fst%nqty])
-      call c_f_pointer(fx_out, fx_out_fort, [fst%nqty])
-      call c_f_pointer(fy_out, fy_out_fort, [fst%nqty])
-      
-      f_out_fort = fst%f
-      fx_out_fort = fst%fx
-      fy_out_fort = fst%fy
+      call c_f_pointer(f_out,  f_f,  [fst%nqty])
+      call c_f_pointer(fx_out, f_fx, [fst%nqty])
+      call c_f_pointer(fy_out, f_fy, [fst%nqty])
+
+      if (s_ix_op > 0) then
+         s_ix = s_ix_op
+      else
+         s_ix = 0
+      end if
+
+      call fspline_eval_external(fst, x, y, 1, s_ix, f_f, f_fx, f_fy)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -1399,8 +1338,8 @@ c-----------------------------------------------------------------------
 c     subprogram 33. fspline_c_eval_deriv2
 c     evaluates the fourier spline and its second derivatives.
 c-----------------------------------------------------------------------
-      subroutine fspline_c_eval_deriv2(handle, x, y, f_out, fx_out,
-     $     fy_out, fxx_out, fxy_out, fyy_out) bind(C)
+      subroutine fspline_c_eval_deriv2(handle, x, y, f_out, 
+     $     fx_out, fy_out, fxx_out, fxy_out, fyy_out, s_ix_op) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
@@ -1408,13 +1347,12 @@ c-----------------------------------------------------------------------
       real(c_double), value :: x, y
       type(c_ptr), value :: f_out, fx_out, fy_out
       type(c_ptr), value :: fxx_out, fxy_out, fyy_out
+      integer(c_int), value :: s_ix_op
 
+      integer(i4) :: s_ix
+      real(c_double), pointer :: f_f(:), f_fx(:), f_fy(:)
+      real(c_double), pointer :: f_fxx(:), f_fxy(:), f_fyy(:)
       type(fspline_type), pointer :: fst
-      real(c_double), pointer :: f_out_fort(:), 
-     $ fx_out_fort(:), fy_out_fort(:)
-      
-      real(c_double), pointer :: fxx_out_fort(:),
-     $ fxy_out_fort(:), fyy_out_fort(:)
 c-----------------------------------------------------------------------
 c     work.
 c-----------------------------------------------------------------------
@@ -1424,26 +1362,27 @@ c-----------------------------------------------------------------------
          return
       end if
 
-      call fspline_eval(fst, x, y, 2)
-      
-      call c_f_pointer(f_out, f_out_fort, [fst%nqty])
-      call c_f_pointer(fx_out, fx_out_fort, [fst%nqty])
-      call c_f_pointer(fy_out, fy_out_fort, [fst%nqty])
-      call c_f_pointer(fxx_out, fxx_out_fort, [fst%nqty])
-      call c_f_pointer(fxy_out, fxy_out_fort, [fst%nqty])
-      call c_f_pointer(fyy_out, fyy_out_fort, [fst%nqty])
-      
-      f_out_fort = fst%f
-      fx_out_fort = fst%fx
-      fy_out_fort = fst%fy
-      fxx_out_fort = fst%fxx
-      fxy_out_fort = fst%fxy
-      fyy_out_fort = fst%fyy
+      call c_f_pointer(f_out,   f_f,   [fst%nqty])
+      call c_f_pointer(fx_out,  f_fx,  [fst%nqty])
+      call c_f_pointer(fy_out,  f_fy,  [fst%nqty])
+      call c_f_pointer(fxx_out, f_fxx, [fst%nqty])
+      call c_f_pointer(fxy_out, f_fxy, [fst%nqty])
+      call c_f_pointer(fyy_out, f_fyy, [fst%nqty])
+
+      if (s_ix_op > 0) then
+         s_ix = s_ix_op
+      else
+         s_ix = 0
+      end if
+
+      call fspline_eval_external(fst, x, y, 2, s_ix, f_f, f_fx, f_fy,
+     $                           f_fxx, f_fxy, f_fyy)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
       return
       end subroutine fspline_c_eval_deriv2
+
 
 c-----------------------------------------------------------------------
       end module spline_c_api_mod
