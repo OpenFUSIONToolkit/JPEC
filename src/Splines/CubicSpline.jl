@@ -3,6 +3,8 @@ module CubicSpline
 const libdir = joinpath(@__DIR__, "..", "..", "deps")
 const libspline = joinpath(libdir, "libspline")
 
+using ..Helper
+
 export spline_setup, spline_eval, spline_eval!, spline_integrate!
 
 abstract type CubicSplineType end
@@ -187,17 +189,18 @@ function _spline_setup(xs::Vector{Float64}, fs::Matrix{ComplexF64}, bctype::Int3
 	return spline
 end
 
-function spline_setup(xs, fs, bctype::Int=1)
+function spline_setup(xs, fs; bctype::Union{String, Int}="not-a-knot")
     """
-    # spline_setup(xs, fs, bctype=0)
+    # spline_setup(xs, fs, bctype="not-a-knot")
     ## Arguments:
     - `xs`: A vector of Float64 values representing the x-coordinates.
     - `fs`: A vector or matrix of Float64/ComplexF64 values representing the function values at the x-coordinates.
-    - `bctype`: An integer specifying the boundary condition type (default is 0):
+    ## Keyword Arguments:
+    - `bctype`: Boundary condition type for the cubic spline in `x`.
         - 1: Natural spline (default)
         - 2: Periodic spline
         - 3: Extrapolated spline
-        - 4: not-a-knot spline
+        - 4: "Not-a-knot" spline
     ## Returns:
     - A `Spline` object containing the spline handle, x-coordinates, function values,
       number of x-coordinates, number of quantities, and index of x position in the spline.
@@ -209,10 +212,13 @@ function spline_setup(xs, fs, bctype::Int=1)
 		error("fs must be a vector or matrix of Float64 or ComplexF64")
 	end
 
-	if  isa(fs, Matrix{ComplexF64}) && bctype == 1
-		error("Complex spline doesn't have natural spline. (bctype = 1)")
+	local bctype_code::Int = Helper.parse_bctype(bctype)
+
+	if  isa(fs, Matrix{ComplexF64}) && bctype_code == 1
+		error("Complex spline doesn't have natural spline. (bctype = 1/natural)")
 	end
-    spline = _spline_setup(xs, fs, Int32(bctype))
+
+    spline = _spline_setup(xs, fs, Int32(bctype_code))
 	
 	finalizer(_destroy_spline, spline)
     
@@ -460,10 +466,14 @@ function spline_integrate!(spline::CubicSplineType)
     """
     spline_integrate!(spline)
 
-    Computes the definite integral of the spline from the starting point `xs[1]`.
-    The results are stored in-place in the `spline.fsi` field.
-    The integral at any grid point `xs[i]` can be accessed via `spline.fsi[i, :]`.
-    """
+	## Arguments:
+	- `spline`: A mutable `Spline` object".
+
+	## Returns:
+	- Nothing. Updates `spline.fsi` in place so that  
+	`spline.fsi[i, :]` equals `∫_{xs[1]}^{xs[i]} f(x) dx` for each component.
+	"""
+
     _spline_integrate!(spline)
 end
 

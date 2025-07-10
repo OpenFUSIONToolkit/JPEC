@@ -1,5 +1,7 @@
 module SplinesMod
 
+include("Helper.jl")
+
 include("CubicSpline.jl")
 include("BicubicSpline.jl")
 include("FourierSpline.jl")

@@ -3,6 +3,8 @@ module BicubicSpline
 const libdir = joinpath(@__DIR__, "..", "..", "deps")
 const libspline = joinpath(libdir, "libspline")
 
+using ..Helper
+
 export bicube_setup, bicube_eval
 
 mutable struct BicubicSplineType
@@ -90,13 +92,15 @@ function _bicube_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
 	return bicube
 end
 
-function bicube_setup(xs, ys, fs, bctypex::Int=4, bctypey::Int=4)
+function bicube_setup(xs, ys, fs; bctypex::Union{String, Int}="not-a-knot",
+	 bctypey::Union{String, Int}="not-a-knot")
 	"""
 	# bicube_setup(xs, ys, fs, bctypex=0, bctypey=0)
 	## Arguments:
 	- `xs`: A vector of Float64 values representing the x-coordinates.
 	- `ys`: A vector of Float64 values representing the y-coordinates.
 	- `fs`: A 3D array of Float64 values representing the function values at the (x,y) coordinates.
+	## Keyword Arguments:
 	- `bctypex`: An integer specifying the boundary condition type for x (Default is 4, not a knot)
 	- `bctypey`: An integer specifying the boundary condition type for y  (Default is 4, not a knot) 
 	## Returns:
@@ -104,10 +108,14 @@ function bicube_setup(xs, ys, fs, bctypex::Int=4, bctypey::Int=4)
 	function values, number of x-coordinates, number of y-coordinates, number of quantities,
 	and boundary condition types.
 	"""
+	
+	local bctype_code_x::Int = Helper.parse_bctype(bctypex)
+	local bctype_code_y::Int = Helper.parse_bctype(bctypey)
+
 	if !isa(xs, Vector{Float64}) || !isa(ys, Vector{Float64}) || !isa(fs, Array{Float64, 3})
 		error("xs must be a vector of Float64, ys must be a vector of Float64, and fs must be a 3D array of Float64")
 	end
-	bicube = _bicube_setup(xs, ys, fs, Int32(bctypex), Int32(bctypey))
+	bicube = _bicube_setup(xs, ys, fs, Int32(bctype_code_x), Int32(bctype_code_y))
 	
 	finalizer(_destroy_bicubic_spline, bicube)
 	

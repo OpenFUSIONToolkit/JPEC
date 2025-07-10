@@ -1,6 +1,6 @@
 name = "JPEC"
 uuid = "462872dd-e066-4d2e-b993-6468b5239634"
-authors = ["Matthew Pharr <matthewcpharr@gmail.com>"]
+authors = ["Matthew Pharr <matthewcpharr@gmail.com>", "JayMyoung Lee <jmlmir@snu.ac.kr>"]
 version = "0.1.0"
 
 [deps]

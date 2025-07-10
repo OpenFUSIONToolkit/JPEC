@@ -3,6 +3,8 @@ module FourierSpline
 const libdir = joinpath(@__DIR__, "..", "..", "deps")
 const libspline = joinpath(libdir, "libspline")
 
+using ..Helper
+
 export fspline_setup, fspline_eval
 
 mutable struct FourierSplineType
@@ -80,9 +82,9 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
 end
 
 function fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3}
-    , mband::Int; bctype::Int=4, fit_method::Int=1, fit_flag::Bool=true)
+    , mband::Int; bctype::Union{String, Int}="not-a-knot", fit_method::Int=1, fit_flag::Bool=true)
     """
-    # fspline_setup(xs, ys, fs, mband; bctype=1, fit_method=1)
+    # fspline_setup(xs, ys, fs, mband; bctype="not-a-knot", fit_method=1)
 
     Creates and fits a function of two variables, f(x, y), to a cubic spline
     in the x-direction and a Fourier series in the y-direction. The y-direction
@@ -123,11 +125,13 @@ function fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
         error("Invalid `fit_method`. Choose 1 or 2.")
     end
 
-    if bctype == 1
-        error("Fourier spline  doesn't have natural spline. (bctype = 1)")
+    local bctype_code::Int = Helper.parse_bctype(bctype)
+
+    if bctype_code == 1
+        error("Fourier spline  doesn't have natural spline. (bctype = 1/natural)")
     end
     # Call the internal setup function that creates and fits the spline
-    fourier = _fspline_setup(xs, ys, fs, mband, Int32(bctype), Int32(fit_method),fit_flag)
+    fourier = _fspline_setup(xs, ys, fs, mband, Int32(bctype_code), Int32(fit_method),fit_flag)
 
     # Add a finalizer to ensure the Fortran object is deallocated when the Julia object is garbage collected.
     finalizer(_destroy_fspline, fourier)
