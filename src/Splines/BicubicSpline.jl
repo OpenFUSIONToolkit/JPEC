@@ -3,15 +3,15 @@ module BicubicSpline
 const libdir = joinpath(@__DIR__, "..", "..", "deps")
 const libspline = joinpath(libdir, "libspline")
 
-using ..Helper
+using ..Helper: parse_bctype, ReadOnlyArray, @expose_fields
 
 export bicube_setup, bicube_eval
 
 mutable struct BicubicSplineType
 	handle::Ptr{Cvoid}
-	xs::Vector{Float64}
-	ys::Vector{Float64}
-	fs::Array{Float64, 3} # 3D array for bicubic spline values
+	_xs::Vector{Float64}
+	_ys::Vector{Float64}
+	_fs::Array{Float64, 3} # 3D array for bicubic spline values
 	mx::Int64
 	my::Int64
 	nqty::Int64
@@ -21,22 +21,25 @@ mutable struct BicubicSplineType
 	bctypey::Int32  # Boundary condition type for y
 
 
-	fsx::Array{Float64, 3}
-	fsy::Array{Float64, 3}
-	fsxy::Array{Float64, 3}
+	_fsx::Array{Float64, 3}
+	_fsy::Array{Float64, 3}
+	_fsxy::Array{Float64, 3}
 
 
 
 end
+
+@expose_fields BicubicSplineType xs ys fs fsx fsy fsxy
+
 
 function _destroy_bicubic_spline(bicube::BicubicSplineType)
     if bicube.handle != C_NULL
         ccall((:bicube_c_destroy, libspline), Cvoid, (Ptr{Cvoid},), bicube.handle)
-        bicube.handle = C_NULL
+		Core.setfield!(bicube, :handle, C_NULL)
     end
 end
 
-function _MakeBicubicSpline(mx::Int64, my::Int64, nqty::Int64)
+function _MakeBicubicSpline(mx::Int64, my::Int64, nqty::Int64, bctypex::Int32, bctypey::Int32)
 	h = Ref{Ptr{Cvoid}}()
 	ccall((:bicube_c_create, libspline), Cvoid,
 		(Int64, Int64, Int64, Ref{Ptr{Cvoid}}), mx, my, nqty, h)
@@ -49,8 +52,8 @@ function _MakeBicubicSpline(mx::Int64, my::Int64, nqty::Int64)
 
 
 	return BicubicSplineType(h[], Vector{Float64}(undef, 0), Vector{Float64}(undef, 0), 
-		Array{Float64,3}(undef, 0, 0, 0), mx, my, nqty, 0, 0, 0, 0
-		,fsx,fsy, fsxy)
+		Array{Float64,3}(undef, 0, 0, 0), mx, my, nqty, 0, 0, bctypex, bctypey,
+		fsx,fsy, fsxy)
 end
 
 
@@ -66,16 +69,14 @@ function _bicube_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
 	mx = length(xs)-1
 	my = length(ys)-1
 	nqty = size(fs, 3)
-	bicube = _MakeBicubicSpline(mx, my, nqty)
-	bicube.xs = xs
-	bicube.ys = ys
-	bicube.fs = fs
-	bicube.bctypex = Int32(bctypex)
-	bicube.bctypey = Int32(bctypey)
+	bicube = _MakeBicubicSpline(mx, my, nqty, Int32(bctypex), Int32(bctypey))
+	bicube._xs = xs
+	bicube._ys = ys
+	bicube._fs = fs
 
-	bicube.fsx = Array{Float64, 3}(undef, mx+1, my+1, nqty)
-	bicube.fsy = Array{Float64, 3}(undef, mx+1, my+1, nqty)
-	bicube.fsxy = Array{Float64, 3}(undef, mx+1, my+1, nqty)
+	bicube._fsx = Array{Float64, 3}(undef, mx+1, my+1, nqty)
+	bicube._fsy = Array{Float64, 3}(undef, mx+1, my+1, nqty)
+	bicube._fsxy = Array{Float64, 3}(undef, mx+1, my+1, nqty)
 
 
 	ccall((:bicube_c_setup, libspline), Cvoid,
@@ -84,7 +85,7 @@ function _bicube_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
 
 	ccall((:bicube_c_fit, libspline), Cvoid,
 		(Ptr{Cvoid}, Int32, Int32, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}), 
-		bicube.handle, bctypex, bctypey, bicube.fsx, bicube.fsy, bicube.fsxy)
+		bicube.handle, bicube.bctypex, bicube.bctypey, bicube._fsx, bicube._fsy, bicube._fsxy)
 	
 	
 	
@@ -109,8 +110,8 @@ function bicube_setup(xs, ys, fs; bctypex::Union{String, Int}="not-a-knot",
 	and boundary condition types.
 	"""
 	
-	local bctype_code_x::Int = Helper.parse_bctype(bctypex)
-	local bctype_code_y::Int = Helper.parse_bctype(bctypey)
+	local bctype_code_x::Int = parse_bctype(bctypex)
+	local bctype_code_y::Int = parse_bctype(bctypey)
 
 	if !isa(xs, Vector{Float64}) || !isa(ys, Vector{Float64}) || !isa(fs, Array{Float64, 3})
 		error("xs must be a vector of Float64, ys must be a vector of Float64, and fs must be a 3D array of Float64")

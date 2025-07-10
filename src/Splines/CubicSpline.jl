@@ -3,7 +3,7 @@ module CubicSpline
 const libdir = joinpath(@__DIR__, "..", "..", "deps")
 const libspline = joinpath(libdir, "libspline")
 
-using ..Helper
+using ..Helper: parse_bctype, ReadOnlyArray, @expose_fields
 
 export spline_setup, spline_eval, spline_eval!, spline_integrate!
 
@@ -11,50 +11,52 @@ abstract type CubicSplineType end
 
 mutable struct RealSplineType <: CubicSplineType
 	handle::Ptr{Cvoid}
-	xs::Vector{Float64}
-	fs::Matrix{Float64}
+	_xs::Vector{Float64}
+	_fs::Matrix{Float64}
 	mx::Int64
 	nqty::Int64
 	ix::Int32  # Index of x position in the spline
     bctype::Int32  # Boundary condition type
 
-	fsi::Matrix{Float64} # To store integrals at gridpoint
-	fs1::Matrix{Float64} # To store 1-deriv at gridpoint
+	_fsi::Matrix{Float64} # To store integrals at gridpoint
+	_fs1::Matrix{Float64} # To store 1-deriv at gridpoint
 
 end
 
 mutable struct ComplexSplineType <: CubicSplineType
 	handle::Ptr{Cvoid}
-	xs::Vector{Float64}
-	fs::Matrix{ComplexF64}
+	_xs::Vector{Float64}
+	_fs::Matrix{ComplexF64}
 	mx::Int64
 	nqty::Int64
 	ix::Int32  # Index of x position in the spline
     bctype::Int32  # Boundary condition type
 
-	fsi::Matrix{ComplexF64} # To store integrals at gridpoint
-	fs1::Matrix{ComplexF64} # To store 1-deriv at gridpoint
+	_fsi::Matrix{ComplexF64} # To store integrals at gridpoint
+	_fs1::Matrix{ComplexF64} # To store 1-deriv at gridpoint
 
 end
 
+@expose_fields RealSplineType xs fs fsi fs1
+@expose_fields ComplexSplineType xs fs fsi fs1
 
 
 function _destroy_spline(spline::CubicSplineType)
     if spline.handle != C_NULL
         ccall((:spline_c_destroy, libspline), Cvoid, (Ptr{Cvoid},), spline.handle)
-        spline.handle = C_NULL 
+		Core.setfield!(spline, :handle, C_NULL)
     end
 end
 
 function _destroy_spline(spline::ComplexSplineType)
     if spline.handle != C_NULL
         ccall((:cspline_c_destroy, libspline), Cvoid, (Ptr{Cvoid},), spline.handle)
-        spline.handle = C_NULL
+		Core.setfield!(spline, :handle, C_NULL)
     end
 end
 
 
-function _MakeSpline(mx::Int64, nqty::Int64)
+function _MakeSpline(mx::Int64, nqty::Int64, bctype::Int32)
 	h = Ref{Ptr{Cvoid}}()
 	ccall((:spline_c_create, libspline), Cvoid,
 		(Int64, Int64, Ref{Ptr{Cvoid}}), mx, nqty, h)
@@ -63,15 +65,11 @@ function _MakeSpline(mx::Int64, nqty::Int64)
 	fsi = Matrix{Float64}(undef, 0, 0)
 	fs1 = Matrix{Float64}(undef, 0, 0)
 	
-	f = Vector{Float64}(undef, nqty)
-	f1 = Vector{Float64}(undef, nqty)
-	f2 = Vector{Float64}(undef, nqty)
-	f3 = Vector{Float64}(undef, nqty)
 	return RealSplineType(h[], Vector{Float64}(undef, 0), Matrix{Float64}(undef, 0, 0)
-	, mx, nqty, 0, 0, fsi, fs1)
+	, mx, nqty, 0, bctype, fsi, fs1)
 end
 
-function _MakeCSpline(mx::Int64, nqty::Int64)
+function _MakeCSpline(mx::Int64, nqty::Int64, bctype::Int32)
 	h = Ref{Ptr{Cvoid}}()
 	ccall((:cspline_c_create, libspline), Cvoid,
 		(Int64, Int64, Ref{Ptr{Cvoid}}), mx, nqty, h)
@@ -79,12 +77,8 @@ function _MakeCSpline(mx::Int64, nqty::Int64)
 	fsi = Matrix{ComplexF64}(undef, 0, 0)
 	fs1 = Matrix{ComplexF64}(undef, 0, 0)
 
-	f = Vector{ComplexF64}(undef, nqty)
-	f1 = Vector{ComplexF64}(undef, nqty)
-	f2 = Vector{ComplexF64}(undef, nqty)
-	f3 = Vector{ComplexF64}(undef, nqty)
 	return ComplexSplineType(h[], Vector{Float64}(undef, 0), Matrix{ComplexF64}(undef, 0, 0),
-	 mx, nqty,  0, 0, fsi, fs1)
+	 mx, nqty,  0, bctype, fsi, fs1)
 end
 
 
@@ -99,20 +93,19 @@ function _spline_setup(xs::Vector{Float64}, fs::Vector{Float64}, bctype::Int32)
 	end
 	mx = length(xs)-1
 	nqty = 1  # Default to 1 quantity if not specified
-	spline = _MakeSpline(mx, nqty)
-	spline.xs = xs
+	spline = _MakeSpline(mx, nqty, Int32(bctype))
+	spline._xs = xs
 	# Convert fs to a matrix with one column
 	fs_matrix = reshape(fs, mx+1, nqty) #considering definition, we need mx+1
-	spline.fs = fs_matrix
-    spline.bctype = Int32(bctype)
-	spline.fs1 = Matrix{Float64}(undef, mx+1, nqty)
+	spline._fs = fs_matrix
+	spline._fs1 = Matrix{Float64}(undef, mx+1, nqty)
 
 	ccall((:spline_c_setup, libspline), Cvoid,
 		(Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}),
 		spline.handle, xs, fs_matrix)
 
 	ccall((:spline_c_fit, libspline), Cvoid, 
-        (Ptr{Cvoid}, Int32, Ptr{Float64}), spline.handle, bctype, spline.fs1)
+        (Ptr{Cvoid}, Int32, Ptr{Float64}), spline.handle, spline.bctype, spline._fs1)
 
 
 	return spline
@@ -126,18 +119,17 @@ function _spline_setup(xs::Vector{Float64}, fs::Matrix{Float64}, bctype::Int32)
 	end
 	mx = length(xs)-1
 	nqty = size(fs, 2)
-	spline = _MakeSpline(mx, nqty)
-	spline.xs = xs
-	spline.fs = fs
-	spline.bctype = Int32(bctype)
-	spline.fs1 = Matrix{Float64}(undef, mx+1, nqty)
+	spline = _MakeSpline(mx, nqty, Int32(bctype))
+	spline._xs = xs
+	spline._fs = fs
+	spline._fs1 = Matrix{Float64}(undef, mx+1, nqty)
 
 	ccall((:spline_c_setup, libspline), Cvoid,
 		(Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}),
 		spline.handle, xs, fs)
 
 	ccall((:spline_c_fit, libspline), Cvoid, 
-        (Ptr{Cvoid}, Int32, Ptr{Float64}), spline.handle, bctype, spline.fs1)
+        (Ptr{Cvoid}, Int32, Ptr{Float64}), spline.handle, spline.bctype, spline._fs1)
 	return spline
 end
 
@@ -149,20 +141,19 @@ function _spline_setup(xs::Vector{Float64}, fs::Vector{ComplexF64}, bctype::Int3
 	end
 	mx = length(xs)-1
 	nqty = 1  # Default to 1 quantity if not specified
-	spline = _MakeCSpline(mx, nqty)
-	spline.xs = xs
+	spline = _MakeCSpline(mx, nqty, Int32(bctype))
+	spline._xs = xs
 	# Convert fs to a matrix with one column
 	fs_matrix = reshape(fs, mx+1, nqty)
-	spline.fs = fs_matrix
-    spline.bctype = Int32(bctype)
-	spline.fs1 = Matrix{ComplexF64}(undef, mx+1, nqty)
+	spline._fs = fs_matrix
+	spline._fs1 = Matrix{ComplexF64}(undef, mx+1, nqty)
 
 	ccall((:cspline_c_setup, libspline), Cvoid,
 		(Ptr{Cvoid}, Ptr{Float64}, Ptr{ComplexF64}),
 		spline.handle, xs, fs_matrix)
 
     ccall((:cspline_c_fit, libspline), Cvoid,
-        (Ptr{Cvoid}, Int32, Ptr{ComplexF64}), spline.handle, bctype, spline.fs1)
+        (Ptr{Cvoid}, Int32, Ptr{ComplexF64}), spline.handle, spline.bctype, spline._fs1)
 	return spline
 end
 
@@ -174,18 +165,17 @@ function _spline_setup(xs::Vector{Float64}, fs::Matrix{ComplexF64}, bctype::Int3
 	end
 	mx = length(xs)-1
 	nqty = size(fs, 2)
-	spline = _MakeCSpline(mx, nqty)
-	spline.xs = xs
-	spline.fs = fs
-	spline.bctype = Int32(bctype)
-	spline.fs1 = Matrix{ComplexF64}(undef, mx+1, nqty)
+	spline = _MakeCSpline(mx, nqty, Int32(bctype))
+	spline._xs = xs
+	spline._fs = fs
+	spline._fs1 = Matrix{ComplexF64}(undef, mx+1, nqty)
 
 
 	ccall((:cspline_c_setup, libspline), Cvoid,
 		(Ptr{Cvoid}, Ptr{Float64}, Ptr{ComplexF64}),
 		spline.handle, xs, fs)
     ccall((:cspline_c_fit, libspline), Cvoid,
-		(Ptr{Cvoid}, Int32, Ptr{ComplexF64}), spline.handle, bctype, spline.fs1)
+		(Ptr{Cvoid}, Int32, Ptr{ComplexF64}), spline.handle, spline.bctype, spline._fs1)
 	return spline
 end
 
@@ -212,7 +202,7 @@ function spline_setup(xs, fs; bctype::Union{String, Int}="not-a-knot")
 		error("fs must be a vector or matrix of Float64 or ComplexF64")
 	end
 
-	local bctype_code::Int = Helper.parse_bctype(bctype)
+	local bctype_code::Int = parse_bctype(bctype)
 
 	if  isa(fs, Matrix{ComplexF64}) && bctype_code == 1
 		error("Complex spline doesn't have natural spline. (bctype = 1/natural)")
@@ -442,22 +432,22 @@ end
 
 
 function _spline_integrate!(spline::RealSplineType)
-    spline.fsi = Matrix{Float64}(undef, spline.mx + 1, spline.nqty)
+    spline._fsi = Matrix{Float64}(undef, spline.mx + 1, spline.nqty)
 
     ccall((:spline_c_int, libspline), Cvoid,
           (Ptr{Cvoid}, Ptr{Float64}),
-          spline.handle, spline.fsi)
+          spline.handle, spline._fsi)
 
     return
 end
 
 function _spline_integrate!(spline::ComplexSplineType)
-    spline.fsi = Matrix{ComplexF64}(undef, spline.mx + 1, spline.nqty)
+    spline._fsi = Matrix{ComplexF64}(undef, spline.mx + 1, spline.nqty)
 
 
     ccall((:cspline_c_int, libspline), Cvoid,
           (Ptr{Cvoid}, Ptr{ComplexF64}), 
-          spline.handle, spline.fsi)
+          spline.handle, spline._fsi)
 
     return
 end
@@ -470,8 +460,8 @@ function spline_integrate!(spline::CubicSplineType)
 	- `spline`: A mutable `Spline` object".
 
 	## Returns:
-	- Nothing. Updates `spline.fsi` in place so that  
-	`spline.fsi[i, :]` equals `∫_{xs[1]}^{xs[i]} f(x) dx` for each component.
+	- Nothing. Updates `spline._fsi` in place so that  
+	`spline._fsi[i, :]` equals `∫_{xs[1]}^{xs[i]} f(x) dx` for each component.
 	"""
 
     _spline_integrate!(spline)

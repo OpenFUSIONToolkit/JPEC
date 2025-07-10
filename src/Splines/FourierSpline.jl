@@ -3,15 +3,15 @@ module FourierSpline
 const libdir = joinpath(@__DIR__, "..", "..", "deps")
 const libspline = joinpath(libdir, "libspline")
 
-using ..Helper
+using ..Helper: parse_bctype, ReadOnlyArray, @expose_fields
 
 export fspline_setup, fspline_eval
 
 mutable struct FourierSplineType
     handle::Ptr{Cvoid}
-    xs::Vector{Float64}
-    ys::Vector{Float64}
-    fs::Array{Float64, 3}
+    _xs::Vector{Float64}
+    _ys::Vector{Float64}
+    _fs::Array{Float64, 3}
     mx::Int64
     my::Int64
     mband::Int64
@@ -23,14 +23,17 @@ mutable struct FourierSplineType
 
 end
 
+@expose_fields FourierSplineType xs ys fs
+
+
 function _destroy_fspline(fourier::FourierSplineType)
     if fourier.handle != C_NULL
         ccall((:fspline_c_destroy, libspline), Cvoid, (Ptr{Cvoid},), fourier.handle)
-        fourier.handle = C_NULL
+        Core.setfield!(fourier, :handle, C_NULL)
     end
 end
 
-function _MakeFourierSpline(mx::Int, my::Int, mband::Int, nqty::Int)
+function _MakeFourierSpline(mx::Int, my::Int, mband::Int, nqty::Int, bctype::Int32, fit_method::Int32)
     h = Ref{Ptr{Cvoid}}()
     ccall((:fspline_c_create, libspline), Cvoid,
           (Int64, Int64, Int64, Int64, Ref{Ptr{Cvoid}}),
@@ -46,7 +49,7 @@ function _MakeFourierSpline(mx::Int, my::Int, mband::Int, nqty::Int)
                              Vector{Float64}(undef, 0),
                              Vector{Float64}(undef, 0),
                              Array{Float64, 3}(undef, 0, 0, 0),
-                             mx, my, mband, nqty, 0, 0, 0)
+                             mx, my, mband, nqty, bctype, fit_method, 0)
 end
 
 function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3}
@@ -56,12 +59,10 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
     mx = length(xs) - 1
     my = length(ys) - 1
     nqty = size(fs, 3)
-    fourier = _MakeFourierSpline(mx, my, mband, nqty)
-    fourier.xs = xs
-    fourier.ys = ys
-    fourier.fs = fs
-    fourier.bctype = Int32(bctype)
-    fourier.fit_method = Int32(fit_method)
+    fourier = _MakeFourierSpline(mx, my, mband, nqty, Int32(bctype), Int32(fit_method))
+    fourier._xs = xs
+    fourier._xs = ys
+    fourier._fs = fs
 
     ccall((:fspline_c_setup, libspline), Cvoid,
           (Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
@@ -69,11 +70,11 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
     if fit_method == 1
         ccall((:fspline_c_fit_1, libspline), Cvoid,
               (Ptr{Cvoid}, Int32, Bool),
-              fourier.handle, bctype, fit_flag)
+              fourier.handle, fourier.bctype, fit_flag)
     elseif fit_method == 2
         ccall((:fspline_c_fit_2, libspline), Cvoid,
               (Ptr{Cvoid}, Int32, Bool),
-              fourier.handle, bctype, fit_flag)
+              fourier.handle, fourier.bctype, fit_flag)
     else
         error("Internal error: Invalid fit_method passed to _fspline_setup.")
     end
@@ -125,7 +126,7 @@ function fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
         error("Invalid `fit_method`. Choose 1 or 2.")
     end
 
-    local bctype_code::Int = Helper.parse_bctype(bctype)
+    local bctype_code::Int = parse_bctype(bctype)
 
     if bctype_code == 1
         error("Fourier spline  doesn't have natural spline. (bctype = 1/natural)")

@@ -46,4 +46,80 @@ function parse_bctype(bctype::Union{String, Int})
 end
 
 
+
+#==============================================================================#
+#                            Read-Only Interface Utilities
+#==============================================================================#
+
+"""
+    ReadOnlyArray{T,N,A}
+
+A thin wrapper that provides a read-only view.
+"""
+struct ReadOnlyArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
+    data::A
+end
+
+Base.size(A::ReadOnlyArray)               = size(A.data)
+Base.getindex(A::ReadOnlyArray, I...)     = @inbounds A.data[I...]
+Base.setindex!(::ReadOnlyArray, args...)  =
+    throw(ArgumentError("Cannot modify a read-only array."))
+
+
+"""
+    @expose_fields TypeName field1 field2 ...
+
+A macro to create a read-only public interface for internal fields of a struct.
+
+For each `field` specified, it assumes an internal field named `_field` exists
+(e.g., `fs` -> `_fs`). It then overloads `Base.getproperty` and `Base.setproperty!`
+for `TypeName` to implement the following behavior:
+
+1.  **Getting:** Accessing `obj.field` returns a `ReadOnlyArray` wrapper around
+    the internal `obj._field`.
+2.  **Setting:** Attempting to assign to `obj.field` (e.g., `obj.field = ...`)
+    is forbidden and throws an `ArgumentError`.
+
+This allows internal functions to modify the data via `obj._field` while
+preventing external users from doing so through the public `obj.field` API.
+"""
+
+macro expose_fields(typ, fields...)
+    # 1) 내부 필드 이름(Symbol) 리스트 생성
+    internal_syms = map(f -> Symbol("_" * string(f)), fields)
+    # 2) 튜플 리터럴 AST로 변환 (여기에서 QuoteNode로 심어줌)
+    internal_tuple = Expr(:tuple, map(x->QuoteNode(x), internal_syms)...)
+
+    quote
+        ######## getproperty ########
+        function Base.getproperty(s::$(esc(typ)), fld::Symbol)
+            $(
+                foldr(
+                    (f, rest) -> :(
+                        if fld === $(QuoteNode(f))
+                            return ReadOnlyArray(getfield(s, $(QuoteNode(Symbol("_", f)))))
+                        else
+                            $rest
+                        end
+                    ),
+                    fields,
+                    init = :(return getfield(s, fld))
+                )
+            )
+        end
+
+        ######## setproperty! ########
+        function Base.setproperty!(s::$(esc(typ)), fld::Symbol, val)
+            # (여기서 internal_tuple 은 (: _fs1, :_fs2, …) 형태)
+            if fld in $(internal_tuple)
+                return setfield!(s, fld, val)
+            end
+            throw(ArgumentError(
+                "Cannot modify property ':$fld'. " *
+                "$(string($(esc(typ)))) fields are read-only."
+            ))
+        end
+    end
+end
+
 end 
