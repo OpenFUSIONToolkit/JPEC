@@ -66,28 +66,23 @@ Base.setindex!(::ReadOnlyArray, args...)  =
     throw(ArgumentError("Cannot modify a read-only array."))
 
 
-"""
+    """
     @expose_fields TypeName field1 field2 ...
 
-A macro to create a read-only public interface for internal fields of a struct.
+    Create a *read-only public interface* for a struct while still allowing
+    internal code to mutate the underlying buffers.
 
-For each `field` specified, it assumes an internal field named `_field` exists
-(e.g., `fs` -> `_fs`). It then overloads `Base.getproperty` and `Base.setproperty!`
-for `TypeName` to implement the following behavior:
+    For every symbol `field` you list (e.g. `fs`, `fs1`),
 
-1.  **Getting:** Accessing `obj.field` returns a `ReadOnlyArray` wrapper around
-    the internal `obj._field`.
-2.  **Setting:** Attempting to assign to `obj.field` (e.g., `obj.field = ...`)
-    is forbidden and throws an `ArgumentError`.
-
-This allows internal functions to modify the data via `obj._field` while
-preventing external users from doing so through the public `obj.field` API.
-"""
+    * an **internal** field named `:_field` (e.g. `:_fs`, `:_fs1`) is assumed to
+    exist in `TypeName`;
+    * the macro generates the following methods:
+    """
 
 macro expose_fields(typ, fields...)
-    # 1) 내부 필드 이름(Symbol) 리스트 생성
+    # 1) Create a list of internal field names (Symbol)
     internal_syms = map(f -> Symbol("_" * string(f)), fields)
-    # 2) 튜플 리터럴 AST로 변환 (여기에서 QuoteNode로 심어줌)
+    # 2) Convert to a tuple literal AST (planted here as a QuoteNode)
     internal_tuple = Expr(:tuple, map(x->QuoteNode(x), internal_syms)...)
 
     quote
@@ -110,7 +105,7 @@ macro expose_fields(typ, fields...)
 
         ######## setproperty! ########
         function Base.setproperty!(s::$(esc(typ)), fld::Symbol, val)
-            # (여기서 internal_tuple 은 (: _fs1, :_fs2, …) 형태)
+            # (where internal_tuple is of the form (: _fs1, :_fs2, ...))
             if fld in $(internal_tuple)
                 return setfield!(s, fld, val)
             end
