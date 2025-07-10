@@ -97,8 +97,8 @@ function bicube_setup(xs, ys, fs, bctypex::Int=4, bctypey::Int=4)
 	- `xs`: A vector of Float64 values representing the x-coordinates.
 	- `ys`: A vector of Float64 values representing the y-coordinates.
 	- `fs`: A 3D array of Float64 values representing the function values at the (x,y) coordinates.
-	- `bctypex`: An integer specifying the boundary condition type for x (Defaule 4, not a knot)
-	- `bctypey`: An integer specifying the boundary condition type for y  (Defaule 4, not a knot) 
+	- `bctypex`: An integer specifying the boundary condition type for x (Default is 4, not a knot)
+	- `bctypey`: An integer specifying the boundary condition type for y  (Default is 4, not a knot) 
 	## Returns:
 	- A `BicubicSpline` object containing the spline handle, x-coordinates, y-coordinates,
 	function values, number of x-coordinates, number of y-coordinates, number of quantities,

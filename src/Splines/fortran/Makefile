@@ -7,7 +7,7 @@ DEPSDIR = ../../../deps
 
 # 1.  Simple OS/CPU detection (works on MSYS/MinGW, Linux, macOS)
 
-OS  ?= $(OS)
+OS  ?=
 CPU ?= $(PROCESSOR_ARCHITECTURE)
 
 ifeq ($(strip $(OS)),)             

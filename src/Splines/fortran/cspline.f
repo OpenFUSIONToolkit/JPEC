@@ -154,7 +154,7 @@ c     switch between csplines.
 c-----------------------------------------------------------------------
 c      - use_classic_splines is always False
 c      if (use_classic_splines .and.
-c     $    (endmode == 3 .OR. endmode == 1))then
+c     $    (endmode == 3 .OR. endmode == 1))then ! 3 = Extrapolate, 1= natural
 c         call cspline_fit_classic(spl,endmode)
 c      else
          call cspline_fit_ahg(spl,endmode)
@@ -226,7 +226,7 @@ c-----------------------------------------------------------------------
       enddo
       r(spl%mx,:)=0
 
-      if (endmode==3) then
+      if (endmode==3) then ! 3 = Extrapolated 
          call cspline_get_yp(spl%xs(0:3),spl%fs(0:3,:),
      $                      spl%xs(0),r(0,:),spl%nqty)
          call cspline_get_yp(spl%xs(spl%mx-3:spl%mx),
@@ -274,7 +274,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      subroutine cspline_fit_ahg(spl,endmode)
+      subroutine cspline_fit_ahg(spl,endmode) 
       
       type(cspline_type), intent(inout) :: spl
       integer, intent(in) :: endmode
@@ -313,7 +313,7 @@ c-----------------------------------------------------------------------
 c     extrapolation boundary conditions.
 c-----------------------------------------------------------------------
       select case(endmode)
-      case(3)
+      case(3) ! 3 = Extrapolate
          do iqty=1,spl%nqty
             spl%fs1(0,iqty)=SUM(cl(1:4)*spl%fs(0:3,iqty))
             spl%fs1(spl%mx,iqty)=SUM(cr(1:4)
@@ -328,7 +328,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      case(4)
+      case(4) ! 4 = not-a-knot 
          spl%fs1(1,:)=spl%fs1(1,:)-(2*spl%fs(1,:)
      $        -spl%fs(0,:)-spl%fs(2,:))*2*b(1)
          spl%fs1(spl%mx-1,:)=spl%fs1(spl%mx-1,:)
@@ -349,7 +349,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boundary conditions.
 c-----------------------------------------------------------------------
-      case(2)
+      case(2) ! 2 = Periodic
          spl%periodic=.true.
          spl%fs1(0,:)=3*((spl%fs(1,:)-spl%fs(0,:))*b(1)
      $        +(spl%fs(0,:)-spl%fs(spl%mx-1,:))*b(spl%mx))
@@ -395,7 +395,7 @@ c-----------------------------------------------------------------------
 c     extrapolation boundary conditions.
 c-----------------------------------------------------------------------
       select case(endmode)
-      case(3)
+      case(3) ! 3 = Extrapolate
          b=b*b
          cl(1)=(spl%xs(0)*(3*spl%xs(0)
      $        -2*(spl%xs(1)+spl%xs(2)+spl%xs(3)))
@@ -439,7 +439,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      case(4)
+      case(4) ! 4 = not-a-knot
          b=b*b
          a(0,1)=a(0,1)+(spl%xs(2)+spl%xs(0)-2*spl%xs(1))*b(1)
          a(1,1)=a(1,1)+(spl%xs(2)-spl%xs(1))*b(1)
@@ -452,7 +452,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boundary conditions.
 c-----------------------------------------------------------------------
-      case(2)
+      case(2) ! 2 = Periodic
          a(0,0:spl%mx:spl%mx)=2*(b(spl%mx)+b(1))
          a(1,0)=b(1)
          a(-1,0)=b(spl%mx)
