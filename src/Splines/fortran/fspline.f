@@ -11,10 +11,11 @@ c     2. fspline_dealloc.
 c     3. fspline_fit_1.
 c     4. fspline_fit_2.
 c     5. fspline_eval.
-c     6. fspline_all_eval.
-c     7. fspline_write_xy.
-c     8. fspline_write_yx.
-c     9. fspline_copy.
+c     6. fspline_eval_external
+c     7. fspline_all_eval.
+c     8. fspline_write_xy.
+c     9. fspline_write_yx.
+c     10. fspline_copy.
 c-----------------------------------------------------------------------
 c     subprogram 0. fspline_type definition.
 c     defines fspline_type.
@@ -437,19 +438,18 @@ c-----------------------------------------------------------------------
       return
       end subroutine fspline_eval
 c-----------------------------------------------------------------------
-c     subprogram 5a. fspline_eval_external.
+c     subprogram 7. fspline_eval_external.
 c     evaluates fspline function (parallel), preserving original logic.
 c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      subroutine fspline_eval_external(fst, x, y, mode, s_ix, f_f,
+      subroutine fspline_eval_external(fst, x, y, mode, f_f,
      $                       f_fx, f_fy, f_fxx, f_fxy, f_fyy)
 
       type(fspline_type), intent(in) :: fst
       real(r8), intent(in) :: x, y
       integer, intent(in) :: mode
-      integer, intent(inout) :: s_ix
 
       integer :: m
       complex(r8) :: expfac, expfac0
@@ -481,13 +481,13 @@ c     evaluate cubic splines
 c-----------------------------------------------------------------------
       select case(mode)
       case (0)
-          call cspline_eval_external(fst%cs, x, s_ix,
+          call cspline_eval_external(fst%cs, x,
      $      cs_f)
       case (1)
-          call cspline_eval_external(fst%cs, x, s_ix,
+          call cspline_eval_external(fst%cs, x,
      $      cs_f, cs_f1)
       case (2)
-          call cspline_eval_external(fst%cs, x, s_ix, cs_f,
+          call cspline_eval_external(fst%cs, x, cs_f,
      $      cs_f1, cs_f2)
       end select
 
@@ -655,7 +655,7 @@ c-----------------------------------------------------------------------
       return
       end subroutine fspline_all_eval
 c-----------------------------------------------------------------------
-c     subprogram 7. fspline_write_xy.
+c     subprogram 8. fspline_write_xy.
 c     produces ascii and binary output for fspline fits.
 c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
@@ -751,7 +751,7 @@ c-----------------------------------------------------------------------
       return
       end subroutine fspline_write_xy
 c-----------------------------------------------------------------------
-c     subprogram 8. fspline_write_yx.
+c     subprogram 9. fspline_write_yx.
 c     produces ascii and binary output for fspline fits.
 c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
@@ -847,7 +847,7 @@ c-----------------------------------------------------------------------
       return
       end subroutine fspline_write_yx
 c-----------------------------------------------------------------------
-c     subprogram 9. fspline_copy.
+c     subprogram 10. fspline_copy.
 c     copies one fspline type to another.
 c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------

@@ -217,16 +217,15 @@ c-----------------------------------------------------------------------
 c     subprogram 5. spline_c_eval
 c     evaluates the spline at a given point.
 c-----------------------------------------------------------------------
-      subroutine spline_c_eval(handle, x, f, ix_op) bind(C)
+      subroutine spline_c_eval(handle, x, f) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f
-      integer(c_int), intent(in), value :: ix_op
 
-      integer(i4) :: ix ! index of x position in the spline
+
       real(c_double), pointer :: fi(:)
       type(spline_type), pointer :: spl
 c-----------------------------------------------------------------------
@@ -241,13 +240,8 @@ c-----------------------------------------------------------------------
 
       call c_f_pointer(f, fi, [spl%nqty])
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
 
-      call spline_eval_external(spl, x, ix, fi)
+      call spline_eval_external(spl, x, fi)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -257,16 +251,14 @@ c-----------------------------------------------------------------------
 c     subprogram 6. spline_c_eval_deriv
 c     evaluates the spline and its first derivative at a given point.
 c-----------------------------------------------------------------------
-      subroutine spline_c_eval_deriv(handle, x, f, f1, ix_op) bind(C)
+      subroutine spline_c_eval_deriv(handle, x, f, f1) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1
-      integer(c_int), intent(in), value :: ix_op
 
-      integer(i4) :: ix ! index of x position in the spline
       real(c_double), pointer :: fi(:), f1i(:)
       type(spline_type), pointer :: spl
 c-----------------------------------------------------------------------
@@ -282,13 +274,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f, fi, [spl%nqty])
       call c_f_pointer(f1, f1i, [spl%nqty])
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
-
-      call spline_eval_external(spl, x, ix, fi, f1i)
+      call spline_eval_external(spl, x, fi, f1i)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -300,16 +286,14 @@ c     evaluates the spline and its first and\
 c     second derivatives at a given point.
 c-----------------------------------------------------------------------
       subroutine spline_c_eval_deriv2(handle, x, f, f1,
-     $     f2, ix_op) bind(C)
+     $     f2) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1, f2
-      integer(c_int), intent(in), value :: ix_op
 
-      integer(i4) :: ix ! index of x position in the spline
       real(c_double), pointer :: fi(:), f1i(:), f2i(:)
       type(spline_type), pointer :: spl
 c-----------------------------------------------------------------------
@@ -326,13 +310,8 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f1, f1i, [spl%nqty])
       call c_f_pointer(f2, f2i, [spl%nqty])
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
 
-      call spline_eval_external(spl, x, ix, fi, f1i, f2i)
+      call spline_eval_external(spl, x, fi, f1i, f2i)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -343,16 +322,15 @@ c     subprogram 8. spline_c_eval_deriv3
 c     evaluates the spline and its first derivative at a given point.
 c-----------------------------------------------------------------------
       subroutine spline_c_eval_deriv3(handle, x, f, f1,
-     $    f2, f3, ix_op) bind(C)
+     $    f2, f3) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1, f2, f3
-      integer(c_int), intent(in), value :: ix_op
 
-      integer(i4) :: ix ! index of x position in the spline
+      
       real(c_double), pointer :: fi(:), f1i(:), f2i(:), f3i(:)
       type(spline_type), pointer :: spl
 c-----------------------------------------------------------------------
@@ -370,13 +348,8 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f2, f2i, [spl%nqty])
       call c_f_pointer(f3, f3i, [spl%nqty])
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
 
-      call spline_eval_external(spl, x, ix, fi, f1i, f2i, f3i)
+      call spline_eval_external(spl, x, fi, f1i, f2i, f3i)
 
 c-----------------------------------------------------------------------
 c     terminate.
@@ -563,16 +536,14 @@ c-----------------------------------------------------------------------
 c     subprogram 14. cspline_c_eval
 c     evaluates the spline at a given point.
 c-----------------------------------------------------------------------
-      subroutine cspline_c_eval(handle, x, f, ix_op) bind(C)
+      subroutine cspline_c_eval(handle, x, f) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f
-      integer(c_int), intent(in), value :: ix_op
 
-      integer(i4) :: ix ! index of x position in the spline
       complex(c_double), pointer :: fi(:)
       type(cspline_type), pointer :: cspl
 c-----------------------------------------------------------------------
@@ -587,13 +558,7 @@ c-----------------------------------------------------------------------
 
       call c_f_pointer(f, fi, [cspl%nqty])
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
-
-      call cspline_eval_external(cspl, x, ix, fi)
+      call cspline_eval_external(cspl, x, fi)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -603,16 +568,14 @@ c-----------------------------------------------------------------------
 c     subprogram 15. cspline_c_eval_deriv
 c     evaluates the spline and its first derivative at a given point.
 c-----------------------------------------------------------------------
-      subroutine cspline_c_eval_deriv(handle, x, f, f1, ix_op) bind(C)
+      subroutine cspline_c_eval_deriv(handle, x, f, f1) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1
-      integer(c_int), intent(in), value :: ix_op
 
-      integer(i4) :: ix ! index of x position in the spline
       complex(c_double), pointer :: fi(:), f1i(:)
       type(cspline_type), pointer :: cspl
 c-----------------------------------------------------------------------
@@ -628,13 +591,9 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f, fi, [cspl%nqty])
       call c_f_pointer(f1, f1i, [cspl%nqty])
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
+      
 
-      call cspline_eval_external(cspl, x, ix, fi, f1i)
+      call cspline_eval_external(cspl, x, fi, f1i)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -646,16 +605,14 @@ c     evaluates the spline and its first and\
 c     second derivatives at a given point.
 c-----------------------------------------------------------------------
       subroutine cspline_c_eval_deriv2(handle, x, f, f1,
-     $     f2, ix_op) bind(C)
+     $     f2) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1, f2
-      integer(c_int), intent(in), value :: ix_op
 
-      integer(i4) :: ix ! index of x position in the spline
       complex(c_double), pointer :: fi(:), f1i(:), f2i(:)
       type(cspline_type), pointer :: cspl
 c-----------------------------------------------------------------------
@@ -672,13 +629,8 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f1, f1i, [cspl%nqty])
       call c_f_pointer(f2, f2i, [cspl%nqty])
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
 
-      call cspline_eval_external(cspl, x, ix, fi, f1i, f2i)
+      call cspline_eval_external(cspl, x, fi, f1i, f2i)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -689,16 +641,14 @@ c     subprogram 17. cspline_c_eval_deriv3
 c     evaluates the spline and its first derivative at a given point.
 c-----------------------------------------------------------------------
       subroutine cspline_c_eval_deriv3(handle, x, f, f1,
-     $    f2, f3, ix_op) bind(C)
+     $    f2, f3) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x
       type(c_ptr), value :: f, f1, f2, f3
-      integer(c_int), intent(in), value :: ix_op
 
-      integer(i4) :: ix ! index of x position in the spline
       complex(c_double), pointer :: fi(:), f1i(:), f2i(:), f3i(:)
       type(cspline_type), pointer :: cspl
 c-----------------------------------------------------------------------
@@ -716,13 +666,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f2, f2i, [cspl%nqty])
       call c_f_pointer(f3, f3i, [cspl%nqty])
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
-
-      call cspline_eval_external(cspl, x, ix, fi, f1i, f2i, f3i)
+      call cspline_eval_external(cspl, x, fi, f1i, f2i, f3i)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -934,17 +878,14 @@ c-----------------------------------------------------------------------
 c     subprogram 23. bicube_c_eval
 c     evaluates the bicubic spline at a given point.
 c-----------------------------------------------------------------------
-      subroutine bicube_c_eval(handle, x, y, f, ix_op, iy_op) bind(C)
+      subroutine bicube_c_eval(handle, x, y, f) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f
-      integer(c_int), intent(in), value :: ix_op, iy_op
 
-      integer(i4) :: ix ! index of x position in the spline
-      integer(i4) :: iy ! index of y position in the spline
       real(c_double), pointer :: fi(:)
       real(r8), pointer :: fix(:), fiy(:), fxy(:), fxx(:), fyy(:)
       type(bicube_type), pointer :: bicube
@@ -958,24 +899,10 @@ c-----------------------------------------------------------------------
          return
       end if
 
-      call c_f_pointer(f, fi, [bicube%nqty])
-      allocate(fix(bicube%nqty), fiy(bicube%nqty))
-      allocate(fxy(bicube%nqty), fxx(bicube%nqty), fyy(bicube%nqty))
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
-      
-      if (iy_op>0) then
-         iy = iy_op
-      else
-         iy = 0
-      end if
+      call c_f_pointer(f, fi, [bicube%nqty])      
 
-      call bicube_eval_external(bicube, x, y, 0, ix, iy, fi, fix, fiy,
-     $                                                    fxy, fxx, fyy)
-      deallocate(fix, fiy)
+      call bicube_eval_external(bicube, x, y, 0, fi)
+
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -986,17 +913,14 @@ c     subprogram 24. bicube_c_eval_deriv
 c     evaluates the bicube and its first derivative at a given point.
 c-----------------------------------------------------------------------
       subroutine bicube_c_eval_deriv(handle, x, y,
-     $                                f, f1x, f1y, ix_op, iy_op) bind(C)
+     $                                f, f1x, f1y) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f, f1x, f1y
-      integer(c_int), intent(in), value :: ix_op, iy_op
 
-      integer(i4) :: ix ! index of x position in the spline
-      integer(i4) :: iy ! index of y position in the spline
       real(c_double), pointer :: fi(:), f1xi(:), f1yi(:)
       real(r8), pointer :: fxy(:), fxx(:), fyy(:)
       type(bicube_type), pointer :: bicube
@@ -1015,21 +939,8 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f1y, f1yi, [bicube%nqty])
       allocate(fxy(bicube%nqty), fxx(bicube%nqty), fyy(bicube%nqty))
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
 
-      if (iy_op>0) then
-         iy = iy_op
-      else
-         iy = 0
-      end if
-
-      call bicube_eval_external(bicube, x, y, 1, ix, iy, fi, f1xi, f1yi,
-     $                                                    fxy, fxx, fyy)
-      deallocate(fxy, fxx, fyy)
+      call bicube_eval_external(bicube, x, y, 1, fi, f1xi, f1yi)
 
 c-----------------------------------------------------------------------
 c     terminate.
@@ -1041,17 +952,14 @@ c     subprogram 25. bicube_c_eval_deriv2
 c     evaluates the bicube and its derivatives at a given point.
 c-----------------------------------------------------------------------
       subroutine bicube_c_eval_deriv2(handle, x, y, f, f1x, f1y,
-     $                           f2xx, f2xy, f2yy, ix_op, iy_op) bind(C)
+     $                           f2xx, f2xy, f2yy) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f, f1x, f1y, f2xx, f2xy, f2yy
-      integer(c_int), intent(in), value :: ix_op, iy_op
 
-      integer(i4) :: ix ! index of x position in the spline
-      integer(i4) :: iy ! index of y position in the spline
       real(c_double), pointer :: fi(:), f1xi(:), f1yi(:)
       real(c_double), pointer :: f2xxi(:), f2xyi(:), f2yyi(:)
       type(bicube_type), pointer :: bicube
@@ -1072,18 +980,8 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f2xy, f2xyi, [bicube%nqty])
       call c_f_pointer(f2yy, f2yyi, [bicube%nqty])
 
-      if (ix_op>0) then
-         ix = ix_op
-      else
-         ix = 0
-      end if
-
-      if (iy_op>0) then
-         iy = iy_op
-      else
-         iy = 0
-      end if
-      call bicube_eval_external(bicube, x, y, 2, ix, iy, fi, f1xi, f1yi,
+      
+      call bicube_eval_external(bicube, x, y, 2, fi, f1xi, f1yi,
      $                                              f2xxi, f2xyi, f2yyi)
 
 c-----------------------------------------------------------------------
@@ -1254,17 +1152,15 @@ c-----------------------------------------------------------------------
 c     subprogram 31. fspline_c_eval
 c     evaluates the fourier spline at a given point.
 c-----------------------------------------------------------------------
-      subroutine fspline_c_eval(handle, x, y, f_out, s_ix_op) bind(C)
+      subroutine fspline_c_eval(handle, x, y, f_out) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f_out
-      integer(c_int), value :: s_ix_op
       
 
-      integer(i4) :: s_ix ! index of x position in the cspline
       real(c_double), pointer :: f_f(:)
       type(fspline_type), pointer :: fst
 c-----------------------------------------------------------------------
@@ -1278,13 +1174,8 @@ c-----------------------------------------------------------------------
 
       call c_f_pointer(f_out, f_f, [fst%nqty])
       
-      if (s_ix_op > 0) then
-         s_ix = s_ix_op
-      else
-         s_ix = 0
-      end if
 
-      call fspline_eval_external(fst, x, y, 0, s_ix, f_f)
+      call fspline_eval_external(fst, x, y, 0, f_f)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -1296,17 +1187,15 @@ c     subprogram 32. fspline_c_eval_deriv
 c     evaluates the fourier spline and its first derivatives.
 c-----------------------------------------------------------------------
       subroutine fspline_c_eval_deriv(handle, x, y, f_out, 
-     $                                fx_out, fy_out, s_ix_op) bind(C)
+     $                                fx_out, fy_out) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f_out, fx_out, fy_out
-      integer(c_int), value :: s_ix_op
 
       type(fspline_type), pointer :: fst
-      integer(i4) :: s_ix
       real(c_double), pointer :: f_f(:), f_fx(:), f_fy(:)
 c-----------------------------------------------------------------------
 c     work.
@@ -1321,13 +1210,8 @@ c-----------------------------------------------------------------------
       call c_f_pointer(fx_out, f_fx, [fst%nqty])
       call c_f_pointer(fy_out, f_fy, [fst%nqty])
 
-      if (s_ix_op > 0) then
-         s_ix = s_ix_op
-      else
-         s_ix = 0
-      end if
 
-      call fspline_eval_external(fst, x, y, 1, s_ix, f_f, f_fx, f_fy)
+      call fspline_eval_external(fst, x, y, 1, f_f, f_fx, f_fy)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -1339,7 +1223,7 @@ c     subprogram 33. fspline_c_eval_deriv2
 c     evaluates the fourier spline and its second derivatives.
 c-----------------------------------------------------------------------
       subroutine fspline_c_eval_deriv2(handle, x, y, f_out, 
-     $     fx_out, fy_out, fxx_out, fxy_out, fyy_out, s_ix_op) bind(C)
+     $     fx_out, fy_out, fxx_out, fxy_out, fyy_out) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
@@ -1347,7 +1231,6 @@ c-----------------------------------------------------------------------
       real(c_double), value :: x, y
       type(c_ptr), value :: f_out, fx_out, fy_out
       type(c_ptr), value :: fxx_out, fxy_out, fyy_out
-      integer(c_int), value :: s_ix_op
 
       integer(i4) :: s_ix
       real(c_double), pointer :: f_f(:), f_fx(:), f_fy(:)
@@ -1369,13 +1252,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(fxy_out, f_fxy, [fst%nqty])
       call c_f_pointer(fyy_out, f_fyy, [fst%nqty])
 
-      if (s_ix_op > 0) then
-         s_ix = s_ix_op
-      else
-         s_ix = 0
-      end if
-
-      call fspline_eval_external(fst, x, y, 2, s_ix, f_f, f_fx, f_fy,
+      call fspline_eval_external(fst, x, y, 2, f_f, f_fx, f_fy,
      $                           f_fxx, f_fxy, f_fyy)
 c-----------------------------------------------------------------------
 c     terminate.

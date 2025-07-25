@@ -15,8 +15,6 @@ mutable struct BicubicSplineType
 	mx::Int64
 	my::Int64
 	nqty::Int64
-	ix::Int32  # Index of x position in the spline
-	iy::Int32  # Index of y position in the spline
 	bctypex::Int32  # Boundary condition type for x
 	bctypey::Int32  # Boundary condition type for y
 
@@ -52,7 +50,7 @@ function _MakeBicubicSpline(mx::Int64, my::Int64, nqty::Int64, bctypex::Int32, b
 
 
 	return BicubicSplineType(h[], Vector{Float64}(undef, 0), Vector{Float64}(undef, 0), 
-		Array{Float64,3}(undef, 0, 0, 0), mx, my, nqty, 0, 0, bctypex, bctypey,
+		Array{Float64,3}(undef, 0, 0, 0), mx, my, nqty, bctypex, bctypey,
 		fsx,fsy, fsxy)
 end
 
@@ -135,16 +133,16 @@ function _bicube_eval(bicube::BicubicSplineType, x::Float64, y::Float64, derivs:
 	fyy = Vector{Float64}(undef, bicube.nqty)
 	if derivs == 0
 		ccall((:bicube_c_eval, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Int32, Int32),
-			bicube.handle, x, y, f, bicube.ix, bicube.iy)
+			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}),
+			bicube.handle, x, y, f)
 	elseif derivs == 1
 		ccall((:bicube_c_eval_deriv, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32, Int32),
-			bicube.handle, x, y, f, fx, fy, bicube.ix, bicube.iy)
+			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+			bicube.handle, x, y, f, fx, fy)
 	elseif derivs == 2
 		ccall((:bicube_c_eval_deriv2, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32, Int32),
-			bicube.handle, x, y, f, fx, fy, fxx, fxy, fyy, bicube.ix, bicube.iy)
+			(Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+			bicube.handle, x, y, f, fx, fy, fxx, fxy, fyy)
 	else
 		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
 	end

@@ -593,16 +593,16 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      subroutine cspline_eval_external(spl,x,s_ix,s_f,s_f1,s_f2,s_f3)
+      subroutine cspline_eval_external(spl,x,s_f,s_f1,s_f2,s_f3)
 
       type(cspline_type), intent(in) :: spl
       real(r8), intent(in) :: x
 
       integer :: iqty,iside
+      integer :: ix, i_low, i_high, i_mid
       real(r8) :: xx,d,z,z1,dx
       complex(r8) :: g,g1,g2,g3
 
-      integer, intent(inout) :: s_ix
       complex(r8), dimension(:), intent(inout) :: s_f
       complex(r8), dimension(:),optional,intent(out) :: s_f1,s_f2,s_f3
 
@@ -615,8 +615,6 @@ c-----------------------------------------------------------------------
 c     preliminary computations.
 c-----------------------------------------------------------------------
       xx=x
-      s_ix=MAX(s_ix,0)
-      s_ix=Min(s_ix,spl%mx-1)
 c-----------------------------------------------------------------------
 c     normalize interval for periodic splines.
 c-----------------------------------------------------------------------
@@ -631,57 +629,67 @@ c-----------------------------------------------------------------------
          enddo
       endif
 c-----------------------------------------------------------------------
-c     find cubic spline interval.
+c     find cubic spline interval using Binary Search
 c-----------------------------------------------------------------------
-      do
-         if(s_ix <= 0)EXIT
-         if(xx >= spl%xs(s_ix))EXIT
-         s_ix=s_ix-1
+      i_low = 0
+      i_high = spl%mx - 1
+
+      do while (i_low <= i_high)
+            i_mid = i_low + (i_high - i_low) / 2
+            if (xx < spl%xs(i_mid)) then
+                  i_high = i_mid - 1
+            else if (xx >= spl%xs(i_mid + 1)) then
+                  i_low = i_mid + 1
+            else
+                  ! We found the interval: xs(i_mid) <= xx < xs(i_mid+1)
+                  ix = i_mid
+                  exit
+            endif
       enddo
-      do
-         if(s_ix >= spl%mx-1)EXIT
-         if(xx < spl%xs(s_ix+1))EXIT
-         s_ix=s_ix+1
-      enddo
+
+      ! If the search fails, treat it as a boundary value.
+      if (i_low > i_high) then
+        ix = min(max(i_low - 1, 0), spl%mx - 1)
+      endif
 c-----------------------------------------------------------------------
 c     evaluate offset and related quantities.
 c-----------------------------------------------------------------------
-      d=spl%xs(s_ix+1)-spl%xs(s_ix)
-      z=(xx-spl%xs(s_ix))/d
+      d=spl%xs(ix+1)-spl%xs(ix)
+      z=(xx-spl%xs(ix))/d
       z1=1-z
 c-----------------------------------------------------------------------
 c     evaluate functions.
 c-----------------------------------------------------------------------
-      s_f=spl%fs(s_ix,:)*z1*z1*(3-2*z1)
-     $     +spl%fs(s_ix+1,:)*z*z*(3-2*z)
-     $     +d*z*z1*(spl%fs1(s_ix,:)*z1
-     $     -spl%fs1(s_ix+1,:)*z)
+      s_f=spl%fs(ix,:)*z1*z1*(3-2*z1)
+     $     +spl%fs(ix+1,:)*z*z*(3-2*z)
+     $     +d*z*z1*(spl%fs1(ix,:)*z1
+     $     -spl%fs1(ix+1,:)*z)
 c-----------------------------------------------------------------------
 c     evaluate first derivatives.
 c-----------------------------------------------------------------------
       if(present(s_f1))then
-         s_f1=6*(spl%fs(s_ix+1,:)
-     $        -spl%fs(s_ix,:))*z*z1/d
-     $        +spl%fs1(s_ix,:)*z1*(3*z1-2)
-     $        +spl%fs1(s_ix+1,:)*z*(3*z-2)
+         s_f1=6*(spl%fs(ix+1,:)
+     $        -spl%fs(ix,:))*z*z1/d
+     $        +spl%fs1(ix,:)*z1*(3*z1-2)
+     $        +spl%fs1(ix+1,:)*z*(3*z-2)
       endif
 c-----------------------------------------------------------------------
 c     evaluate second derivatives.
 c-----------------------------------------------------------------------
       if(present(s_f2))then
-         s_f2=(6*(spl%fs(s_ix+1,:)
-     $        -spl%fs(s_ix,:))*(z1-z)/d
-     $        -spl%fs1(s_ix,:)*(6*z1-2)
-     $        +spl%fs1(s_ix+1,:)*(6*z-2))/d
+         s_f2=(6*(spl%fs(ix+1,:)
+     $        -spl%fs(ix,:))*(z1-z)/d
+     $        -spl%fs1(ix,:)*(6*z1-2)
+     $        +spl%fs1(ix+1,:)*(6*z-2))/d
       endif
 c-----------------------------------------------------------------------
 c     evaluate third derivatives.
 c-----------------------------------------------------------------------
       if(present(s_f3))then
-         s_f3=(12*(spl%fs(s_ix,:)
-     $        -spl%fs(s_ix+1,:))/d
-     $        +6*(spl%fs1(s_ix,:)
-     $        +spl%fs1(s_ix+1,:)))/(d*d)
+         s_f3=(12*(spl%fs(ix,:)
+     $        -spl%fs(ix+1,:))/d
+     $        +6*(spl%fs1(ix,:)
+     $        +spl%fs1(ix+1,:)))/(d*d)
       endif
 c-----------------------------------------------------------------------
 c     restore powers.

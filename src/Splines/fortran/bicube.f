@@ -650,33 +650,24 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine bicube_eval_external(bcs, x, y, mode,
-     $     b_ix, b_iy, b_f, b_fx, b_fy, b_fxx, b_fxy, b_fyy)
+     $     b_f, b_fx, b_fy, b_fxx, b_fxy, b_fyy)
 
       type(bicube_type), intent(in) :: bcs
       real(r8), intent(in) :: x,y
       integer, intent(in) :: mode
 
       integer :: i,iqty,iside
+      integer :: ix, iy, i_low, i_high, i_mid
       real(r8) :: dx,dy,xx,yy,g,gx,gy,gxx,gxy,gyy,xfac,yfac
       real(r8), dimension (4,4,bcs%nqty) :: c
 
-      integer, intent(inout) :: b_ix,b_iy
-      real(r8), dimension(:), intent(inout) :: b_f,b_fx,b_fy
-      real(r8), dimension(:), intent(inout) :: b_fxx,b_fxy,b_fyy
-c-----------------------------------------------------------------------
-c     error-check for mode number--external array is limited.
-c-----------------------------------------------------------------------
-c      if (mode > 1) then
-c         call program_stop("Set bicube_eval_external mode <=1 !")
-c      endif
-c      ????
+      real(r8), dimension(:), intent(inout) :: b_f
+      real(r8), dimension(:), intent(inout), optional :: b_fx,b_fy
+      real(r8), dimension(:), intent(inout), optional :: b_fxx,
+     $     b_fxy,b_fyy
 c-----------------------------------------------------------------------
 c     preliminary computations.
 c-----------------------------------------------------------------------
-      b_ix=max(b_ix,0)
-      b_ix=min(b_ix,bcs%mx-1)
-      b_iy=max(b_iy,0)
-      b_iy=min(b_iy,bcs%my-1)
       xx=x
       yy=y
 c-----------------------------------------------------------------------
@@ -693,18 +684,22 @@ c-----------------------------------------------------------------------
          enddo
       endif
 c-----------------------------------------------------------------------
-c     find x interval.
+c     find x interval using Binary search
 c-----------------------------------------------------------------------
-      do
-         if(b_ix <= 0)EXIT
-         if(xx >= bcs%xs(b_ix))EXIT
-         b_ix=b_ix-1
-      enddo
-      do
-         if(b_ix >= bcs%mx-1)EXIT
-         if(xx < bcs%xs(b_ix+1))EXIT
-         b_ix=b_ix+1
-      enddo
+      i_low = 0
+      i_high = bcs%mx - 1
+      do while (i_low <= i_high)
+         i_mid = i_low + (i_high - i_low) / 2
+         if (xx < bcs%xs(i_mid)) then
+               i_high = i_mid - 1
+         else if (xx >= bcs%xs(i_mid + 1)) then
+               i_low = i_mid + 1
+         else
+               ix = i_mid
+               exit
+         endif
+      end do
+      if (i_low > i_high) ix = min(max(i_low - 1, 0), bcs%mx - 1)
 c-----------------------------------------------------------------------
 c     normalize y interval for periodic splines.
 c-----------------------------------------------------------------------
@@ -721,22 +716,26 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     find y interval.
 c-----------------------------------------------------------------------
-      do
-         if(b_iy <= 0)EXIT
-         if(yy >= bcs%ys(b_iy))EXIT
-         b_iy=b_iy-1
-      enddo
-      do
-         if(b_iy >= bcs%my-1)EXIT
-         if(yy < bcs%ys(b_iy+1))EXIT
-         b_iy=b_iy+1
-      enddo
+      i_low = 0
+      i_high = bcs%my - 1
+      do while (i_low <= i_high)
+         i_mid = i_low + (i_high - i_low) / 2
+         if (yy < bcs%ys(i_mid)) then
+               i_high = i_mid - 1
+         else if (yy >= bcs%ys(i_mid + 1)) then
+               i_low = i_mid + 1
+         else
+               iy = i_mid
+               exit
+         endif
+      end do
+      if (i_low > i_high) iy = min(max(i_low - 1, 0), bcs%my - 1)
 c-----------------------------------------------------------------------
 c     find offsets and compute local coefficients.
 c-----------------------------------------------------------------------
-      dx=xx-bcs%xs(b_ix)
-      dy=yy-bcs%ys(b_iy)
-      call bicube_getco_external_sub(bcs,b_ix,b_iy,c)
+      dx=xx-bcs%xs(ix)
+      dy=yy-bcs%ys(iy)
+      call bicube_getco_external_sub(bcs,ix,iy,c)
 c-----------------------------------------------------------------------
 c     evaluate f.
 c-----------------------------------------------------------------------

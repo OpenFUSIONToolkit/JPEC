@@ -18,7 +18,6 @@ mutable struct FourierSplineType
     nqty::Int64
     bctype::Int32
     fit_method::Int32
-    s_ix::Int32
 
 
 end
@@ -49,7 +48,7 @@ function _MakeFourierSpline(mx::Int, my::Int, mband::Int, nqty::Int, bctype::Int
                              Vector{Float64}(undef, 0),
                              Vector{Float64}(undef, 0),
                              Array{Float64, 3}(undef, 0, 0, 0),
-                             mx, my, mband, nqty, bctype, fit_method, 0)
+                             mx, my, mband, nqty, bctype, fit_method)
 end
 
 function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3}
@@ -144,9 +143,9 @@ function _fspline_eval(spl::FourierSplineType, x::Float64, y::Float64, derivs::I
     if derivs == 0
         f = Vector{Float64}(undef, spl.nqty)
         ccall((:fspline_c_eval, libspline), Cvoid,
-            # (handle,      x,       y,      f_out,      s_ix_op)
-            (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Int32),
-            spl.handle, x, y, f, spl.s_ix)
+            # (handle,      x,       y,      f_out)
+            (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}),
+            spl.handle, x, y, f)
         return f
 
     elseif derivs == 1
@@ -154,9 +153,9 @@ function _fspline_eval(spl::FourierSplineType, x::Float64, y::Float64, derivs::I
         fx = Vector{Float64}(undef, spl.nqty)
         fy = Vector{Float64}(undef, spl.nqty)
         ccall((:fspline_c_eval_deriv, libspline), Cvoid,
-            # (handle,      x,       y,      f_out,      fx_out,      fy_out,      s_ix_op)
-            (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32),
-            spl.handle, x, y, f, fx, fy, spl.s_ix)
+            # (handle,      x,       y,      f_out,      fx_out,      fy_out)
+            (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+            spl.handle, x, y, f, fx, fy)
         return f, fx, fy
 
     elseif derivs == 2
@@ -167,9 +166,9 @@ function _fspline_eval(spl::FourierSplineType, x::Float64, y::Float64, derivs::I
         fxy = Vector{Float64}(undef, spl.nqty)
         fyy = Vector{Float64}(undef, spl.nqty)
         ccall((:fspline_c_eval_deriv2, libspline), Cvoid,
-            # (handle,      x,       y,      f_out,      fx_out,      fy_out,      fxx_out,     fxy_out,     fyy_out,     s_ix_op)
-            (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32),
-            spl.handle, x, y, f, fx, fy, fxx, fxy, fyy, spl.s_ix)
+            # (handle,      x,       y,      f_out,      fx_out,      fy_out,      fxx_out,     fxy_out,     fyy_out)
+            (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+            spl.handle, x, y, f, fx, fy, fxx, fxy, fyy)
         return f, fx, fy, fxx, fxy, fyy
         
     else
