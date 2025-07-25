@@ -2,9 +2,10 @@
 module JPEC
 
 include("Splines/Splines.jl")
-using .SplinesMod
+import .SplinesMod as Spl
+export SplinesMod, Spl
 
-#include("Equilibrium/Equilibrium.jl")
-#using .Equilibrium
+include("Equilibrium/Equilibrium.jl")
+export Equilibrium
 
 end # module JPEC
