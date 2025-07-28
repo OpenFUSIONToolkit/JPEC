@@ -14,10 +14,13 @@ function build_fortran()
     # Set OS-dependent flags
     if Sys.isapple()
         ENV["LIBS"] = "-framework Accelerate"
+        ENV["LIBSUFFIX"] = ".dylib"
     elseif Sys.islinux()
         ENV["LIBS"] = "-lopenblas"
+        ENV["LIBSUFFIX"] = ".so"
     elseif Sys.iswindows()
         ENV["LIBS"] = "-lopenblas"
+        ENV["LIBSUFFIX"] = ".dll"
     else
         error("Unsupported OS for Fortran build")
     end

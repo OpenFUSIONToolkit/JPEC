@@ -4,8 +4,9 @@ FFLAGS ?= -fPIC
 LDFLAGS ?= -shared
 LIBS ?= -framework Accelerate
 RECURSFLAG ?= -frecursive
+LIBSUFFIX ?= .dylib
 
-OUTLIB = libspline.dylib
+OUTLIB = libspline$(LIBSUFFIX)
 
 F90 = $(FC) $(FFLAGS) $(RECURSFLAG)
 

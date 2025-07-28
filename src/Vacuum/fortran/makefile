@@ -6,8 +6,9 @@ LIBS ?= -framework Accelerate
 RECURSFLAG ?= -frecursive
 LEGACYFLAG ?= -std=legacy
 ZEROFLAG ?= -finit-local-zero
+LIBSUFFIX ?= .dylib
 
-OUTLIB = libvac.dylib
+OUTLIB = libvac$(LIBSUFFIX)
 
 F90 = $(FC) $(FFLAGS) $(ZEROFLAG) $(RECURSFLAG) $(LEGACYFLAG)
 
