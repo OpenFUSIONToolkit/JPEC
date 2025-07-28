@@ -441,10 +441,60 @@ function ode_fixup(sing_flag::Bool, test::Bool)
     return
 end
 
-# Example stub for test
 function ode_test()
-    # Implement test logic here
-    return false
+    # Returns true/false according to stopping/flag criteria
+
+    # All globals are assumed available (see your input Fortran)
+    # psifac, psimax, istep, nstep, istate, res_flag
+    # ising, msing, singfac, singfac_max
+    # ca_old, ca, msol, mpert, u, flag_count, ksing, err_unit
+    # Also: sing_get_ca, etc
+
+    # Static storage: emulated with `global`
+    global singfac_old, powmax
+    if !isdefined(@__MODULE__, :singfac_old)
+        singfac_old = singfac
+    end
+    if !isdefined(@__MODULE__, :powmax)
+        powmax = 0.0
+    end
+
+    flag = psifac == psimax || istep == nstep || istate < 0
+    if !res_flag || flag || ising > msing || singfac > singfac_max
+        return flag
+    end
+
+    ca_old .= ca           # Save previous surface ca
+    sing_get_ca(ising, psifac, u, ca)    # Updates global ca
+    dca = ca .- ca_old
+    dsingfac = abs((singfac - singfac_old)/singfac)
+    singfac_old = singfac
+
+    power = zeros(Float64, msol)
+    powmax_old = powmax
+    for isol in 1:msol
+        # ca[:,isol,:]::matrix of size (mpert,2)
+        # Flatten the relevant slice for norm calculation
+        ca_isol = ca[:, isol, :]           # mpert × 2
+        dca_isol = dca[:, isol, :]
+        norm = abs(sum(conj.(ca_isol) .* ca_isol))
+        dnorm = abs(sum(conj.(ca_isol) .* dca_isol))
+        power[isol] = dnorm / (norm * dsingfac)
+    end
+    powmax = maximum(power)
+
+    global flag_count
+    flag_count += 1
+    if flag_count < 3
+        return flag
+    end
+    flag = flag || ((singfac < singfac_max) && (powmax > powmax_old))
+
+    if ising == ksing
+        println(err_unit, float(log10(singfac)), "  ", float(log10(powmax)))
+    end
+
+    return flag
 end
 
 # Example stub for test fixup
