@@ -405,10 +405,122 @@ function ode_sing_init()
     return nothing  # or could return a struct with all these values, for a more Julian approach
 end
 
-# Example stub for ideal crossing
 function ode_ideal_cross()
-    # Implement ideal crossing logic here
-    return
+    # ...existing code...
+
+    # Fixup solution at singular surface
+    if verbose
+        println("psi = $(sing[ising].psifac), q = $(sing[ising].q)")
+    end
+    ode_unorm(true)
+
+    # Diagnose solution before reinitialization
+    if diagnose
+        sing_get_ca(ising, psifac, u, ca)
+        init_out_unit = ascii_open("reinit.out", "UNKNOWN")
+        println(init_out_unit, "Output from ode_ideal_cross, singfac = $singfac")
+        println(init_out_unit, "Asymptotic coefficients matrix before reinit:")
+        for jsol in 1:msol
+            println(init_out_unit, "jsol = $jsol, m = $(mlow + jsol - 1)")
+            # Print ca values for each ipert
+            for ipert in 1:mpert
+                println(init_out_unit, ca[ipert, jsol, 1], abs(ca[ipert, jsol, 1]),
+                        ca[ipert, jsol, 2], abs(ca[ipert, jsol, 2]))
+            end
+        end
+    end
+
+    # Write asymptotic coefficients before reinit
+    if bin_euler
+        sing_get_ca(ising, psifac, u, ca)
+        write(euler_bin_unit, 4)
+        write(euler_bin_unit, sing[ising].psifac, sing[ising].q, sing[ising].q1)
+        write(euler_bin_unit, msol)
+        write(euler_bin_unit, ca)
+    end
+
+    # Re-initialize
+    psi_old = psifac
+    ipert0 = round(Int, nn * sing[ising].q) - mlow + 1
+    dpsi = sing[ising].psifac - psifac
+    psifac = sing[ising].psifac + dpsi
+    sing_get_ua(ising, psifac, ua)
+    if !con_flag
+        u[:, index[1], :] .= 0  # originally u(ipert0,:,:) = 0
+    end
+    sing_der(neq, psi_old, u, du1)
+    sing_der(neq, psifac, u, du2)
+    u .= u .+ (du1 .+ du2) .* dpsi
+    if !con_flag
+        u[ipert0, :, :] .= 0
+        u[:, index[1], :] .= ua[:, ipert0 + mpert, :]
+    end
+
+    # Diagnose solution after reinitialization
+    if diagnose
+        sing_get_ca(ising, psifac, u, ca)
+        println(init_out_unit, "Asymptotic coefficients matrix after reinit:")
+        for jsol in 1:msol
+            println(init_out_unit, "jsol = $jsol, m = $(mlow + jsol - 1)")
+            for ipert in 1:mpert
+                println(init_out_unit, ca[ipert, jsol, 1], abs(ca[ipert, jsol, 1]),
+                        ca[ipert, jsol, 2], abs(ca[ipert, jsol, 2]))
+            end
+        end
+        ascii_close(init_out_unit)
+        program_stop("Termination by ode_ideal_cross.")
+    end
+
+    # Write asymptotic coefficients after reinit
+    if bin_euler
+        sing_get_ca(ising, psifac, u, ca)
+        write(euler_bin_unit, msol)
+        write(euler_bin_unit, ca)
+        write(euler_bin_unit, sing[ising].restype.e, sing[ising].restype.f,
+              sing[ising].restype.h, sing[ising].restype.m,
+              sing[ising].restype.g, sing[ising].restype.k,
+              sing[ising].restype.eta, sing[ising].restype.rho,
+              sing[ising].restype.taua, sing[ising].restype.taur)
+    end
+
+    # Find next ising
+    while true
+        ising += 1
+        if ising > msing || psilim < sing[min(ising, msing)].psifac
+            break
+        end
+        q = sing[ising].q
+        if mlow <= nn * q && mhigh >= nn * q
+            break
+        end
+    end
+
+    # Compute conditions at next singular surface
+    if ising > msing || psilim < sing[min(ising, msing)].psifac
+        psimax = psilim * (1 - eps)
+        m1 = round(Int, nn * qlim) + sign(one, nn * sq.fs1[mpsi, 4])
+        next = "finish"
+    else
+        psimax = sing[ising].psifac - singfac_min / abs(nn * sing[ising].q1)
+        m1 = round(Int, nn * sing[ising].q)
+        println(crit_out_unit, "ising = $ising, psifac = $(sing[ising].psifac), q = $(sing[ising].q), di = $(sing[ising].di), alpha = $(sing[ising].alpha)")
+    end
+
+    # Restart ode solver
+    istate = 1
+    istep += 1
+    rwork[1] = psimax
+    new = true
+    u_save .= u
+    psi_save = psifac
+
+    # Write to files
+    println(crit_out_unit, "step info")
+    if crit_break
+        write(crit_bin_unit)
+    end
+
+    # ...existing code...
 end
 
 # Example stub for kinetic crossing
