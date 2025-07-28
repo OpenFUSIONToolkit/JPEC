@@ -53,7 +53,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine errmes ( nout,mesage )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -81,7 +81,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine wrtout ( nsrf, vec, wvec, m1,m2 )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       dimension vec(*)
@@ -108,7 +108,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine vecwrt ( mm, vec, wvec, m1,m2, nout1,nout2 )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -142,7 +142,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine writg1 ( string, seps, iseps, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -178,7 +178,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine errnc ( mesage, nrcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -209,7 +209,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwopn ( cdfid, file, nrw, rcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, nout(*)
@@ -242,7 +242,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwinq ( cdfid, ndims, nvars, ngatts, recid, rcode,
      $     nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, recid, nout(*)
@@ -277,7 +277,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwdid ( cdfid, dimnam, ndid, rcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, nout(*)
@@ -310,7 +310,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwdinq ( cdfid, dimid, dimnam, dimsiz, rcode,
      $     nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, dimid, dimsiz, nout(*)
@@ -342,7 +342,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwvid ( cdfid, varnam, vid, rcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, vid, nout(*)
@@ -375,7 +375,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwvinq ( cdfid, vid, varnam, vartyp, nvdims,
      $     vdims, nvatts, rcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, vid, vartyp, vdims(*), nout(*)
@@ -421,7 +421,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwvg1i ( cdfid, vid, vindx,nd, val1, rcode,
      $     nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, vid, vindx(*), val1, nout(*)
@@ -462,7 +462,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwvgt1 ( cdfid, vid, vindx,nd, val1, rcode,
      $     nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, vid, vindx(*), nout(*)
@@ -503,7 +503,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwvg1c ( cdfid, vid, vindx,nd, chval, rcode,
      $     nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, vid, vindx(*), nout(*)
@@ -544,7 +544,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwvgti ( cdfid, vid, start, count,nd, val0, vals,
      $     rcode, nd1,nd2, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, vid, start(*), count(*),
@@ -586,7 +586,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwvgt ( cdfid, vid, start,count,nd, val0, vals,
      $     nd1,nd2, rcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, vid, start(*), count(*), nout(*)
@@ -633,7 +633,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwvgtc ( cdfid, vid, start,count,nd, string, lenstr,
      $     rcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, vid, start(*), count(*), nout(*)
@@ -676,7 +676,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwainq ( cdfid, vid, attnam, attype, attlen, rcode,
      $     nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode, vid, attype, attlen, nout(*)
@@ -711,7 +711,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwagtc ( cdfid, vid, attnam, astrng, attlen, maxa1,
      $     rcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode,vid, attlen, nout(*)
@@ -766,7 +766,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwagt ( cdfid, vid, attnam, attval, attlen,
      $     rcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode,vid, attlen, nout(*)
@@ -814,7 +814,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine nwanam ( cdfid, vid, n, attnam, rcode, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer cdfid, rcode,vid, nout(*)
@@ -848,7 +848,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine writn1 ( mesage, n, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       character*(*) mesage
@@ -878,7 +878,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine writnn ( mesage, n, nd, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       character*(*) mesage
@@ -908,7 +908,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine writa1 ( mesage, string1, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       character*(*) mesage
@@ -939,7 +939,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine writv1 ( mesage, a, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       character*(*) mesage
@@ -969,7 +969,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine writis ( mesage, a, nd1, nd2, nw, nd, nout )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       character*(*) mesage
@@ -1003,7 +1003,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine writvs ( mesage, a, nd1, nd2, nw, nd, nout )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1052,7 +1052,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine vfrmt1 ( n, field1, fmt )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1083,7 +1083,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine vfrmt2 ( n, field1, fmt )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1114,7 +1114,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine vfrmt3 ( n, field1, fmt )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1145,7 +1145,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine bounds ( x1,z1, n1,n2, xmin,xmax, zmin,zmax )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1177,7 +1177,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine boundsi ( x1,z1, n1,n2, xmin,xmax, zmin,zmax,
      $     ixn,ixx,izn,izx )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1220,7 +1220,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine macopy ( ain,ndin, aout,ndout )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1246,7 +1246,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine matwrt ( a, maxj1, maxj2, jmax1, jmax2, label )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1279,7 +1279,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine vacasym ( vacin, nd,nnj,label, nout1,nout2 )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
 
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1328,7 +1328,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine masym0 ( vacin, nd,nnj,n1,n2,n10,n20,
      $     label, nout1,nout2 )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       character*(*) label
@@ -1382,7 +1382,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine vacasymi ( vacin, nd,nnj,label, nout1,nout2 )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
       USE vglobal_mod
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -1462,7 +1462,7 @@ c     subprogram 38. msctimer.
 c     computes elapsed cpu time; dummy routine.
 c-----------------------------------------------------------------------
       subroutine msctimer ( nout,mesage )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       character*(*) mesage
@@ -1476,7 +1476,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine shftpi ( xin,fin, xout,fout, n )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       dimension xin(*), fin(*), xout(*), fout(*)

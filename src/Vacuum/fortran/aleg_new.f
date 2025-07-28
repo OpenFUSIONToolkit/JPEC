@@ -14,7 +14,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       SUBROUTINE aleg_new(x,nloc,pm,pn,pp, aleg0,aleg1 )
-      USE local_mod, ONLY: r8
+      USE vglobal_mod, ONLY: r8
       IMPLICIT NONE
 
       REAL(r8), INTENT(IN) :: x
@@ -241,7 +241,7 @@ c
 
 !...................................................
        SUBROUTINE ek3(eta,ier,error,maxit,cel1,cel2,convg, kounter)
-       USE local_mod, ONLY: r8
+       USE vglobal_mod, ONLY: r8
        IMPLICIT NONE
 
        REAL(r8), INTENT(IN) :: eta,error
