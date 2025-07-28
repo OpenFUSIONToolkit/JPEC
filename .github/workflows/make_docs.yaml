@@ -1,0 +1,29 @@
+name: Build and Test Julia Package
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.10'
+
+      - name: Instantiate Julia environment
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Build package
+        run: julia --project=. -e 'using Pkg; Pkg.build()'
+
+      - name: Run tests
+        run: julia --project=. -e 'using Pkg; Pkg.test()'
