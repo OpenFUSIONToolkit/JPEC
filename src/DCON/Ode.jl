@@ -158,9 +158,9 @@ function ode_axis_init()
         while true
             it += 1
             #spline_eval(sq, psifac, 1)
-            result = JPEC.SplinesMod.spline_eval(sq, psifac)
-            q = sq.f[5]
-            q1 = sq.f1[5]
+            #q = sq.f[5]
+            #q1 = sq.f1[5]
+            q, q1 = JPEC.SplinesMod.spline_eval(sq, psifac, 1)
             dpsi = (qlow - q) / q1
             psifac += dpsi
             if abs(dpsi) < eps * abs(psifac) || it > itmax
@@ -618,7 +618,7 @@ function ode_step()
     # Update u and psifac with the solution at the end of the interval
     u .= sol.u[end]
     psifac = sol.t[end]
-    
+
     # Diagnose error
     if rwork[11] < 1e-14 && diagnose
         dt = rwork[11]
@@ -873,7 +873,8 @@ function ode_record_edge()
     vacuum1 = 0.0 + 0.0im
     plasma1 = 0.0 + 0.0im
 
-    spline_eval(sq, psifac, 0)
+    #spline_eval(sq, psifac, 0)
+    q = JPEC.SplinesMod.spline_eval(sq, psifac, 0)
     if size_edge > 0
         if sq.f[4] >= q_edge[i_edge] && psifac >= psiedge
             free_test(plasma1, vacuum1, total1, psifac)
