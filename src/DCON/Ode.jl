@@ -296,10 +296,113 @@ function ode_axis_init()
     return
 end
 
-# Example stub for singular initialization
 function ode_sing_init()
-    # Implement singular initialization logic here
-    return
+    # Declare and initialize local variables
+    star = fill(' ', mpert)
+    # local variables
+    ua = Array{Complex{r8}}(undef, mpert, 2*mpert, 2)
+    dpsi = 0.0
+    new = true
+
+    ising = sing_start
+    dpsi = singfac_min/abs(nn*sing[ising].q1)*10
+    psifac = sing[ising].psifac + dpsi
+    q = sing[ising].q + dpsi*sing[ising].q1
+
+    # Allocate and initialize solution arrays
+    u      = zeros(Complex{r8}, mpert, mpert, 2)
+    du     = zeros(Complex{r8}, mpert, mpert, 2)
+    u_save = zeros(Complex{r8}, mpert, mpert, 2)
+    unorm0 = zeros(r8, 2*mpert)
+    unorm  = zeros(r8, 2*mpert)
+    index  = zeros(Int, 2*mpert)
+
+    if old_init
+        u .= 0.0
+        for ipert ∈ 1:mpert
+            u[ipert, ipert, 2] = 1.0
+        end
+    else
+        sing_get_ua(ising, psifac, ua)
+        # Big slice: u = ua[:, mpert+1:2*mpert,:]
+        for i = 1:mpert, j = 1:mpert, k = 1:2
+            u[i, j, k] = ua[i, mpert+j, k]
+        end
+    end
+    u_save .= u
+    psi_save = psifac
+    msol = mpert
+    neq = 4 * mpert * msol
+
+    # Diagnose output: for demonstration, I'll use console prints only
+    if diagnose
+        sing_der(neq, psifac, u, du)
+        file = ascii_open("init.out", "w")
+        println(file, "Output from ode_sing_init")
+        println(file, "mlow mhigh mpert q psifac dpsi order")
+        println(file, mlow, " ", mhigh, " ", mpert, " ", q, " ", psifac, " ", dpsi, " ", sing_order)
+        ipert0 = sing[ising].m - mlow + 1
+        star = fill(' ', mpert)
+        star[ipert0] = '*'
+        m = mlow
+        for isol in 1:msol
+            println(file, "isol = $isol, m = $m", star[isol])
+            # The original Fortran code prints a header and then u and du for each ipert.
+            for ipert in 1:mpert
+                println(file, "$ipert ", u[ipert, isol, 1], " ", u[ipert, isol, 2],
+                        " ", du[ipert, isol, 1], " ", du[ipert, isol, 2], " ",
+                        star[ipert])
+            end
+            m += 1
+        end
+        ascii_close(file)
+        program_stop("Termination by ode_sing_init.")
+    end
+
+    # Compute conditions at next singular surface
+    while true
+        ising += 1
+        if ising > msing || psilim < sing[ising ≤ msing ? ising : msing].psifac
+            break
+        end
+        q = sing[ising].q
+        if mlow ≤ nn*q && mhigh ≥ nn*q
+            break
+        end
+    end
+
+    if ising > msing || psilim < sing[ising ≤ msing ? ising : msing].psifac
+        m1 = round(Int, nn*qlim) + round(Int, sign(one, nn*sq.fs1[mpsi, 4]))
+        psimax = psilim * (1-eps)
+        next_ = "finish"
+    else
+        m1 = round(Int, nn*sing[ising].q)
+        psimax = sing[ising].psifac - singfac_min/abs(nn*sing[ising].q1)
+        next_ = "cross"
+    end
+
+    # Set up integrator parameters
+    istep = 0
+    istate = 1
+    iopt = 1
+    itask = 5
+    itol = 2
+    mf = 10
+    istate = 1
+
+    # Set up work arrays
+    liw = length(iwork)    # iwork must exist!
+    lrw = 22 + 64*mpert*msol
+    rwork = zeros(r8, lrw)
+    atol  = zeros(r8, mpert, msol, 2)
+    fixfac = zeros(r8, msol, msol)
+    iwork = zeros(Int, liw)  # or readjust as needed
+    rwork[1] = psimax
+    rwork[5] = dpsi
+    rwork[11] = rwork[5]
+
+    # Terminate, or in Julia just return (no need for RETURN)
+    return nothing  # or could return a struct with all these values, for a more Julian approach
 end
 
 # Example stub for ideal crossing
