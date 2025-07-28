@@ -158,7 +158,7 @@ function ode_axis_init()
         while true
             it += 1
             #spline_eval(sq, psifac, 1)
-            result = JPEC.SplinesMod.spline_eval(plasma_eq.sq, psifac)
+            result = JPEC.SplinesMod.spline_eval(sq, psifac)
             q = sq.f[5]
             q1 = sq.f1[5]
             dpsi = (qlow - q) / q1
@@ -542,10 +542,102 @@ function ode_resist_cross()
     return
 end
 
-# Example stub for integrator step
 function ode_step()
-    # Implement ODE step logic here
-    return
+    # ODE integrator step
+    # Compute relative tolerances
+    singfac_local = typemax(Float64)
+    if kin_flag
+        if ising == 1 && kmsing >= 1
+            singfac_local = abs(psifac - kinsing[ising].psifac) /
+                            (kinsing[ising].psifac - psilow)
+        elseif ising <= kmsing
+            singfac_local = min(
+                abs(psifac - kinsing[ising].psifac),
+                abs(psifac - kinsing[ising-1].psifac)
+            ) / abs(kinsing[ising].psifac - kinsing[ising-1].psifac)
+        end
+    else
+        if ising <= msing
+            singfac_local = abs(sing[ising].m - nn * q)
+        end
+        if ising > 1
+            singfac_local = min(
+                singfac_local,
+                abs(sing[ising-1].m - nn * q)
+            )
+        end
+    end
+    tol = singfac_local < crossover ? tol_r : tol_nr
+    rtol = tol
+
+    # Compute absolute tolerances
+    for ieq in 1:2, isol in 1:msol
+        atol0 = maximum(abs.(u[:, isol, ieq])) * tol
+        if atol0 == 0
+            atol0 = typemax(Float64)
+        end
+        atol[:, isol, ieq] .= ComplexF64(atol0, atol0)
+    end
+
+    # Choose psiout
+    if node_flag
+        while psifac < sq.xs[ix]
+            ix += 1
+        end
+        psiout = sq.xs[ix]
+        psiout = min(psiout, psimax)
+        rwork[1] = psiout
+    else
+        psiout = psimax
+    end
+
+    # Advance differential equations
+    global istep
+    istep += 1
+
+    # Use DifferentialEquations.jl for general ODE solving in Julia
+    using DifferentialEquations
+
+    # Define the ODE function in the DifferentialEquations.jl format
+    function ode_func!(du, u, p, t)
+        sing_der(neq, t, u, du)
+    end
+
+    # Set up the problem
+    u0 = copy(u)
+    tspan = (psifac, psiout)
+    prob = ODEProblem(ode_func!, u0, tspan)
+
+    # Set tolerances
+    abstol = maximum(abs.(atol))
+    reltol = rtol
+
+    # Solve the ODE
+    sol = solve(prob, abstol=abstol, reltol=reltol)
+
+    # Update u and psifac with the solution at the end of the interval
+    u .= sol.u[end]
+    psifac = sol.t[end]
+    
+    # Diagnose error
+    if rwork[11] < 1e-14 && diagnose
+        dt = rwork[11]
+        sing_der(neq, psifac, u, du)
+        dewset(neq, itol, rtol, atol, u, ewt)
+        err = du .* dt ./ ewt
+        errabs = abs.(err)
+        errmax = maximum(errabs)
+        errloc = ind2sub(size(errabs), argmax(errabs))
+        ipert, isol, ieq = errloc
+        ewtmax = ewt[ipert, isol, ieq]
+        msg = """
+        Termination by ode_step
+        ipert = $ipert, ieq = $ieq, isol = $isol, msol = $msol
+        errmax = $(errmax), ewt = $(ewtmax), atol = $(abs(atol[ipert, isol, ieq]))
+        """
+        program_stop(msg)
+    end
+
 end
 
 function ode_unorm(sing_flag::Bool)
