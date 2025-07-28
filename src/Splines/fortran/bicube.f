@@ -31,28 +31,28 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      MODULE bicube_mod
-      USE spline_mod
-      IMPLICIT NONE
+      module bicube_mod
+      use spline_mod
+      implicit none
 
-      TYPE :: bicube_type
-      INTEGER :: mx,my,nqty,ix,iy
-      REAL(r8), DIMENSION(:,:), ALLOCATABLE :: xext,yext,fext
-      REAL(r8), DIMENSION(2) :: x0,y0
-      REAL(r8), DIMENSION(:), ALLOCATABLE :: xs,ys
-      REAL(r8), DIMENSION(:,:), ALLOCATABLE :: xpower,ypower
-      REAL(r8), DIMENSION(:,:,:), ALLOCATABLE :: fs,fsx,fsy,fsxy
-      REAL(r8), DIMENSION(:), ALLOCATABLE :: f,fx,fy,fxx,fxy,fyy
-      REAL(r8), DIMENSION(:,:,:,:,:), ALLOCATABLE :: cmats
-      REAL(r8), DIMENSION(:,:,:,:,:), ALLOCATABLE :: gs,gsx,gsy,gsxy,
+      type :: bicube_type
+      integer :: mx,my,nqty,ix,iy
+      real(r8), dimension(:,:), allocatable :: xext,yext,fext
+      real(r8), dimension(2) :: x0,y0
+      real(r8), dimension(:), allocatable :: xs,ys
+      real(r8), dimension(:,:), allocatable :: xpower,ypower
+      real(r8), dimension(:,:,:), allocatable :: fs,fsx,fsy,fsxy
+      real(r8), dimension(:), allocatable :: f,fx,fy,fxx,fxy,fyy
+      real(r8), dimension(:,:,:,:,:), allocatable :: cmats
+      real(r8), dimension(:,:,:,:,:), allocatable :: gs,gsx,gsy,gsxy,
      $     gsxx,gsyy
-      CHARACTER(6) :: xtitle,ytitle
-      CHARACTER(6), DIMENSION(:), ALLOCATABLE :: title
-      CHARACTER(6) :: name
-      LOGICAL, DIMENSION(2) :: periodic
-      END TYPE bicube_type
+      character(6) :: xtitle,ytitle
+      character(6), dimension(:), allocatable :: title
+      character(6) :: name
+      logical, dimension(2) :: periodic
+      end type bicube_type
 
-      CONTAINS
+      contains
 c-----------------------------------------------------------------------
 c     subprogram 1. bicube_alloc.
 c     allocates space for bicube_type.
@@ -60,10 +60,10 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_alloc(bcs,mx,my,nqty)
+      subroutine bicube_alloc(bcs,mx,my,nqty)
 
-      INTEGER, INTENT(IN) :: mx,my,nqty
-      TYPE(bicube_type), INTENT(OUT) :: bcs
+      integer, intent(in) :: mx,my,nqty
+      type(bicube_type), intent(out) :: bcs
 c-----------------------------------------------------------------------
 c     set scalars.
 c-----------------------------------------------------------------------
@@ -72,25 +72,25 @@ c-----------------------------------------------------------------------
       bcs%ix=0
       bcs%iy=0
       bcs%nqty=nqty
-      bcs%periodic=.FALSE.
+      bcs%periodic=.false.
 c-----------------------------------------------------------------------
 c     allocate space.
 c-----------------------------------------------------------------------
-      ALLOCATE(bcs%xs(0:mx))
-      ALLOCATE(bcs%ys(0:my))
-      ALLOCATE(bcs%fs(0:mx,0:my,nqty))
-      ALLOCATE(bcs%fsx(0:mx,0:my,nqty))
-      ALLOCATE(bcs%fsy(0:mx,0:my,nqty))
-      ALLOCATE(bcs%fsxy(0:mx,0:my,nqty))
-      ALLOCATE(bcs%title(nqty))
-      ALLOCATE(bcs%f(nqty))
-      ALLOCATE(bcs%fx(nqty))
-      ALLOCATE(bcs%fy(nqty))
-      ALLOCATE(bcs%fxx(nqty))
-      ALLOCATE(bcs%fxy(nqty))
-      ALLOCATE(bcs%fyy(nqty))
-      ALLOCATE(bcs%xpower(2,nqty),bcs%ypower(2,nqty))
-      ALLOCATE(bcs%xext(2,nqty),bcs%yext(2,nqty),bcs%fext(2,nqty))
+      allocate(bcs%xs(0:mx))
+      allocate(bcs%ys(0:my))
+      allocate(bcs%fs(0:mx,0:my,nqty))
+      allocate(bcs%fsx(0:mx,0:my,nqty))
+      allocate(bcs%fsy(0:mx,0:my,nqty))
+      allocate(bcs%fsxy(0:mx,0:my,nqty))
+      allocate(bcs%title(nqty))
+      allocate(bcs%f(nqty))
+      allocate(bcs%fx(nqty))
+      allocate(bcs%fy(nqty))
+      allocate(bcs%fxx(nqty))
+      allocate(bcs%fxy(nqty))
+      allocate(bcs%fyy(nqty))
+      allocate(bcs%xpower(2,nqty),bcs%ypower(2,nqty))
+      allocate(bcs%xext(2,nqty),bcs%yext(2,nqty),bcs%fext(2,nqty))
       bcs%xpower=0
       bcs%ypower=0
       bcs%x0=0
@@ -98,8 +98,8 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_alloc
+      return
+      end subroutine bicube_alloc
 c-----------------------------------------------------------------------
 c     subprogram 2. bicube_dealloc.
 c     deallocates space for bicube_type.
@@ -107,39 +107,39 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_dealloc(bcs)
+      subroutine bicube_dealloc(bcs)
 
-      TYPE(bicube_type), INTENT(INOUT) :: bcs
+      type(bicube_type), intent(inout) :: bcs
 c-----------------------------------------------------------------------
 c     allocate space.
 c-----------------------------------------------------------------------
-      DEALLOCATE(bcs%xs)
-      DEALLOCATE(bcs%ys)
-      DEALLOCATE(bcs%fs)
-      DEALLOCATE(bcs%fsx)
-      DEALLOCATE(bcs%fsy)
-      DEALLOCATE(bcs%fsxy)
-      DEALLOCATE(bcs%title)
-      DEALLOCATE(bcs%f)
-      DEALLOCATE(bcs%fx)
-      DEALLOCATE(bcs%fy)
-      DEALLOCATE(bcs%fxx)
-      DEALLOCATE(bcs%fxy)
-      DEALLOCATE(bcs%fyy)
-      DEALLOCATE(bcs%xpower,bcs%ypower)
-      DEALLOCATE(bcs%xext,bcs%yext,bcs%fext)
-      IF(ALLOCATED(bcs%cmats))DEALLOCATE(bcs%cmats)
-      IF(ALLOCATED(bcs%gs))DEALLOCATE(bcs%gs)
-      IF(ALLOCATED(bcs%gsx))DEALLOCATE(bcs%gsx)
-      IF(ALLOCATED(bcs%gsy))DEALLOCATE(bcs%gsy)
-      IF(ALLOCATED(bcs%gsxx))DEALLOCATE(bcs%gsxx)
-      IF(ALLOCATED(bcs%gsxy))DEALLOCATE(bcs%gsxy)
-      IF(ALLOCATED(bcs%gsyy))DEALLOCATE(bcs%gsyy)
+      deallocate(bcs%xs)
+      deallocate(bcs%ys)
+      deallocate(bcs%fs)
+      deallocate(bcs%fsx)
+      deallocate(bcs%fsy)
+      deallocate(bcs%fsxy)
+      deallocate(bcs%title)
+      deallocate(bcs%f)
+      deallocate(bcs%fx)
+      deallocate(bcs%fy)
+      deallocate(bcs%fxx)
+      deallocate(bcs%fxy)
+      deallocate(bcs%fyy)
+      deallocate(bcs%xpower,bcs%ypower)
+      deallocate(bcs%xext,bcs%yext,bcs%fext)
+      if(allocated(bcs%cmats))deallocate(bcs%cmats)
+      if(allocated(bcs%gs))deallocate(bcs%gs)
+      if(allocated(bcs%gsx))deallocate(bcs%gsx)
+      if(allocated(bcs%gsy))deallocate(bcs%gsy)
+      if(allocated(bcs%gsxx))deallocate(bcs%gsxx)
+      if(allocated(bcs%gsxy))deallocate(bcs%gsxy)
+      if(allocated(bcs%gsyy))deallocate(bcs%gsyy)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_dealloc
+      return
+      end subroutine bicube_dealloc
 c-----------------------------------------------------------------------
 c     subprogram 3. bicube_fit.
 c     fits functions to bicubic splines.
@@ -147,17 +147,17 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_fit(bcs,endmode1,endmode2)
+      subroutine bicube_fit(bcs,endmode1,endmode2)
 
-      TYPE(bicube_type), INTENT(INOUT), TARGET :: bcs
-      CHARACTER(*), INTENT(IN) :: endmode1,endmode2
+      type(bicube_type), intent(inout), TARGET :: bcs
+      integer, intent(in) :: endmode1,endmode2
 
-      INTEGER :: iqty,iside,ix,iy
-      REAL(r8), DIMENSION(0:bcs%mx) :: xfac
-      REAL(r8), DIMENSION(0:bcs%my) :: yfac
-      TYPE(spline_type) :: spl
+      integer :: iqty,iside,ix,iy
+      real(r8), dimension(0:bcs%mx) :: xfac
+      real(r8), dimension(0:bcs%my) :: yfac
+      type(spline_type) :: spl
 
-      REAL(r8), DIMENSION(:,:,:), POINTER :: fs,fsx,fsy,fsxy
+      real(r8), dimension(:,:,:), POinTER :: fs,fsx,fsy,fsxy
 c-----------------------------------------------------------------------
 c     set pointers.
 c-----------------------------------------------------------------------
@@ -168,72 +168,72 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     extract x powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
-         DO iqty=1,bcs%nqty
-            IF(bcs%xpower(iside,iqty) /= 0)THEN
+      do iside=1,2
+         do iqty=1,bcs%nqty
+            if(bcs%xpower(iside,iqty) /= 0)then
                xfac=1/ABS(bcs%xs-bcs%x0(iside))**bcs%xpower(iside,iqty)
-               DO iy=0,bcs%my
+               do iy=0,bcs%my
                   bcs%fs(:,iy,iqty)=bcs%fs(:,iy,iqty)*xfac
-               ENDDO
-            ENDIF
-         ENDDO
-      ENDDO
+               enddo
+            endif
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     extract y powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
-         DO iqty=1,bcs%nqty
-            IF(bcs%ypower(iside,iqty) /= 0)THEN
+      do iside=1,2
+         do iqty=1,bcs%nqty
+            if(bcs%ypower(iside,iqty) /= 0)then
                yfac=1/ABS(bcs%ys-bcs%y0(iside))**bcs%ypower(iside,iqty)
-               DO ix=0,bcs%mx
+               do ix=0,bcs%mx
                   bcs%fs(ix,:,iqty)=bcs%fs(ix,:,iqty)*yfac
-               ENDDO
-            ENDIF
-         ENDDO
-      ENDDO
+               enddo
+            endif
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     set periodicity.
 c-----------------------------------------------------------------------
-      bcs%periodic=(/endmode1 == "periodic",endmode2 == "periodic"/)
-      IF(bcs%periodic(1))bcs%fs(bcs%mx,:,:)=bcs%fs(0,:,:)
-      IF(bcs%periodic(2))bcs%fs(:,bcs%my,:)=bcs%fs(:,0,:)
+      bcs%periodic=(/endmode1 == 2,endmode2 == 2/) !2=periodic      
+      if(bcs%periodic(1))bcs%fs(bcs%mx,:,:)=bcs%fs(0,:,:)
+      if(bcs%periodic(2))bcs%fs(:,bcs%my,:)=bcs%fs(:,0,:)
 c-----------------------------------------------------------------------
 c     evaluate y derivatives.
 c-----------------------------------------------------------------------
-      CALL spline_alloc(spl,bcs%my,bcs%mx+1)
+      call spline_alloc(spl,bcs%my,bcs%mx+1)
       spl%xs=bcs%ys
-      DO iqty=1,bcs%nqty
+      do iqty=1,bcs%nqty
          spl%fs=TRANSPOSE(bcs%fs(:,:,iqty))
-         CALL spline_fit(spl,endmode2)
+         call spline_fit(spl,endmode2)
          bcs%fsy(:,:,iqty)=TRANSPOSE(spl%fs1)
-      ENDDO
-      CALL spline_dealloc(spl)
+      enddo
+      call spline_dealloc(spl)
 c-----------------------------------------------------------------------
 c     evaluate x derivatives.
 c-----------------------------------------------------------------------
       spl%mx=bcs%mx
       spl%nqty=bcs%my+1
-      CALL spline_alloc(spl,bcs%mx,bcs%my+1)
+      call spline_alloc(spl,bcs%mx,bcs%my+1)
       spl%xs=bcs%xs
-      DO iqty=1,bcs%nqty
+      do iqty=1,bcs%nqty
          spl%fs=bcs%fs(:,:,iqty)
-         CALL spline_fit(spl,endmode1)
+         call spline_fit(spl,endmode1)
          bcs%fsx(:,:,iqty)=spl%fs1
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     evaluate mixed derivatives.
 c-----------------------------------------------------------------------
-      DO iqty=1,bcs%nqty
+      do iqty=1,bcs%nqty
          spl%fs=bcs%fsy(:,:,iqty)
-         CALL spline_fit(spl,endmode1)
+         call spline_fit(spl,endmode1)
          bcs%fsxy(:,:,iqty)=spl%fs1
-      ENDDO
-      CALL spline_dealloc(spl)
+      enddo
+      call spline_dealloc(spl)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_fit
+      return
+      end subroutine bicube_fit
 c-----------------------------------------------------------------------
 c     subprogram 4. bicube_lsfit.
 c     least-square fit to cubic splines of piecewise-constant functions.
@@ -241,21 +241,21 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_lsfit(bcs)
+      subroutine bicube_lsfit(bcs)
 
-      TYPE(bicube_type), INTENT(INOUT) :: bcs
+      type(bicube_type), intent(inout) :: bcs
 
-      LOGICAL, PARAMETER :: diagnose=.FALSE.
-      INTEGER :: ix,iy,nx,ny,mx,my,nrhs,n,info,i,j,k,l,kd,ldab
-      INTEGER, DIMENSION(4*(bcs%mx+1)*(bcs%my+1)) :: ipiv
-      REAL(r8), PARAMETER ::
+      logical, PARAMETER :: diagnose=.false.
+      integer :: ix,iy,nx,ny,mx,my,nrhs,n,info,i,j,k,l,kd,ldab
+      integer, dimension(4*(bcs%mx+1)*(bcs%my+1)) :: ipiv
+      real(r8), PARAMETER ::
      $     a0=13/35._r8,a1=9/70._r8,b0=11/210._r8,b1=13/420._r8
-      REAL(r8), DIMENSION(0:bcs%mx+1) :: dx
-      REAL(r8), DIMENSION(0:bcs%my+1) :: dy
-      REAL(r8), DIMENSION(4,0:bcs%mx,0:bcs%my,bcs%nqty) :: rhs
-      REAL(r8), DIMENSION(0:bcs%mx+1,0:bcs%my+1,bcs%nqty) :: g
-      REAL(r8), DIMENSION(4,4,-1:1,-1:1,0:bcs%mx,0:bcs%my) :: amat
-      REAL(r8), DIMENSION(:,:), ALLOCATABLE :: ab
+      real(r8), dimension(0:bcs%mx+1) :: dx
+      real(r8), dimension(0:bcs%my+1) :: dy
+      real(r8), dimension(4,0:bcs%mx,0:bcs%my,bcs%nqty) :: rhs
+      real(r8), dimension(0:bcs%mx+1,0:bcs%my+1,bcs%nqty) :: g
+      real(r8), dimension(4,4,-1:1,-1:1,0:bcs%mx,0:bcs%my) :: amat
+      real(r8), dimension(:,:), allocatable :: ab
 c-----------------------------------------------------------------------
 c     define sizes.
 c-----------------------------------------------------------------------
@@ -279,7 +279,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     least squares fit, function values.
 c-----------------------------------------------------------------------
-      DO iy=0,ny
+      do iy=0,ny
          amat(1,1,0,0,0:nx,iy)=a0**2
      $        *(dx(0:nx)+dx(1:nx+1))*(dy(iy)+dy(iy+1))
          amat(1,1,-1,0,0:nx,iy)=a0*a1*dx(0:nx)*(dy(iy)+dy(iy+1))
@@ -290,11 +290,11 @@ c-----------------------------------------------------------------------
          amat(1,1,-1,+1,0:nx,iy)=a1**2*dx(0:nx)*dy(iy+1)
          amat(1,1,+1,-1,0:nx,iy)=a1**2*dx(1:nx+1)*dy(iy)
          amat(1,1,+1,+1,0:nx,iy)=a1**2*dx(1:nx+1)*dy(iy+1)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     least squares fit, x derivatiives.
 c-----------------------------------------------------------------------
-      DO iy=0,ny
+      do iy=0,ny
          amat(1,2,0,0,0:nx,iy)=a0*b0
      $        *(dx(1:nx+1)**2-dx(0:nx)**2)*(dy(iy)+dy(iy+1))
          amat(1,2,-1,0,0:nx,iy)=+a0*b1*(dy(iy)+dy(iy+1))*dx(0:nx)**2
@@ -303,11 +303,11 @@ c-----------------------------------------------------------------------
          amat(1,2,+1,-1,0:nx,iy)=-a1*b1*dx(1:nx+1)**2*dy(iy)
          amat(1,2,-1,+1,0:nx,iy)=+a1*b1*dx(0:nx)**2*dy(iy+1)
          amat(1,2,+1,+1,0:nx,iy)=-a1*b1*dx(1:nx+1)**2*dy(iy+1)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     least squares fit, y derivatiives.
 c-----------------------------------------------------------------------
-      DO ix=0,nx
+      do ix=0,nx
          amat(1,3,0,0,ix,0:ny)=a0*b0
      $        *(dy(1:ny+1)**2-dy(0:ny)**2)*(dx(ix)+dx(ix+1))
          amat(1,3,-1,0,ix,0:ny)=+a0*b1*(dx(ix)+dx(ix+1))*dy(0:ny)**2
@@ -316,11 +316,11 @@ c-----------------------------------------------------------------------
          amat(1,3,+1,-1,ix,0:ny)=-a1*b1*dy(1:ny+1)**2*dx(ix)
          amat(1,3,-1,+1,ix,0:ny)=+a1*b1*dy(0:ny)**2*dx(ix+1)
          amat(1,3,+1,+1,ix,0:ny)=-a1*b1*dy(1:ny+1)**2*dx(ix+1)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     least squares fit, mixed derivatives.
 c-----------------------------------------------------------------------
-      DO iy=0,ny
+      do iy=0,ny
          amat(1,4,0,0,0:nx,iy)=b0**2
      $        *(dx(0:nx)**2-dx(1:nx+1)**2)*(dy(iy)**2-dy(iy+1)**2)
          amat(1,4,-1,0,0:nx,iy)=+b0*b1*dx(0:nx)**2
@@ -335,80 +335,80 @@ c-----------------------------------------------------------------------
          amat(1,4,-1,+1,0:nx,iy)=-b1**2*dx(0:nx)**2*dy(iy+1)**2
          amat(1,4,+1,-1,0:nx,iy)=-b1**2*dx(1:nx+1)**2*dy(iy)**2
          amat(1,4,+1,+1,0:nx,iy)=b1**2*dx(1:nx+1)**2*dy(iy+1)**2
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     least squares fit, rhs.
 c-----------------------------------------------------------------------
-      DO iy=0,ny
-         DO ix=0,nx
+      do iy=0,ny
+         do ix=0,nx
             rhs(1,ix,iy,:)
      $           =(dx(ix)*g(ix,iy,:)+dx(ix+1)*g(ix+1,iy,:))*dy(iy)
      $           +(dx(ix)*g(ix,iy+1,:)+dx(ix+1)*g(ix+1,iy+1,:))*dy(iy+1)
-         ENDDO
-      ENDDO
+         enddo
+      enddo
       rhs=rhs/4
 c-----------------------------------------------------------------------
 c     continuity of second x-derivatives.
 c-----------------------------------------------------------------------
-      DO ix=1,nx-1
+      do ix=1,nx-1
          amat(2,1,-1,0,ix,0:ny)=3/dx(ix)**2
          amat(2,1,0,0,ix,0:ny)=3/dx(ix+1)**2-3/dx(ix)**2
          amat(2,1,1,0,ix,0:ny)=-3/dx(ix+1)**2
          amat(2,2,-1,0,ix,0:ny)=1/dx(ix)
          amat(2,2,0,0,ix,0:ny)=2/dx(ix)+2/dx(ix+1)
          amat(2,2,1,0,ix,0:ny)=1/dx(ix+1)
-      ENDDO
+      enddo
       amat(2,2,0,0,0:nx:nx,0:ny)=1
 c-----------------------------------------------------------------------
 c     continuity of second y-derivatives.
 c-----------------------------------------------------------------------
-      DO iy=1,ny-1
+      do iy=1,ny-1
          amat(3,1,0,-1,0:nx,iy)=3/dy(iy)**2
          amat(3,1,0,0,0:nx,iy)=3/dy(iy+1)**2-3/dy(iy)**2
          amat(3,1,0,1,0:nx,iy)=-3/dy(iy+1)**2
          amat(3,3,0,-1,0:nx,iy)=1/dy(iy)
          amat(3,3,0,0,0:nx,iy)=2/dy(iy)+2/dy(iy+1)
          amat(3,3,0,1,0:nx,iy)=1/dy(iy+1)
-      ENDDO
+      enddo
       amat(3,3,0,0,0:nx,0:ny:ny)=1
 c-----------------------------------------------------------------------
 c     continuity of mixed second derivatives.
 c-----------------------------------------------------------------------
-      DO ix=1,nx-1
+      do ix=1,nx-1
          amat(4,3,-1,0,ix,0:ny)=3/dx(ix)**2
          amat(4,3,0,0,ix,0:ny)=3/dx(ix+1)**2-3/dx(ix)**2
          amat(4,3,1,0,ix,0:ny)=-3/dx(ix+1)**2
          amat(4,4,-1,0,ix,0:ny)=1/dx(ix)
          amat(4,4,0,0,ix,0:ny)=2/dx(ix)+2/dx(ix+1)
          amat(4,4,1,0,ix,0:ny)=1/dx(ix+1)
-      ENDDO
+      enddo
       amat(4,4,0,0,0:nx:nx,0:ny)=1
 c-----------------------------------------------------------------------
 c     transfer matrix to lapack band storage.
 c-----------------------------------------------------------------------
-      ALLOCATE(ab(ldab,n))
+      allocate(ab(ldab,n))
       ab=0
-      DO ix=0,nx
-         DO mx=MAX(-ix,-1),MIN(nx-ix,1)
-            DO iy=0,ny
-               DO my=MAX(-iy,-1),MIN(ny-iy,1)
-                  DO k=1,4
-                     DO l=1,4
+      do ix=0,nx
+         do mx=MAX(-ix,-1),Min(nx-ix,1)
+            do iy=0,ny
+               do my=MAX(-iy,-1),Min(ny-iy,1)
+                  do k=1,4
+                     do l=1,4
                         i=4*(iy*(nx+1)+ix)+k
                         j=4*((iy+my)*(nx+1)+ix+mx)+l
                         ab(2*kd+1+i-j,j)=amat(k,l,mx,my,ix,iy)
-                     ENDDO
-                  ENDDO
-               ENDDO
-            ENDDO
-         ENDDO
-      ENDDO
+                     enddo
+                  enddo
+               enddo
+            enddo
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     factor and solve.
 c-----------------------------------------------------------------------
-      CALL dgbtrf(n,n,kd,kd,ab,ldab,ipiv,info)
-      CALL dgbtrs('N',n,kd,kd,nrhs,ab,ldab,ipiv,rhs,n,info)
-      DEALLOCATE(ab)
+      call dgbtrf(n,n,kd,kd,ab,ldab,ipiv,info)
+      call dgbtrs('N',n,kd,kd,nrhs,ab,ldab,ipiv,rhs,n,info)
+      deallocate(ab)
 c-----------------------------------------------------------------------
 c     compute output.
 c-----------------------------------------------------------------------
@@ -419,8 +419,8 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_lsfit
+      return
+      end subroutine bicube_lsfit
 c-----------------------------------------------------------------------
 c     subprogram 5. bicube_eval.
 c     evaluates bicubic spline function.
@@ -428,29 +428,29 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_eval(bcs,x,y,mode)
+      subroutine bicube_eval(bcs,x,y,mode)
 
-      TYPE(bicube_type), INTENT(INOUT) :: bcs
-      REAL(r8), INTENT(IN) :: x,y
-      INTEGER, INTENT(IN) :: mode
+      type(bicube_type), intent(inout) :: bcs
+      real(r8), intent(in) :: x,y
+      integer, intent(in) :: mode
 
-      INTEGER :: i,iqty,iside
-      REAL(r8) :: dx,dy,xx,yy,g,gx,gy,gxx,gyy,gxy,xfac,yfac
-      REAL(r8), DIMENSION (4,4,bcs%nqty) :: c
+      integer :: i,iqty,iside
+      real(r8) :: dx,dy,xx,yy,g,gx,gy,gxx,gyy,gxy,xfac,yfac
+      real(r8), dimension (4,4,bcs%nqty) :: c
 c-----------------------------------------------------------------------
 c     preliminary computations.
 c-----------------------------------------------------------------------
-      IF(bcs%mx==0 .OR. bcs%my==0)THEN
-         WRITE(*, *) 'ERROR: Bicubic spline entitled "',bcs%title,'"'
-         IF(bcs%mx==0)THEN
-            WRITE(*, *) 'has 0 elements specified for x axis '
+      if(bcs%mx==0 .OR. bcs%my==0)then
+         write(*, *) 'ERROR: Bicubic spline entitled "',bcs%title,'"'
+         if(bcs%mx==0)then
+            write(*, *) 'has 0 elements specified for x axis '
      $                  //TRIM(bcs%xtitle)
-         ELSE
-            WRITE(*, *) 'has 0 elements specified for y axis '
+         else
+            write(*, *) 'has 0 elements specified for y axis '
      $                  //TRIM(bcs%ytitle)
-         ENDIF
-         STOP
-      ENDIF
+         endif
+         stop
+      endif
       bcs%ix=max(bcs%ix,0)
       bcs%ix=min(bcs%ix,bcs%mx-1)
       bcs%iy=max(bcs%iy,0)
@@ -460,83 +460,83 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     normalize x interval for periodic splines.
 c-----------------------------------------------------------------------
-      IF(bcs%periodic(1))THEN
-         DO
-            IF(xx < bcs%xs(bcs%mx))EXIT
+      if(bcs%periodic(1))then
+         do
+            if(xx < bcs%xs(bcs%mx))EXIT
             xx=xx-bcs%xs(bcs%mx)
-         ENDDO
-         DO
-            IF(xx >= bcs%xs(0))EXIT
+         enddo
+         do
+            if(xx >= bcs%xs(0))EXIT
             xx=xx+bcs%xs(bcs%mx)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     find x interval.
 c-----------------------------------------------------------------------
-      DO
-         IF(bcs%ix <= 0)EXIT
-         IF(xx >= bcs%xs(bcs%ix))EXIT
+      do
+         if(bcs%ix <= 0)EXIT
+         if(xx >= bcs%xs(bcs%ix))EXIT
          bcs%ix=bcs%ix-1
-      ENDDO
-      DO
-         IF(bcs%ix >= bcs%mx-1)EXIT
-         IF(xx < bcs%xs(bcs%ix+1))EXIT
+      enddo
+      do
+         if(bcs%ix >= bcs%mx-1)EXIT
+         if(xx < bcs%xs(bcs%ix+1))EXIT
          bcs%ix=bcs%ix+1
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     normalize y interval for periodic splines.
 c-----------------------------------------------------------------------
-      IF(bcs%periodic(2))THEN
-         DO
-            IF(yy < bcs%ys(bcs%my))EXIT
+      if(bcs%periodic(2))then
+         do
+            if(yy < bcs%ys(bcs%my))EXIT
             yy=yy-bcs%ys(bcs%my)
-         ENDDO
-         DO
-            IF(yy >= bcs%ys(0))EXIT
+         enddo
+         do
+            if(yy >= bcs%ys(0))EXIT
             yy=yy+bcs%ys(bcs%my)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     find y interval.
 c-----------------------------------------------------------------------
-      DO
-         IF(bcs%iy <= 0)EXIT
-         IF(yy >= bcs%ys(bcs%iy))EXIT
+      do
+         if(bcs%iy <= 0)EXIT
+         if(yy >= bcs%ys(bcs%iy))EXIT
          bcs%iy=bcs%iy-1
-      ENDDO
-      DO
-         IF(bcs%iy >= bcs%my-1)EXIT
-         IF(yy < bcs%ys(bcs%iy+1))EXIT
+      enddo
+      do
+         if(bcs%iy >= bcs%my-1)EXIT
+         if(yy < bcs%ys(bcs%iy+1))EXIT
          bcs%iy=bcs%iy+1
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     find offsets and compute local coefficients.
 c-----------------------------------------------------------------------
       dx=xx-bcs%xs(bcs%ix)
       dy=yy-bcs%ys(bcs%iy)
-      IF(ALLOCATED(bcs%cmats))THEN
+      if(allocated(bcs%cmats))then
          c=bcs%cmats(:,:,bcs%ix+1,bcs%iy+1,:)
-      ELSE
+      else
          c=bicube_getco(bcs)
-      ENDIF
+      endif
 c-----------------------------------------------------------------------
 c     evaluate f.
 c-----------------------------------------------------------------------
       bcs%f=0
-      DO i=4,1,-1
+      do i=4,1,-1
          bcs%f=bcs%f*dx
      $        +((c(i,4,:)*dy
      $        +c(i,3,:))*dy
      $        +c(i,2,:))*dy
      $        +c(i,1,:)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     evaluate first derivatives of f
 c-----------------------------------------------------------------------
-      IF(mode > 0)THEN
+      if(mode > 0)then
          bcs%fx=0
          bcs%fy=0
-         DO i=4,1,-1
+         do i=4,1,-1
             bcs%fy=bcs%fy*dx
      $           +(c(i,4,:)*3*dy
      $           +c(i,3,:)*2)*dy
@@ -545,103 +545,103 @@ c-----------------------------------------------------------------------
      $           +(c(4,i,:)*3*dx
      $           +c(3,i,:)*2)*dx
      $           +c(2,i,:)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     evaluate second derivatives of f
 c-----------------------------------------------------------------------
-      IF(mode > 1)THEN
+      if(mode > 1)then
          bcs%fxx=0
          bcs%fyy=0
          bcs%fxy=0
-         DO i=4,1,-1
+         do i=4,1,-1
             bcs%fyy=bcs%fyy*dx
      $           +(c(i,4,:)*3*dy
      $           +c(i,3,:))*2
             bcs%fxx=bcs%fxx*dy
      $           +(c(4,i,:)*3*dx
      $           +c(3,i,:))*2
-         ENDDO
-         DO i=4,2,-1
+         enddo
+         do i=4,2,-1
             bcs%fxy=bcs%fxy*dx
      $           +((c(i,4,:)*3*dy
      $           +c(i,3,:)*2)*dy
      $           +c(i,2,:))*(i-1)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     restore x powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
+      do iside=1,2
          dx=x-bcs%x0(iside)
-         DO iqty=1,bcs%nqty
-            IF(bcs%xpower(iside,iqty) == 0)CYCLE
+         do iqty=1,bcs%nqty
+            if(bcs%xpower(iside,iqty) == 0)cycle
             xfac=ABS(dx)**bcs%xpower(iside,iqty)
             g=bcs%f(iqty)*xfac
-            IF(mode > 0)THEN
+            if(mode > 0)then
                gx=(bcs%fx(iqty)+bcs%f(iqty)
      $              *bcs%xpower(iside,iqty)/dx)*xfac
                gy=bcs%fy(iqty)*xfac
-            ENDIF
-            IF(mode > 1)THEN
+            endif
+            if(mode > 1)then
                gxx=(bcs%fxx(iqty)+bcs%xpower(iside,iqty)/dx
      $              *(2*bcs%fx(iqty)+(bcs%xpower(iside,iqty)-1)
      $              *bcs%f(iqty)/dx))*xfac
                gxy=(bcs%fxy(iqty)+bcs%fy(iqty)
      $              *bcs%xpower(iside,iqty)/dx)*xfac
                gyy=bcs%fyy(iqty)*xfac
-            ENDIF
+            endif
             bcs%f(iqty)=g
-            IF(mode > 0)THEN
+            if(mode > 0)then
                bcs%fx(iqty)=gx
                bcs%fy(iqty)=gy
-            ENDIF
-            IF(mode > 1)THEN
+            endif
+            if(mode > 1)then
                bcs%fxx(iqty)=gxx
                bcs%fxy(iqty)=gxy
                bcs%fyy(iqty)=gyy
-            ENDIF
-         ENDDO
-      ENDDO
+            endif
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     restore y powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
+      do iside=1,2
          dy=y-bcs%y0(iside)
-         DO iqty=1,bcs%nqty
-            IF(bcs%ypower(iside,iqty) == 0)CYCLE
+         do iqty=1,bcs%nqty
+            if(bcs%ypower(iside,iqty) == 0)cycle
             yfac=ABS(dy)**bcs%ypower(iside,iqty)
             g=bcs%f(iqty)*yfac
-            IF(mode > 0)THEN
+            if(mode > 0)then
                gx=bcs%fx(iqty)*yfac
                gy=(bcs%fy(iqty)+bcs%f(iqty)
      $              *bcs%ypower(iside,iqty)/dy)*yfac
-            ENDIF
-            IF(mode > 1)THEN
+            endif
+            if(mode > 1)then
                gxx=bcs%fxx(iqty)*yfac
                gxy=(bcs%fxy(iqty)+bcs%fy(iqty)
      $              *bcs%ypower(iside,iqty)/dy)*yfac
                gyy=(bcs%fyy(iqty)+bcs%ypower(iside,iqty)/dy
      $              *(2*bcs%fy(iqty)+(bcs%ypower(iside,iqty)-1)
      $              *bcs%f(iqty)/dy))*yfac
-            ENDIF
+            endif
             bcs%f(iqty)=g
-            IF(mode > 0)THEN
+            if(mode > 0)then
                bcs%fx(iqty)=gx
                bcs%fy(iqty)=gy
-            ENDIF
-            IF(mode > 1)THEN
+            endif
+            if(mode > 1)then
                bcs%fxx(iqty)=gxx
                bcs%fxy(iqty)=gxy
                bcs%fyy(iqty)=gyy
-            ENDIF
-         ENDDO
-      ENDDO
+            endif
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_eval
+      return
+      end subroutine bicube_eval
 c-----------------------------------------------------------------------
 c     subprogram 5a. bicube_eval_external.
 c     evaluates bicubic spline function with external arrays (parallel).
@@ -649,111 +649,111 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_eval_external(bcs, x, y, mode,
-     $     b_ix, b_iy, b_f, b_fx, b_fy, b_fxx, b_fxy, b_fyy)
+      subroutine bicube_eval_external(bcs, x, y, mode,
+     $     b_f, b_fx, b_fy, b_fxx, b_fxy, b_fyy)
 
-      TYPE(bicube_type), INTENT(IN) :: bcs
-      REAL(r8), INTENT(IN) :: x,y
-      INTEGER, INTENT(IN) :: mode
+      type(bicube_type), intent(in) :: bcs
+      real(r8), intent(in) :: x,y
+      integer, intent(in) :: mode
 
-      INTEGER :: i,iqty,iside
-      REAL(r8) :: dx,dy,xx,yy,g,gx,gy,gxx,gxy,gyy,xfac,yfac
-      REAL(r8), DIMENSION (4,4,bcs%nqty) :: c
+      integer :: i,iqty,iside
+      integer :: ix, iy, i_low, i_high, i_mid
+      real(r8) :: dx,dy,xx,yy,g,gx,gy,gxx,gxy,gyy,xfac,yfac
+      real(r8), dimension (4,4,bcs%nqty) :: c
 
-      INTEGER, INTENT(INOUT) :: b_ix,b_iy
-      REAL(r8), DIMENSION(:), INTENT(INOUT) :: b_f,b_fx,b_fy
-      REAL(r8), DIMENSION(:), INTENT(INOUT) :: b_fxx,b_fxy,b_fyy
-c-----------------------------------------------------------------------
-c     error-check for mode number--external array is limited.
-c-----------------------------------------------------------------------
-      IF (mode > 1) THEN
-         CALL program_stop("Set bicube_eval_external mode <=1 !")
-      ENDIF
+      real(r8), dimension(:), intent(inout) :: b_f
+      real(r8), dimension(:), intent(inout), optional :: b_fx,b_fy
+      real(r8), dimension(:), intent(inout), optional :: b_fxx,
+     $     b_fxy,b_fyy
 c-----------------------------------------------------------------------
 c     preliminary computations.
 c-----------------------------------------------------------------------
-      b_ix=max(b_ix,0)
-      b_ix=min(b_ix,bcs%mx-1)
-      b_iy=max(b_iy,0)
-      b_iy=min(b_iy,bcs%my-1)
       xx=x
       yy=y
 c-----------------------------------------------------------------------
 c     normalize x interval for periodic splines.
 c-----------------------------------------------------------------------
-      IF(bcs%periodic(1))THEN
-         DO
-            IF(xx < bcs%xs(bcs%mx))EXIT
+      if(bcs%periodic(1))then
+         do
+            if(xx < bcs%xs(bcs%mx))EXIT
             xx=xx-bcs%xs(bcs%mx)
-         ENDDO
-         DO
-            IF(xx >= bcs%xs(0))EXIT
+         enddo
+         do
+            if(xx >= bcs%xs(0))EXIT
             xx=xx+bcs%xs(bcs%mx)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
-c     find x interval.
+c     find x interval using Binary search
 c-----------------------------------------------------------------------
-      DO
-         IF(b_ix <= 0)EXIT
-         IF(xx >= bcs%xs(b_ix))EXIT
-         b_ix=b_ix-1
-      ENDDO
-      DO
-         IF(b_ix >= bcs%mx-1)EXIT
-         IF(xx < bcs%xs(b_ix+1))EXIT
-         b_ix=b_ix+1
-      ENDDO
+      i_low = 0
+      i_high = bcs%mx - 1
+      do while (i_low <= i_high)
+         i_mid = i_low + (i_high - i_low) / 2
+         if (xx < bcs%xs(i_mid)) then
+               i_high = i_mid - 1
+         else if (xx >= bcs%xs(i_mid + 1)) then
+               i_low = i_mid + 1
+         else
+               ix = i_mid
+               exit
+         endif
+      end do
+      if (i_low > i_high) ix = min(max(i_low - 1, 0), bcs%mx - 1)
 c-----------------------------------------------------------------------
 c     normalize y interval for periodic splines.
 c-----------------------------------------------------------------------
-      IF(bcs%periodic(2))THEN
-         DO
-            IF(yy < bcs%ys(bcs%my))EXIT
+      if(bcs%periodic(2))then
+         do
+            if(yy < bcs%ys(bcs%my))EXIT
             yy=yy-bcs%ys(bcs%my)
-         ENDDO
-         DO
-            IF(yy >= bcs%ys(0))EXIT
+         enddo
+         do
+            if(yy >= bcs%ys(0))EXIT
             yy=yy+bcs%ys(bcs%my)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     find y interval.
 c-----------------------------------------------------------------------
-      DO
-         IF(b_iy <= 0)EXIT
-         IF(yy >= bcs%ys(b_iy))EXIT
-         b_iy=b_iy-1
-      ENDDO
-      DO
-         IF(b_iy >= bcs%my-1)EXIT
-         IF(yy < bcs%ys(b_iy+1))EXIT
-         b_iy=b_iy+1
-      ENDDO
+      i_low = 0
+      i_high = bcs%my - 1
+      do while (i_low <= i_high)
+         i_mid = i_low + (i_high - i_low) / 2
+         if (yy < bcs%ys(i_mid)) then
+               i_high = i_mid - 1
+         else if (yy >= bcs%ys(i_mid + 1)) then
+               i_low = i_mid + 1
+         else
+               iy = i_mid
+               exit
+         endif
+      end do
+      if (i_low > i_high) iy = min(max(i_low - 1, 0), bcs%my - 1)
 c-----------------------------------------------------------------------
 c     find offsets and compute local coefficients.
 c-----------------------------------------------------------------------
-      dx=xx-bcs%xs(b_ix)
-      dy=yy-bcs%ys(b_iy)
-      call bicube_getco_external_sub(bcs,b_ix,b_iy,c)
+      dx=xx-bcs%xs(ix)
+      dy=yy-bcs%ys(iy)
+      call bicube_getco_external_sub(bcs,ix,iy,c)
 c-----------------------------------------------------------------------
 c     evaluate f.
 c-----------------------------------------------------------------------
       b_f=0
-      DO i=4,1,-1
+      do i=4,1,-1
          b_f=b_f*dx
      $        +((c(i,4,:)*dy
      $        +c(i,3,:))*dy
      $        +c(i,2,:))*dy
      $        +c(i,1,:)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     evaluate first derivatives of f
 c-----------------------------------------------------------------------
-      IF(mode > 0)THEN
+      if(mode > 0)then
          b_fx=0
          b_fy=0
-         DO i=4,1,-1
+         do i=4,1,-1
             b_fy=b_fy*dx
      $           +(c(i,4,:)*3*dy
      $           +c(i,3,:)*2)*dy
@@ -762,103 +762,103 @@ c-----------------------------------------------------------------------
      $           +(c(4,i,:)*3*dx
      $           +c(3,i,:)*2)*dx
      $           +c(2,i,:)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     evaluate second derivatives of f
 c-----------------------------------------------------------------------
-      IF(mode > 1)THEN
+      if(mode > 1)then
          b_fxx=0
          b_fyy=0
          b_fxy=0
-         DO i=4,1,-1
+         do i=4,1,-1
             b_fyy=b_fyy*dx
      $           +(c(i,4,:)*3*dy
      $           +c(i,3,:))*2
             b_fxx=b_fxx*dy
      $           +(c(4,i,:)*3*dx
      $           +c(3,i,:))*2
-         ENDDO
-         DO i=4,2,-1
+         enddo
+         do i=4,2,-1
             b_fxy=b_fxy*dx
      $           +((c(i,4,:)*3*dy
      $           +c(i,3,:)*2)*dy
      $           +c(i,2,:))*(i-1)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     restore x powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
+      do iside=1,2
          dx=x-bcs%x0(iside)
-         DO iqty=1,bcs%nqty
-            IF(bcs%xpower(iside,iqty) == 0)CYCLE
+         do iqty=1,bcs%nqty
+            if(bcs%xpower(iside,iqty) == 0)cycle
             xfac=ABS(dx)**bcs%xpower(iside,iqty)
             g=b_f(iqty)*xfac
-            IF(mode > 0)THEN
+            if(mode > 0)then
                gx=(b_fx(iqty)+b_f(iqty)
      $              *bcs%xpower(iside,iqty)/dx)*xfac
                gy=b_fy(iqty)*xfac
-            ENDIF
-            IF(mode > 1)THEN
+            endif
+            if(mode > 1)then
                gxx=(b_fxx(iqty)+bcs%xpower(iside,iqty)/dx
      $              *(2*bcs%fx(iqty)+(bcs%xpower(iside,iqty)-1)
      $              *b_f(iqty)/dx))*xfac
                gxy=(b_fxy(iqty)+bcs%fy(iqty)
      $              *bcs%xpower(iside,iqty)/dx)*xfac
                gyy=b_fyy(iqty)*xfac
-            ENDIF
+            endif
             b_f(iqty)=g
-            IF(mode > 0)THEN
+            if(mode > 0)then
                b_fx(iqty)=gx
                b_fy(iqty)=gy
-            ENDIF
-            IF(mode > 1)THEN
+            endif
+            if(mode > 1)then
                b_fxx(iqty)=gxx
                b_fxy(iqty)=gxy
                b_fyy(iqty)=gyy
-            ENDIF
-         ENDDO
-      ENDDO
+            endif
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     restore y powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
+      do iside=1,2
          dy=y-bcs%y0(iside)
-         DO iqty=1,bcs%nqty
-            IF(bcs%ypower(iside,iqty) == 0)CYCLE
+         do iqty=1,bcs%nqty
+            if(bcs%ypower(iside,iqty) == 0)cycle
             yfac=ABS(dy)**bcs%ypower(iside,iqty)
             g=b_f(iqty)*yfac
-            IF(mode > 0)THEN
+            if(mode > 0)then
                gx=b_fx(iqty)*yfac
                gy=(b_fy(iqty)+b_f(iqty)
      $              *bcs%ypower(iside,iqty)/dy)*yfac
-            ENDIF
-            IF(mode > 1)THEN
+            endif
+            if(mode > 1)then
                gxx=b_fxx(iqty)*yfac
                gxy=(b_fxy(iqty)+b_fy(iqty)
      $              *bcs%ypower(iside,iqty)/dy)*yfac
                gyy=(b_fyy(iqty)+bcs%ypower(iside,iqty)/dy
      $              *(2*bcs%fy(iqty)+(bcs%ypower(iside,iqty)-1)
      $              *b_f(iqty)/dy))*yfac
-            ENDIF
+            endif
             b_f(iqty)=g
-            IF(mode > 0)THEN
+            if(mode > 0)then
                b_fx(iqty)=gx
                b_fy(iqty)=gy
-            ENDIF
-            IF(mode > 1)THEN
+            endif
+            if(mode > 1)then
                b_fxx(iqty)=gxx
                b_fxy(iqty)=gxy
                b_fyy(iqty)=gyy
-            ENDIF
-         ENDDO
-      ENDDO
+            endif
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_eval_external
+      return
+      end subroutine bicube_eval_external
 c-----------------------------------------------------------------------
 c     subprogram 6. bicube_getco.
 c     computes coefficient matrices.
@@ -868,13 +868,13 @@ c     declarations.
 c-----------------------------------------------------------------------
       FUNCTION bicube_getco(bcs) RESULT(cmat)
 
-      TYPE(bicube_type), INTENT(IN) :: bcs
-      REAL(r8), DIMENSION(4,4,bcs%nqty) :: cmat
+      type(bicube_type), intent(in) :: bcs
+      real(r8), dimension(4,4,bcs%nqty) :: cmat
 
-      REAL(r8) :: hxfac,hxfac2,hxfac3
-      REAL(r8) :: hyfac,hyfac2,hyfac3
-      REAL(r8), DIMENSION(3:4,4) :: gxmat,gymat
-      REAL(r8), DIMENSION(4,4,bcs%nqty) :: temp
+      real(r8) :: hxfac,hxfac2,hxfac3
+      real(r8) :: hyfac,hyfac2,hyfac3
+      real(r8), dimension(3:4,4) :: gxmat,gymat
+      real(r8), dimension(4,4,bcs%nqty) :: temp
 c-----------------------------------------------------------------------
 c     compute gxmat.
 c-----------------------------------------------------------------------
@@ -953,8 +953,8 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END FUNCTION bicube_getco
+      return
+      end FUNCTION bicube_getco
 c-----------------------------------------------------------------------
 c     subprogram 6a. bicube_getco_external.
 c     computes coefficient matrices for external arrays.
@@ -964,14 +964,14 @@ c     declarations.
 c-----------------------------------------------------------------------
       FUNCTION bicube_getco_external(bcs,b_ix,b_iy) RESULT(cmat)
 
-      TYPE(bicube_type), INTENT(IN) :: bcs
-      INTEGER, INTENT(IN) :: b_ix, b_iy
-      REAL(r8), DIMENSION(4,4,bcs%nqty) :: cmat
+      type(bicube_type), intent(in) :: bcs
+      integer, intent(in) :: b_ix, b_iy
+      real(r8), dimension(4,4,bcs%nqty) :: cmat
 
-      REAL(r8) :: hxfac,hxfac2,hxfac3
-      REAL(r8) :: hyfac,hyfac2,hyfac3
-      REAL(r8), DIMENSION(3:4,4) :: gxmat,gymat
-      REAL(r8), DIMENSION(4,4,bcs%nqty) :: temp
+      real(r8) :: hxfac,hxfac2,hxfac3
+      real(r8) :: hyfac,hyfac2,hyfac3
+      real(r8), dimension(3:4,4) :: gxmat,gymat
+      real(r8), dimension(4,4,bcs%nqty) :: temp
 c-----------------------------------------------------------------------
 c     compute gxmat.
 c-----------------------------------------------------------------------
@@ -1050,8 +1050,8 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END FUNCTION bicube_getco_external
+      return
+      end FUNCTION bicube_getco_external
 c-----------------------------------------------------------------------
 c     subprogram 6b. bicube_getco_external_sub.
 c     computes coefficient matrices for external arrays.
@@ -1060,16 +1060,16 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_getco_external_sub(bcs,b_ix,b_iy, cmat)
+      subroutine bicube_getco_external_sub(bcs,b_ix,b_iy, cmat)
 
-      TYPE(bicube_type), INTENT(IN) :: bcs
-      INTEGER, INTENT(IN) :: b_ix, b_iy
-      REAL(r8), DIMENSION(4,4,bcs%nqty), INTENT(OUT) :: cmat
+      type(bicube_type), intent(in) :: bcs
+      integer, intent(in) :: b_ix, b_iy
+      real(r8), dimension(4,4,bcs%nqty), intent(out) :: cmat
 
-      REAL(r8) :: hxfac,hxfac2,hxfac3
-      REAL(r8) :: hyfac,hyfac2,hyfac3
-      REAL(r8), DIMENSION(3:4,4) :: gxmat,gymat
-      REAL(r8), DIMENSION(4,4,bcs%nqty) :: temp
+      real(r8) :: hxfac,hxfac2,hxfac3
+      real(r8) :: hyfac,hyfac2,hyfac3
+      real(r8), dimension(3:4,4) :: gxmat,gymat
+      real(r8), dimension(4,4,bcs%nqty) :: temp
 c-----------------------------------------------------------------------
 c     compute gxmat.
 c-----------------------------------------------------------------------
@@ -1148,8 +1148,8 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_getco_external_sub
+      return
+      end subroutine bicube_getco_external_sub
 c-----------------------------------------------------------------------
 c     subprogram 7. bicube_all_eval.
 c     evaluates bicubic splines in all intervals.
@@ -1157,110 +1157,110 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_all_eval(bcs,dx,dy,f,fx,fy,fxx,fyy,fxy,mode)
+      subroutine bicube_all_eval(bcs,dx,dy,f,fx,fy,fxx,fyy,fxy,mode)
 
-      TYPE(bicube_type), INTENT(INOUT) :: bcs
-      REAL(r8), INTENT(IN) :: dx,dy
-      REAL(r8), INTENT(OUT), DIMENSION(bcs%mx,bcs%my,bcs%nqty) ::
+      type(bicube_type), intent(inout) :: bcs
+      real(r8), intent(in) :: dx,dy
+      real(r8), intent(out), dimension(bcs%mx,bcs%my,bcs%nqty) ::
      $     f,fx,fy,fxx,fyy,fxy
-      INTEGER, INTENT(IN) :: mode
+      integer, intent(in) :: mode
 
-      INTEGER :: i,ix,iy,iqty,iside
-      REAL(r8), DIMENSION(bcs%mx) :: dxv
-      REAL(r8), DIMENSION(bcs%my) :: dyv
+      integer :: i,ix,iy,iqty,iside
+      real(r8), dimension(bcs%mx) :: dxv
+      real(r8), dimension(bcs%my) :: dyv
 
-      REAL(R8), DIMENSION(bcs%mx) :: dxx,xfac
-      REAL(R8), DIMENSION(bcs%my) :: dyy,yfac
-      REAL(R8), DIMENSION(bcs%mx,bcs%my) :: g,gx,gy,gxx,gxy,gyy
+      real(R8), dimension(bcs%mx) :: dxx,xfac
+      real(R8), dimension(bcs%my) :: dyy,yfac
+      real(R8), dimension(bcs%mx,bcs%my) :: g,gx,gy,gxx,gxy,gyy
 c-----------------------------------------------------------------------
 c     compute local displacements and coefficients.
 c-----------------------------------------------------------------------
       dxv=(bcs%xs(1:bcs%mx)-bcs%xs(0:bcs%mx-1))*dx
       dyv=(bcs%ys(1:bcs%my)-bcs%ys(0:bcs%my-1))*dy
-      CALL bicube_all_getco(bcs)
+      call bicube_all_getco(bcs)
 c-----------------------------------------------------------------------
 c     evaluate f.
 c-----------------------------------------------------------------------
       f=0
-      DO i=4,1,-1
-         IF(i /= 4)THEN
-            DO ix=1,bcs%mx
+      do i=4,1,-1
+         if(i /= 4)then
+            do ix=1,bcs%mx
                f(ix,:,:)=f(ix,:,:)*dxv(ix)
-            ENDDO
-         ENDIF
-         DO iy=1,bcs%my
+            enddo
+         endif
+         do iy=1,bcs%my
             f(:,iy,:)=f(:,iy,:)
      $           +((bcs%cmats(i,4,:,iy,:)*dyv(iy)
      $           +bcs%cmats(i,3,:,iy,:))*dyv(iy)
      $           +bcs%cmats(i,2,:,iy,:))*dy
      $           +bcs%cmats(i,1,:,iy,:)
-         ENDDO
-      ENDDO
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     evaluate fx.
 c-----------------------------------------------------------------------
-      IF(mode > 0)THEN
+      if(mode > 0)then
          fx=0
-         DO i=4,1,-1
-            IF(i /= 4)THEN
-               DO iy=1,bcs%my
+         do i=4,1,-1
+            if(i /= 4)then
+               do iy=1,bcs%my
                   fx(:,iy,:)=fx(:,iy,:)*dyv(iy)
-               ENDDO
-            ENDIF
-            DO ix=1,bcs%mx
+               enddo
+            endif
+            do ix=1,bcs%mx
                fx(ix,:,:)=fx(ix,:,:)
      $              +(bcs%cmats(4,i,ix,:,:)*3*dxv(ix)
      $              +bcs%cmats(3,i,ix,:,:)*2)*dxv(ix)
      $              +bcs%cmats(2,i,ix,:,:)
-            ENDDO
-         ENDDO
+            enddo
+         enddo
 c-----------------------------------------------------------------------
 c     evaluate fy.
 c-----------------------------------------------------------------------
          fy=0
-         DO i=4,1,-1
-            IF(i /= 4)THEN
-               DO ix=1,bcs%mx
+         do i=4,1,-1
+            if(i /= 4)then
+               do ix=1,bcs%mx
                   fy(ix,:,:)=fy(ix,:,:)*dxv(ix)
-               ENDDO
-            ENDIF
-            DO iy=1,bcs%my
+               enddo
+            endif
+            do iy=1,bcs%my
                fy(:,iy,:)=fy(:,iy,:)
      $              +(bcs%cmats(i,4,:,iy,:)*3*dyv(iy)
      $              +bcs%cmats(i,3,:,iy,:)*2)*dyv(iy)
      $              +bcs%cmats(i,2,:,iy,:)
-            ENDDO
-         ENDDO
-      ENDIF
+            enddo
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     evaluate fxx.
 c-----------------------------------------------------------------------
-      IF(mode > 1)THEN
+      if(mode > 1)then
          fxx=0
-         DO i=4,1,-1
-            IF(i /= 4)THEN
-               DO iy=1,bcs%my
+         do i=4,1,-1
+            if(i /= 4)then
+               do iy=1,bcs%my
                   fxx(:,iy,:)=fxx(:,iy,:)*dyv(iy)
-               ENDDO
-            ENDIF
-            DO ix=1,bcs%mx
+               enddo
+            endif
+            do ix=1,bcs%mx
                fxx(ix,:,:)=fxx(ix,:,:)
      $              +(bcs%cmats(4,i,ix,:,:)*3*dxv(ix)
      $              +bcs%cmats(3,i,ix,:,:))*2
-            ENDDO
-         ENDDO
+            enddo
+         enddo
 c-----------------------------------------------------------------------
 c     evaluate fyy and fxy
 c-----------------------------------------------------------------------
          fyy=0
-         DO i=4,1,-1
-            IF(i /= 4)THEN
-               DO ix=1,bcs%mx
+         do i=4,1,-1
+            if(i /= 4)then
+               do ix=1,bcs%mx
                   fyy(ix,:,:)=fyy(ix,:,:)*dxv(ix)
                   fxy(ix,:,:)=fxy(ix,:,:)*dxv(ix)
-               ENDDO
-            ENDIF
-            DO iy=1,bcs%my
+               enddo
+            endif
+            do iy=1,bcs%my
                fyy(:,iy,:)=fyy(:,iy,:)
      $              +(bcs%cmats(i,4,:,iy,:)*3*dyv(iy)
      $              +bcs%cmats(i,3,:,iy,:))*2
@@ -1268,86 +1268,86 @@ c-----------------------------------------------------------------------
      $              +((bcs%cmats(i,4,:,iy,:)*3*dyv(iy)
      $              +bcs%cmats(i,3,:,iy,:)*2)*dyv(iy)
      $              +bcs%cmats(i,2,:,iy,:))*(i-1)
-            ENDDO
-         ENDDO
-      ENDIF
+            enddo
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     restore x powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
+      do iside=1,2
          dxx=(bcs%xs(0:bcs%mx-1)+dxv(1:bcs%mx))-bcs%x0(iside)
-         DO iqty=1,bcs%nqty
-            IF(bcs%xpower(iside,iqty) == 0)CYCLE
+         do iqty=1,bcs%nqty
+            if(bcs%xpower(iside,iqty) == 0)cycle
             xfac=dxx**bcs%xpower(iside,iqty)
-            DO iy=1,bcs%my
+            do iy=1,bcs%my
                g(:,iy)=f(:,iy,iqty)*xfac
-               IF(mode > 0)THEN
+               if(mode > 0)then
                   gx(:,iy)=(fx(:,iy,iqty)+f(:,iy,iqty)
      $                 *bcs%xpower(iside,iqty)/dxx)*xfac
                   gy(:,iy)=fy(:,iy,iqty)*xfac
-               ENDIF
-               IF(mode > 1)THEN
+               endif
+               if(mode > 1)then
                   gxy(:,iy)=(fxy(:,iy,iqty)+fy(:,iy,iqty)
      $                 *bcs%xpower(iside,iqty)/dxx)*xfac
                   gxx(:,iy)=(fxx(:,iy,iqty)+bcs%xpower(iside,iqty)/dxx
      $                 *(2*fx(:,iy,iqty)+(bcs%xpower(iside,iqty)-1)
      $                 *f(:,iy,iqty)/dxx))*xfac
                   gyy(:,iy)=fyy(:,iy,iqty)*xfac
-               ENDIF
+               endif
                f(:,iy,iqty)=g(:,iy)
-               IF(mode > 0)THEN
+               if(mode > 0)then
                   fx(:,iy,iqty)=gx(:,iy)
                   fy(:,iy,iqty)=gy(:,iy)
-               ENDIF
-               IF(mode > 1)THEN
+               endif
+               if(mode > 1)then
                   fxx(:,iy,iqty)=gxx(:,iy)
                   fxy(:,iy,iqty)=gxy(:,iy)
                   fyy(:,iy,iqty)=gyy(:,iy)
-               ENDIF
-            ENDDO
-         ENDDO
-      ENDDO
+               endif
+            enddo
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     restore y powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
+      do iside=1,2
          dyy=(bcs%ys(0:bcs%my-1)+dyv(1:bcs%my))-bcs%y0(iside)
-         DO iqty=1,bcs%nqty
-            IF(bcs%ypower(iside,iqty) == 0)CYCLE
+         do iqty=1,bcs%nqty
+            if(bcs%ypower(iside,iqty) == 0)cycle
             yfac=dyy**bcs%ypower(iside,iqty)
-            DO ix=1,bcs%mx
+            do ix=1,bcs%mx
                g(ix,:)=f(ix,:,iqty)*yfac
-               IF(mode > 0)THEN
+               if(mode > 0)then
                   gy(ix,:)=(fy(ix,:,iqty)+f(ix,:,iqty)
      $                 *bcs%ypower(iside,iqty)/dyy)*yfac
                   gx(ix,:)=fx(ix,:,iqty)*yfac
-               ENDIF
-               IF(mode > 1)THEN
+               endif
+               if(mode > 1)then
                   gxx(ix,:)=fxx(ix,:,iqty)*yfac
                   gxy(ix,:)=(fxy(ix,:,iqty)+fx(ix,:,iqty)
      $                 *bcs%ypower(iside,iqty)/dyy)*yfac
                   gyy(ix,:)=(fyy(ix,:,iqty)+bcs%ypower(iside,iqty)/dyy
      $                 *(2*fy(ix,:,iqty)+(bcs%ypower(iside,iqty)-1)
      $                 *f(ix,:,iqty)/dyy))*yfac
-               ENDIF
+               endif
                f(ix,:,iqty)=g(ix,:)
-               IF(mode > 0)THEN
+               if(mode > 0)then
                   fx(ix,:,iqty)=gx(ix,:)
                   fy(ix,:,iqty)=gy(ix,:)
-               ENDIF
-               IF(mode > 1)THEN
+               endif
+               if(mode > 1)then
                   fxx(ix,:,iqty)=gxx(ix,:)
                   fxy(ix,:,iqty)=gxy(ix,:)
                   fyy(ix,:,iqty)=gyy(ix,:)
-               ENDIF
-            ENDDO
-         ENDDO
-      ENDDO
+               endif
+            enddo
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_all_eval
+      return
+      end subroutine bicube_all_eval
 c-----------------------------------------------------------------------
 c     subprogram 8. bicube_all_getco.
 c     computes coefficient matrices in all intervals.
@@ -1355,24 +1355,24 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_all_getco(bcs)
+      subroutine bicube_all_getco(bcs)
 
-      TYPE(bicube_type), INTENT(INOUT) :: bcs
+      type(bicube_type), intent(inout) :: bcs
 
-      INTEGER :: ix,iy
-      REAL(r8), DIMENSION(bcs%mx) :: hxfac,hxfac2,hxfac3
-      REAL(r8), DIMENSION(bcs%my) :: hyfac,hyfac2,hyfac3
-      REAL(r8), DIMENSION(3:4,4,bcs%mx) :: gxmat
-      REAL(r8), DIMENSION(3:4,4,bcs%my) :: gymat
-      REAL(r8), DIMENSION(4,4,bcs%mx,bcs%my,bcs%nqty) :: temp
+      integer :: ix,iy
+      real(r8), dimension(bcs%mx) :: hxfac,hxfac2,hxfac3
+      real(r8), dimension(bcs%my) :: hyfac,hyfac2,hyfac3
+      real(r8), dimension(3:4,4,bcs%mx) :: gxmat
+      real(r8), dimension(3:4,4,bcs%my) :: gymat
+      real(r8), dimension(4,4,bcs%mx,bcs%my,bcs%nqty) :: temp
 c-----------------------------------------------------------------------
 c     allocate space.
 c-----------------------------------------------------------------------
-      IF(ALLOCATED(bcs%cmats))THEN
-         RETURN
-      ELSE
-         ALLOCATE(bcs%cmats(4,4,bcs%mx,bcs%my,bcs%nqty))
-      ENDIF
+      if(allocated(bcs%cmats))then
+         return
+      else
+         allocate(bcs%cmats(4,4,bcs%mx,bcs%my,bcs%nqty))
+      endif
 c-----------------------------------------------------------------------
 c     compute gxmat.
 c-----------------------------------------------------------------------
@@ -1424,7 +1424,7 @@ c-----------------------------------------------------------------------
 c     multiply by gymat^T.
 c-----------------------------------------------------------------------
       temp(:,1:2,:,:,:)=bcs%cmats(:,1:2,:,:,:)
-      DO iy=1,bcs%my
+      do iy=1,bcs%my
          temp(:,3,:,iy,:)
      $        =bcs%cmats(:,1,:,iy,:)*gymat(3,1,iy)
      $        +bcs%cmats(:,2,:,iy,:)*gymat(3,2,iy)
@@ -1435,12 +1435,12 @@ c-----------------------------------------------------------------------
      $        +bcs%cmats(:,2,:,iy,:)*gymat(4,2,iy)
      $        +bcs%cmats(:,3,:,iy,:)*gymat(4,3,iy)
      $        +bcs%cmats(:,4,:,iy,:)*gymat(4,4,iy)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     multiply by gxmat.
 c-----------------------------------------------------------------------
       bcs%cmats(1:2,:,:,:,:)=temp(1:2,:,:,:,:)
-      DO ix=1,bcs%mx
+      do ix=1,bcs%mx
          bcs%cmats(3,:,ix,:,:)
      $        =gxmat(3,1,ix)*temp(1,:,ix,:,:)
      $        +gxmat(3,2,ix)*temp(2,:,ix,:,:)
@@ -1451,12 +1451,12 @@ c-----------------------------------------------------------------------
      $        +gxmat(4,2,ix)*temp(2,:,ix,:,:)
      $        +gxmat(4,3,ix)*temp(3,:,ix,:,:)
      $        +gxmat(4,4,ix)*temp(4,:,ix,:,:)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_all_getco
+      return
+      end subroutine bicube_all_getco
 c-----------------------------------------------------------------------
 c     subprogram 9. bicube_write_xy.
 c     produces ascii and binary output for bicubic spline fits.
@@ -1464,97 +1464,97 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_write_xy(bcs,out,bin,iua,iub,interp)
+      subroutine bicube_write_xy(bcs,out,bin,iua,iub,interp)
 
-      TYPE(bicube_type), INTENT(INOUT) :: bcs
-      LOGICAL, INTENT(IN) :: out,bin
-      INTEGER, INTENT(IN) :: iua,iub
-      LOGICAL, INTENT(IN) :: interp
+      type(bicube_type), intent(inout) :: bcs
+      logical, intent(in) :: out,bin
+      integer, intent(in) :: iua,iub
+      logical, intent(in) :: interp
 
-      INTEGER :: ix,iy,jx,jy,iqty
-      REAL(r8) :: x,y,dx,dy
+      integer :: ix,iy,jx,jy,iqty
+      real(r8) :: x,y,dx,dy
 
-      CHARACTER(80) :: format1,format2
+      character(80) :: format1,format2
 c-----------------------------------------------------------------------
 c     write formats.
 c-----------------------------------------------------------------------
- 10   FORMAT(1x,"iy = ",i3,", ",a6," = ",1p,e11.3)
- 20   FORMAT(1x,"iy = ",i3,", jy = ",i1,", ",a6," = ",1p,e11.3)
- 30   FORMAT('(/3x,"ix",4x,a,1x,',i3.3,'(4x,a6,1x)/)')
- 40   FORMAT('(i5,1p,e11.3,',i3.3,'e11.3)')
+ 10   format(1x,"iy = ",i3,", ",a6," = ",1p,e11.3)
+ 20   format(1x,"iy = ",i3,", jy = ",i1,", ",a6," = ",1p,e11.3)
+ 30   format('(/3x,"ix",4x,a,1x,',i3.3,'(4x,a6,1x)/)')
+ 40   format('(i5,1p,e11.3,',i3.3,'e11.3)')
 c-----------------------------------------------------------------------
 c     abort.
 c-----------------------------------------------------------------------
-      IF(.NOT. (out. OR. bin))RETURN
+      if(.not. (out. OR. bin))return
 c-----------------------------------------------------------------------
 c     create format statements.
 c-----------------------------------------------------------------------
-      IF(out)THEN
-         WRITE(format1,30)bcs%nqty
-         WRITE(format2,40)bcs%nqty
-      ENDIF
+      if(out)then
+         write(format1,30)bcs%nqty
+         write(format2,40)bcs%nqty
+      endif
 c-----------------------------------------------------------------------
 c     write input data.
 c-----------------------------------------------------------------------
-      IF(out)WRITE(iua,'(1x,a/)')"input data"
-      DO iy=0,bcs%my
+      if(out)write(iua,'(1x,a/)')"input data"
+      do iy=0,bcs%my
          y=bcs%ys(iy)
-         IF(out)then
-            WRITE(iua,10)iy,bcs%ytitle,bcs%ys(iy)
-            WRITE(iua,format1)bcs%xtitle,
+         if(out)then
+            write(iua,10)iy,bcs%ytitle,bcs%ys(iy)
+            write(iua,format1)bcs%xtitle,
      $           (bcs%title(iqty),iqty=1,bcs%nqty)
-         ENDIF
-         DO ix=0,bcs%mx
+         endif
+         do ix=0,bcs%mx
             x=bcs%xs(ix)
-            CALL bicube_eval(bcs,x,y,0)
-            IF(out)WRITE(iua,format2)ix,x,bcs%f
-            IF(bin)WRITE(iub)REAL(x,4),REAL(bcs%f,4)
-         ENDDO
-         IF(out)WRITE(iua,format1)bcs%xtitle,
+            call bicube_eval(bcs,x,y,0)
+            if(out)write(iua,format2)ix,x,bcs%f
+            if(bin)write(iub)real(x,4),real(bcs%f,4)
+         enddo
+         if(out)write(iua,format1)bcs%xtitle,
      $        (bcs%title(iqty),iqty=1,bcs%nqty)
-         IF(bin)WRITE(iub)
-      ENDDO
+         if(bin)write(iub)
+      enddo
 c-----------------------------------------------------------------------
 c     begin loops over y for interpolated data.
 c-----------------------------------------------------------------------
-      IF(interp)THEN
-         IF(out)WRITE(iua,'(1x,a/)')"interpolated data"
-         DO iy=0,bcs%my-1
+      if(interp)then
+         if(out)write(iua,'(1x,a/)')"interpolated data"
+         do iy=0,bcs%my-1
             dy=(bcs%ys(iy+1)-bcs%ys(iy))/4
-            DO jy=0,4
+            do jy=0,4
                y=bcs%ys(iy)+dy*jy
-               IF(out)then
-                  WRITE(iua,20)iy,jy,bcs%ytitle,y
-                  WRITE(iua,format1)bcs%xtitle,
+               if(out)then
+                  write(iua,20)iy,jy,bcs%ytitle,y
+                  write(iua,format1)bcs%xtitle,
      $                 (bcs%title(iqty),iqty=1,bcs%nqty)
-               ENDIF
+               endif
 c-----------------------------------------------------------------------
 c     begin loops over x for interpolated data.
 c-----------------------------------------------------------------------
-               DO ix=0,bcs%mx-1
+               do ix=0,bcs%mx-1
                   dx=(bcs%xs(ix+1)-bcs%xs(ix))/4
-                  DO jx=0,4
+                  do jx=0,4
                      x=bcs%xs(ix)+dx*jx
-                     CALL bicube_eval(bcs,x,y,0)
-                     IF(out)WRITE(iua,format2)ix,x,bcs%f
-                     IF(bin)WRITE(iub)REAL(x,4),REAL(bcs%f,4)
-                  ENDDO
-                  IF(out)WRITE(iua,'()')
-               ENDDO
+                     call bicube_eval(bcs,x,y,0)
+                     if(out)write(iua,format2)ix,x,bcs%f
+                     if(bin)write(iub)real(x,4),real(bcs%f,4)
+                  enddo
+                  if(out)write(iua,'()')
+               enddo
 c-----------------------------------------------------------------------
 c     complete loops over y.
 c-----------------------------------------------------------------------
-               IF(out)WRITE(iua,format1)bcs%xtitle,
+               if(out)write(iua,format1)bcs%xtitle,
      $                 (bcs%title(iqty),iqty=1,bcs%nqty)
-               IF(bin)WRITE(iub)
-            ENDDO
-         ENDDO
-      ENDIF
+               if(bin)write(iub)
+            enddo
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_write_xy
+      return
+      end subroutine bicube_write_xy
 c-----------------------------------------------------------------------
 c     subprogram 10. bicube_write_yx.
 c     produces ascii and binary output for bicubic spline fits.
@@ -1562,97 +1562,97 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_write_yx(bcs,out,bin,iua,iub,interp)
+      subroutine bicube_write_yx(bcs,out,bin,iua,iub,interp)
 
-      TYPE(bicube_type), INTENT(INOUT) :: bcs
-      LOGICAL, INTENT(IN) :: out,bin
-      INTEGER, INTENT(IN) :: iua,iub
-      LOGICAL, INTENT(IN) :: interp
+      type(bicube_type), intent(inout) :: bcs
+      logical, intent(in) :: out,bin
+      integer, intent(in) :: iua,iub
+      logical, intent(in) :: interp
 
-      INTEGER :: ix,iy,jx,jy,iqty
-      REAL(r8) :: x,y,dx,dy
+      integer :: ix,iy,jx,jy,iqty
+      real(r8) :: x,y,dx,dy
 
-      CHARACTER(80) :: format1,format2
+      character(80) :: format1,format2
 c-----------------------------------------------------------------------
 c     write formats.
 c-----------------------------------------------------------------------
- 10   FORMAT(1x,"ix = ",i3,", ",a6," = ",1p,e11.3)
- 20   FORMAT(1x,"ix = ",i3,", jx = ",i1,", ",a6," = ",1p,e11.3)
- 30   FORMAT('(/4x,"iy",4x,a6,1x,',i3.3,'(4x,a6,1x)/)')
- 40   FORMAT('(i6,1p,e11.3,',i3.3,'e11.3)')
+ 10   format(1x,"ix = ",i3,", ",a6," = ",1p,e11.3)
+ 20   format(1x,"ix = ",i3,", jx = ",i1,", ",a6," = ",1p,e11.3)
+ 30   format('(/4x,"iy",4x,a6,1x,',i3.3,'(4x,a6,1x)/)')
+ 40   format('(i6,1p,e11.3,',i3.3,'e11.3)')
 c-----------------------------------------------------------------------
 c     abort.
 c-----------------------------------------------------------------------
-      IF(.NOT. (out. OR. bin))RETURN
+      if(.not. (out. OR. bin))return
 c-----------------------------------------------------------------------
 c     create format statements.
 c-----------------------------------------------------------------------
-      IF(out)THEN
-         WRITE(format1,30)bcs%nqty
-         WRITE(format2,40)bcs%nqty
-         WRITE(iua,'(1x,a/)')"input data"
-      ENDIF
+      if(out)then
+         write(format1,30)bcs%nqty
+         write(format2,40)bcs%nqty
+         write(iua,'(1x,a/)')"input data"
+      endif
 c-----------------------------------------------------------------------
 c     write input data.
 c-----------------------------------------------------------------------
-      DO ix=0,bcs%mx
+      do ix=0,bcs%mx
          x=bcs%xs(ix)
-         IF(out)then
-            WRITE(iua,10)ix,bcs%xtitle,bcs%xs(ix)
-            WRITE(iua,format1)bcs%ytitle,
+         if(out)then
+            write(iua,10)ix,bcs%xtitle,bcs%xs(ix)
+            write(iua,format1)bcs%ytitle,
      $           (bcs%title(iqty),iqty=1,bcs%nqty)
-         ENDIF
-         DO iy=0,bcs%my
+         endif
+         do iy=0,bcs%my
             y=bcs%ys(iy)
-            CALL bicube_eval(bcs,x,y,0)
-            IF(out)WRITE(iua,format2)iy,y,bcs%f
-            IF(bin)WRITE(iub)REAL(y,4),REAL(bcs%f,4)
-         ENDDO
-         IF(out)WRITE(iua,format1)bcs%ytitle,
+            call bicube_eval(bcs,x,y,0)
+            if(out)write(iua,format2)iy,y,bcs%f
+            if(bin)write(iub)real(y,4),real(bcs%f,4)
+         enddo
+         if(out)write(iua,format1)bcs%ytitle,
      $        (bcs%title(iqty),iqty=1,bcs%nqty)
-         IF(bin)WRITE(iub)
-      ENDDO
+         if(bin)write(iub)
+      enddo
 c-----------------------------------------------------------------------
 c     begin loops over x for interpolated data.
 c-----------------------------------------------------------------------
-      IF(interp)THEN
-         IF(out)WRITE(iua,'(1x,a/)')"interpolated data"
-         DO ix=0,bcs%mx-1
+      if(interp)then
+         if(out)write(iua,'(1x,a/)')"interpolated data"
+         do ix=0,bcs%mx-1
             dx=(bcs%xs(ix+1)-bcs%xs(ix))/4
-            DO jx=0,4
+            do jx=0,4
                x=bcs%xs(ix)+dx*jx
-               IF(out)then
-                  WRITE(iua,20)ix,jx,bcs%xtitle,x
-                  WRITE(iua,format1)bcs%ytitle,
+               if(out)then
+                  write(iua,20)ix,jx,bcs%xtitle,x
+                  write(iua,format1)bcs%ytitle,
      $                 (bcs%title(iqty),iqty=1,bcs%nqty)
-               ENDIF
+               endif
 c-----------------------------------------------------------------------
 c     begin loops over y for interpolated data.
 c-----------------------------------------------------------------------
-               DO iy=0,bcs%my-1
+               do iy=0,bcs%my-1
                   dy=(bcs%ys(iy+1)-bcs%ys(iy))/4
-                  DO jy=0,4
+                  do jy=0,4
                      y=bcs%ys(iy)+dy*jy
-                     CALL bicube_eval(bcs,x,y,0)
-                     IF(out)WRITE(iua,format2)iy,y,bcs%f
-                     IF(bin)WRITE(iub)REAL(y,4),REAL(bcs%f,4)
-                  ENDDO
-                  IF(out)WRITE(iua,'()')
-               ENDDO
+                     call bicube_eval(bcs,x,y,0)
+                     if(out)write(iua,format2)iy,y,bcs%f
+                     if(bin)write(iub)real(y,4),real(bcs%f,4)
+                  enddo
+                  if(out)write(iua,'()')
+               enddo
 c-----------------------------------------------------------------------
 c     complete loops over x.
 c-----------------------------------------------------------------------
-               IF(out)WRITE(iua,format1)bcs%ytitle,
+               if(out)write(iua,format1)bcs%ytitle,
      $                 (bcs%title(iqty),iqty=1,bcs%nqty)
-               IF(bin)WRITE(iub)
-            ENDDO
-         ENDDO
-      ENDIF
+               if(bin)write(iub)
+            enddo
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_write_yx
+      return
+      end subroutine bicube_write_yx
 c-----------------------------------------------------------------------
 c     subprogram 11. bicube_write_arrays.
 c     produces ascii and binary output for bicubic spline fits.
@@ -1660,64 +1660,64 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_write_arrays(bcs,out,iua,iqty)
+      subroutine bicube_write_arrays(bcs,out,iua,iqty)
 
-      TYPE(bicube_type), INTENT(INOUT) :: bcs
-      LOGICAL, INTENT(IN) :: out
-      INTEGER, INTENT(IN) :: iua,iqty
+      type(bicube_type), intent(inout) :: bcs
+      logical, intent(in) :: out
+      integer, intent(in) :: iua,iqty
 
-      CHARACTER(80) :: format1,format2
-      INTEGER :: ix,iy,my
+      character(80) :: format1,format2
+      integer :: ix,iy,my
 c-----------------------------------------------------------------------
 c     formats.
 c-----------------------------------------------------------------------
- 10   FORMAT('(/2x,"ix/iy",',i3.3,'(3x,i3.3,5x)/)')
- 20   FORMAT('(i5,1p,',i3.3,'e11.3)')
+ 10   format('(/2x,"ix/iy",',i3.3,'(3x,i3.3,5x)/)')
+ 20   format('(i5,1p,',i3.3,'e11.3)')
 c-----------------------------------------------------------------------
 c     abort.
 c-----------------------------------------------------------------------
-      IF(.NOT. out)RETURN
-      my=MIN(bcs%my,32)
-      WRITE(iua,'(a,i2/)')"iqty = ",iqty
+      if(.not. out)return
+      my=Min(bcs%my,32)
+      write(iua,'(a,i2/)')"iqty = ",iqty
 c-----------------------------------------------------------------------
 c     write fs.
 c-----------------------------------------------------------------------
-      WRITE(format1,10)my+1
-      WRITE(format2,20)my+1
-      WRITE(iua,"(a)")"fs:"
-      WRITE(iua,format1)(iy,iy=0,my)
-      WRITE(iua,format2)(ix,(bcs%fs(ix,iy,iqty),iy=0,my),
+      write(format1,10)my+1
+      write(format2,20)my+1
+      write(iua,"(a)")"fs:"
+      write(iua,format1)(iy,iy=0,my)
+      write(iua,format2)(ix,(bcs%fs(ix,iy,iqty),iy=0,my),
      $     ix=0,bcs%mx)
-      WRITE(iua,format1)(iy,iy=0,my)
+      write(iua,format1)(iy,iy=0,my)
 c-----------------------------------------------------------------------
 c     write fsx.
 c-----------------------------------------------------------------------
-      WRITE(iua,"(a)")"fsx:"
-      WRITE(iua,format1)(iy,iy=0,my)
-      WRITE(iua,format2)(ix,(bcs%fsx(ix,iy,iqty),iy=0,my),
+      write(iua,"(a)")"fsx:"
+      write(iua,format1)(iy,iy=0,my)
+      write(iua,format2)(ix,(bcs%fsx(ix,iy,iqty),iy=0,my),
      $     ix=0,bcs%mx)
-      WRITE(iua,format1)(iy,iy=0,my)
+      write(iua,format1)(iy,iy=0,my)
 c-----------------------------------------------------------------------
 c     write fsy.
 c-----------------------------------------------------------------------
-      WRITE(iua,"(a)")"fsy:"
-      WRITE(iua,format1)(iy,iy=0,my)
-      WRITE(iua,format2)(ix,(bcs%fsy(ix,iy,iqty),iy=0,my),
+      write(iua,"(a)")"fsy:"
+      write(iua,format1)(iy,iy=0,my)
+      write(iua,format2)(ix,(bcs%fsy(ix,iy,iqty),iy=0,my),
      $     ix=0,bcs%mx)
-      WRITE(iua,format1)(iy,iy=0,my)
+      write(iua,format1)(iy,iy=0,my)
 c-----------------------------------------------------------------------
 c     write fsxy.
 c-----------------------------------------------------------------------
-      WRITE(iua,"(a)")"fsxy:"
-      WRITE(iua,format1)(iy,iy=0,my)
-      WRITE(iua,format2)(ix,(bcs%fsxy(ix,iy,iqty),iy=0,my),
+      write(iua,"(a)")"fsxy:"
+      write(iua,format1)(iy,iy=0,my)
+      write(iua,format2)(ix,(bcs%fsxy(ix,iy,iqty),iy=0,my),
      $     ix=0,bcs%mx)
-      WRITE(iua,format1)(iy,iy=0,my)
+      write(iua,format1)(iy,iy=0,my)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_write_arrays
+      return
+      end subroutine bicube_write_arrays
 c-----------------------------------------------------------------------
 c     subprogram 12. bicube_copy.
 c     copies one bicube type to another.
@@ -1725,15 +1725,15 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_copy(bcs1,bcs2)
+      subroutine bicube_copy(bcs1,bcs2)
 
-      TYPE(bicube_type), INTENT(IN) :: bcs1
-      TYPE(bicube_type), INTENT(INOUT) :: bcs2
+      type(bicube_type), intent(in) :: bcs1
+      type(bicube_type), intent(inout) :: bcs2
 c-----------------------------------------------------------------------
 c     computations.
 c-----------------------------------------------------------------------
-      IF(ALLOCATED(bcs2%xs))CALL bicube_dealloc(bcs2)
-      CALL bicube_alloc(bcs2,bcs1%mx,bcs1%my,bcs1%nqty)
+      if(allocated(bcs2%xs))call bicube_dealloc(bcs2)
+      call bicube_alloc(bcs2,bcs1%mx,bcs1%my,bcs1%nqty)
       bcs2%xs=bcs1%xs
       bcs2%ys=bcs1%ys
       bcs2%fs=bcs1%fs
@@ -1755,8 +1755,8 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_copy
+      return
+      end subroutine bicube_copy
 c-----------------------------------------------------------------------
 c     subprogram 13. bicube_extrema.
 c     finds extrema.
@@ -1764,17 +1764,17 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bicube_extrema(bcs)
+      subroutine bicube_extrema(bcs)
 
-      TYPE(bicube_type), INTENT(INOUT) :: bcs
+      type(bicube_type), intent(inout) :: bcs
 
-      CHARACTER(80) :: message
-      INTEGER :: iext,iqty,it
-      INTEGER, PARAMETER :: itmax=20
-      INTEGER, DIMENSION(2,2) :: jext
-      REAL(r8), PARAMETER :: eps=1e-10
-      REAL(r8) :: x,y,dx,dy,lx,ly,lf,f,df,adet
-      REAL(r8), DIMENSION(2,2) :: amat,ainv
+      character(80) :: message
+      integer :: iext,iqty,it
+      integer, PARAMETER :: itmax=20
+      integer, dimension(2,2) :: jext
+      real(r8), PARAMETER :: eps=1e-10
+      real(r8) :: x,y,dx,dy,lx,ly,lf,f,df,adet
+      real(r8), dimension(2,2) :: amat,ainv
 c-----------------------------------------------------------------------
 c     compute lengths.
 c-----------------------------------------------------------------------
@@ -1783,8 +1783,8 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     start loops over iqty.
 c-----------------------------------------------------------------------
-      DO iqty=1,bcs%nqty
-         jext(:,1)=MINLOC(bcs%fs(:,:,iqty))-1
+      do iqty=1,bcs%nqty
+         jext(:,1)=MinLOC(bcs%fs(:,:,iqty))-1
          jext(:,2)=MAXLOC(bcs%fs(:,:,iqty))-1
          bcs%fext(1,iqty)=bcs%fs(jext(1,1),jext(2,1),iqty)
          bcs%fext(2,iqty)=bcs%fs(jext(1,2),jext(2,2),iqty)
@@ -1792,7 +1792,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     start loops over extrema.
 c-----------------------------------------------------------------------
-         DO iext=1,2
+         do iext=1,2
             x=bcs%xs(jext(1,iext))
             y=bcs%ys(jext(2,iext))
             f=HUGE(f)
@@ -1802,10 +1802,10 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     locate extema by newton iteration.
 c-----------------------------------------------------------------------
-            DO
-               CALL bicube_eval(bcs,x,y,2)
+            do
+               call bicube_eval(bcs,x,y,2)
                df=bcs%f(iqty)-f
-               IF(ABS(dx) < eps*lx .OR. ABS(dy) < eps*ly
+               if(ABS(dx) < eps*lx .OR. ABS(dy) < eps*ly
      $              .OR. ABS(df) < eps*lf .OR. it >= itmax)EXIT
                it=it+1
                f=bcs%f(iqty)
@@ -1823,27 +1823,27 @@ c-----------------------------------------------------------------------
                dy=-ainv(2,1)*bcs%fx(iqty)-ainv(2,2)*bcs%fy(iqty)
                x=x+dx
                y=y+dy
-            ENDDO
+            enddo
 c-----------------------------------------------------------------------
 c     abort on failure.
 c-----------------------------------------------------------------------
-            IF(it >= itmax)THEN
-               WRITE(message,'(a,i3,a)')
+            if(it >= itmax)then
+               write(message,'(a,i3,a)')
      $              "bicube_extrema: convergence failure for iqty = ",
      $              iqty,"."
-               CALL program_stop(message)
-            ENDIF
+               call program_stop(message)
+            endif
 c-----------------------------------------------------------------------
 c     finish loops over iext and iqty.
 c-----------------------------------------------------------------------
             bcs%xext(iext,iqty)=x
             bcs%yext(iext,iqty)=y
             bcs%fext(iext,iqty)=bcs%f(iqty)
-         ENDDO
-      ENDDO
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bicube_extrema
-      END MODULE bicube_mod
+      return
+      end subroutine bicube_extrema
+      end module bicube_mod
