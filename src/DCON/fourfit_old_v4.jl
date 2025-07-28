@@ -10,7 +10,7 @@ Full integration with JPEC equilibrium system based on:
 
 # Package setup using absolute path
 using Pkg
-Pkg.activate("/Users/seoda-eun/JPEC/JPEC")
+Pkg.activate("../..")
 Pkg.instantiate()
 using JPEC
 using LinearAlgebra
