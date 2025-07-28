@@ -1,6 +1,5 @@
 
 
-
 using Test
 using Pkg
 
@@ -8,27 +7,13 @@ using Pkg
 Pkg.activate(joinpath(@__DIR__, ".."))
 using JPEC
 
-@testset "Make fortran files" begin
-    try
-        # Run the build function
-        result = JPEC.build_fortran()
-        @test true
-        @info "Fortran builds completed successfully"
-    catch e
-        @test false
-        @warn "build_spline_fortran() failed: $e"
+# Check if specific test files are requested via ARGS
+if !isempty(ARGS)
+    for testfile in ARGS
+        @info "Running test file: $testfile"
+        include(testfile)
     end
-end
-
-
-@testset "splines" begin
-    # This lines are  test for splines
-end
-
-@testset "fourfit" begin
-    # This lines are test for fourfit
-end
-
-@testset "vacuum" begin
-    # This lines are test for vacuum code
+else
+    include("./runtests_build.jl")
+    include("./runtests_spline.jl")
 end
