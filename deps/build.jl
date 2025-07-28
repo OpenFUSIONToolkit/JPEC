@@ -69,6 +69,8 @@ function build_vacuum_fortran()
 
 end
 
+# Example for including more fortran:
+#
 # function build_jpec_fortran()
 #     dir = joinpath(parent_dir, "Gpec", "fortran")
 #     try
