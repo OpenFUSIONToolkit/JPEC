@@ -250,7 +250,7 @@ function ode_axis_init()
     else
         error("Cannot recognize sort_type = $sort_type")
     end
-    bubble(key, index, 1, mpert)
+    index .= sortperm_subrange(key, 1, mpert) # in original Fortran: bubble(key, index, 1, mpert)
 
     # Initialize solutions
     u .= 0
@@ -720,8 +720,8 @@ function ode_fixup(sing_flag::Bool, test::Bool)
         end
         # Sort unorm
         index[1:msol] .= collect(1:msol)
-        bubble(unorm, index, 1, mpert)
-        bubble(unorm, index, mpert + 1, msol)
+        index[1:mpert] .= sortperm_subrange(unorm, 1:mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
+        index[mpert+1:msol] .= sortperm_subrange(unorm, mpert+1:msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
     end
 
     # Triangularize primary solutions
