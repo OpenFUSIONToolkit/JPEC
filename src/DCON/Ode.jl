@@ -766,9 +766,29 @@ function ode_test_fixup()
     return
 end
 
-# Example stub for record edge
 function ode_record_edge()
-    # Implement record edge logic here
+    debug = false
+    # calc_number is persistent in Fortran; use a global or Ref in Julia if needed
+    global calc_number
+    total1 = 0.0 + 0.0im
+    vacuum1 = 0.0 + 0.0im
+    plasma1 = 0.0 + 0.0im
+
+    spline_eval(sq, psifac, 0)
+    if size_edge > 0
+        if sq.f[4] >= q_edge[i_edge] && psifac >= psiedge
+            free_test(plasma1, vacuum1, total1, psifac)
+            if debug
+                println("$(calc_number) $(i_edge) $(psifac) $(sq.f[4]) $(q_edge[i_edge]) $(real(total1)) $(real(vacuum1)) $(real(plasma1))")
+            end
+            calc_number += 1
+            dw_edge[i_edge] = total1
+            q_edge[i_edge] = sq.f[4]
+            psi_edge[i_edge] = psifac
+            i_edge = min(i_edge + 1, size_edge)  # just to be extra safe
+        end
+    end
+
     return
 end
 
