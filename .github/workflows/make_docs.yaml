@@ -22,8 +22,9 @@ jobs:
       - name: Instantiate Julia environment
         run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
+      - name: Download BLAS
+        run: sudo apt install -y libopenblas-dev
       - name: Build package
         run: julia --project=. -e 'using Pkg; Pkg.build()'
-
       - name: Run tests
         run: julia --project=. -e 'using Pkg; Pkg.test()'
