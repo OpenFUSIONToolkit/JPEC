@@ -1,10 +1,12 @@
 # === CONFIGURABLE ===
-FC = gfortran  # You can override this: `make FC=ifort`
+FC ?= gfortran  # You can override this: `make FC=ifort`
 FFLAGS ?= -fPIC
 LDFLAGS ?= -shared
 LIBS ?= -framework Accelerate
-OUTLIB = libspline.dylib
 RECURSFLAG ?= -frecursive
+LIBSUFFIX ?= .dylib
+
+OUTLIB = libspline$(LIBSUFFIX)
 
 F90 = $(FC) $(FFLAGS) $(RECURSFLAG)
 

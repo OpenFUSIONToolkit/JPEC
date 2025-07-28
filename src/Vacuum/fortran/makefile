@@ -1,12 +1,14 @@
 # === CONFIGURABLE ===
-FC = gfortran  # You can override this: `make FC=ifort`
+FC ?= gfortran  # You can override this: `make FC=ifort`
 FFLAGS ?= -fPIC
 LDFLAGS ?= -shared
 LIBS ?= -framework Accelerate
-OUTLIB = libvac.dylib
 RECURSFLAG ?= -frecursive
 LEGACYFLAG ?= -std=legacy
 ZEROFLAG ?= -finit-local-zero
+LIBSUFFIX ?= .dylib
+
+OUTLIB = libvac$(LIBSUFFIX)
 
 F90 = $(FC) $(FFLAGS) $(ZEROFLAG) $(RECURSFLAG) $(LEGACYFLAG)
 
