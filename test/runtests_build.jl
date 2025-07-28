@@ -6,6 +6,6 @@
         @info "Fortran builds completed successfully"
     catch e
         @test false
-        @warn "build_spline_fortran() failed: $e"
+        @error "build_spline_fortran() failed: $e"
     end
 end
