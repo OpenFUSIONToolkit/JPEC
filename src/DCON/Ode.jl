@@ -541,9 +541,32 @@ function ode_step()
     return
 end
 
-# Example stub for normalization
 function ode_unorm(sing_flag::Bool)
-    # Implement normalization logic here
+    # Compute norms of first solution vectors, abort if any are zero
+    unorm[1:mpert] .= sqrt.(sum(abs.(u[:, 1:mpert, 1]).^2, dims=1)[:])
+    unorm[mpert+1:msol] .= sqrt.(sum(abs.(u[:, mpert+1:msol, 2]).^2, dims=1)[:])
+    if minimum(unorm[1:msol]) == 0
+        jmax = argmin(unorm[1:msol])
+        message = "_unorm: unorm(1,$jmax) = 0"
+        program_stop(message)
+    end
+
+    # Normalize unorm and perform Gaussian reduction if required
+    if new
+        new = false
+        unorm0[1:msol] .= unorm[1:msol]
+    else
+        unorm[1:msol] .= unorm[1:msol] ./ unorm0[1:msol]
+        uratio = maximum(unorm[1:msol]) / minimum(unorm[1:msol])
+        if uratio > ucrit || sing_flag
+            ode_fixup(sing_flag, false)
+            if diagnose
+                ode_test_fixup()
+            end
+            new = true
+        end
+    end
+
     return
 end
 
