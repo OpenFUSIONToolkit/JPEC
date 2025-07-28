@@ -1,7 +1,3 @@
-
-
-
-
 # How to modify build.jl:
 # 1) Declare build functions for each Fortran codes as 'build_*_fortran()'
 # 2) Add these functions to the results array in build_fortran()
@@ -13,10 +9,23 @@ const parent_dir = joinpath(@__DIR__, "..", "src")
 export build_fortran
 export build_spline_fortran, build_vacuum_fortran
 
-
-
-
 function build_fortran()
+    ENV["FC"]=get(ENV, "FC", "gfortran")
+    # Set OS-dependent flags
+    if Sys.isapple()
+        ENV["LIBS"] = "-framework Accelerate"
+    elseif Sys.islinux()
+        ENV["LIBS"] = "-lopenblas"
+    elseif Sys.iswindows()
+        ENV["LIBS"] = "-lopenblas"
+    else
+        error("Unsupported OS for Fortran build")
+    end
+    ENV["RECURSFLAG"] = "-frecursive"
+    ENV["LEGACYFLAG"] = "-std=legacy"
+    ENV["ZEROFLAG"] = "-finit-local-zero"
+    ENV["FFLAGS"] = "-fPIC"
+    ENV["LDFLAGS"] = "-shared"
 
     results = [
         # build_jpec_fortran() add here
@@ -70,3 +79,4 @@ end
 # end
 
 
+build_fortran() # Call the build function to execute the builds

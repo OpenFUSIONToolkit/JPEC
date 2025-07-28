@@ -1,12 +1,11 @@
-#include ../install/DEFAULTS.inc
-
 # === CONFIGURABLE ===
-FC = gfortran  # You can override this: `make FC=ifort`
+FC ?= gfortran  # You can override this: `make FC=ifort`
 FFLAGS ?= -fPIC
 LDFLAGS ?= -shared
 LIBS ?= -framework Accelerate
-OUTLIB = libspline.dylib
 RECURSFLAG ?= -frecursive
+
+OUTLIB = libspline.dylib
 
 F90 = $(FC) $(FFLAGS) $(RECURSFLAG)
 
