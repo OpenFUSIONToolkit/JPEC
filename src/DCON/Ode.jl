@@ -547,9 +547,137 @@ function ode_unorm(sing_flag::Bool)
     return
 end
 
-# Example stub for fixup
 function ode_fixup(sing_flag::Bool, test::Bool)
-    # Implement fixup logic here
+    # ...existing code...
+
+    diagnose = false
+    secondary = false
+    # new is a persistent variable in Fortran; use a global or Ref in Julia if needed
+    global new
+    mask = trues(2, msol)
+    jmax = zeros(Int, 1)
+
+    # Open output file and write initial values
+    if diagnose
+        if new
+            ascii_open(init_out_unit, "fixup.out", "UNKNOWN")
+            new = false
+        end
+        println(init_out_unit, "mlow = $mlow, mhigh = $mhigh, mpert = $mpert, msol = $msol, psifac = $psifac, q = $q")
+        println(init_out_unit, "input values:")
+        for isol in 1:msol
+            println(init_out_unit, "isol = $isol, m = $(mlow + isol - 1)")
+            # Print first two components
+            for ipert in 1:2
+                println(init_out_unit, "re u($ipert), im u($ipert)")
+            end
+            # Normalize and print
+            norm_val = maximum(abs.(u[:, isol, 1]))
+            for ipert in 1:mpert
+                println(init_out_unit, ipert, u[ipert, isol, :] / norm_val)
+            end
+            for ipert in 1:2
+                println(init_out_unit, "re u($ipert), im u($ipert)")
+            end
+        end
+    end
+
+    # Initial output
+    println(crit_out_unit, "Gaussian Reduction at istep = $istep, psi = $psifac, q = $q")
+    if !sing_flag
+        println(crit_out_unit, "Gaussian Reduction at istep = $istep, psi = $psifac, q = $q")
+    end
+    istate = 1
+    flag_count = 0
+
+    # Initialize fixfac
+    if !test
+        fixfac .= 0
+        for isol in 1:msol
+            fixfac[isol, isol] = 1
+        end
+        # Sort unorm
+        index[1:msol] .= collect(1:msol)
+        bubble(unorm, index, 1, mpert)
+        bubble(unorm, index, mpert + 1, msol)
+    end
+
+    # Triangularize primary solutions
+    mask .= true
+    for isol in 1:mpert
+        ksol = index[isol]
+        mask[2, ksol] = false
+        if !test
+            # Find max location
+            absvals = abs.(u[:, ksol, 1])
+            masked = absvals .* mask[1, 1:mpert]
+            kpert = argmax(masked)
+            mask[1, kpert] = false
+        end
+        for jsol in 1:msol
+            if mask[2, jsol]
+                if !test
+                    fixfac[ksol, jsol] = -u[kpert, jsol, 1] / u[kpert, ksol, 1]
+                end
+                u[:, jsol, :] .= u[:, jsol, :] .+ u[:, ksol, :] .* fixfac[ksol, jsol]
+                if !test
+                    u[kpert, jsol, 1] = 0
+                end
+            end
+        end
+    end
+
+    # Triangularize secondary solutions
+    if msol > mpert && secondary
+        mask .= true
+        for isol in mpert + 1:msol
+            ksol = index[isol]
+            mask[2, ksol] = false
+            if !test
+                absvals = abs.(u[:, ksol, 2])
+                masked = absvals .* mask[1, 1:mpert]
+                kpert = argmax(masked)
+                mask[1, kpert] = false
+            end
+            for jsol in mpert + 1:msol
+                if mask[2, jsol]
+                    if !test
+                        fixfac[ksol, jsol] = -u[kpert, jsol, 2] / u[kpert, ksol, 2]
+                    end
+                    u[:, jsol, :] .= u[:, jsol, :] .+ u[:, ksol, :] .* fixfac[ksol, jsol]
+                    if !test
+                        u[kpert, jsol, 2] = 0
+                    end
+                end
+            end
+        end
+    end
+
+    # Save fixfac to file
+    if bin_euler && !test
+        write(euler_bin_unit, 2)
+        write(euler_bin_unit, sing_flag, msol)
+        write(euler_bin_unit, fixfac, index[1:msol])
+    end
+
+    # Write output values and close output file
+    if diagnose
+        println(init_out_unit, "output values:")
+        for isol in 1:msol
+            println(init_out_unit, "isol = $isol, m = $(mlow + isol - 1)")
+            for ipert in 1:2
+                println(init_out_unit, "re u($ipert), im u($ipert)")
+            end
+            for ipert in 1:mpert
+                println(init_out_unit, ipert, u[ipert, isol, :])
+            end
+            for ipert in 1:2
+                println(init_out_unit, "re u($ipert), im u($ipert)")
+            end
+        end
+    end
+
+    # ...existing code...
     return
 end
 
