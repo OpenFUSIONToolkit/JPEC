@@ -1,3 +1,5 @@
+using JPEC
+
 struct ResistType
     e::Float64
     f::Float64
@@ -24,9 +26,9 @@ struct SingType
     q1::Float64
     di::Float64
     alpha::Complex{Float64}
-    power::Vector{Complex{Float64}}
-    vmat::Array{Complex{Float64},4}
-    mmat::Array{Complex{Float64},4}
+    power::Union{Nothing, Vector{Complex{Float64}}}
+    vmat::Union{Nothing, Array{Complex{Float64},4}}
+    mmat::Union{Nothing, Array{Complex{Float64},4}}
     restype::ResistType
 end
 
@@ -55,7 +57,7 @@ struct DconInternal
     sol_base::Int
 
     # Spline type (replace Any with actual type if available)
-    locstab::Any
+    locstab::CubicSplineType
 
     # Singularity arrays and counters
     msing::Int
