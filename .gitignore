@@ -3,4 +3,4 @@
 .vscode
 *.o
 *.DS_Store
-./notebooks/spline_examples.ipynb
+notebooks/spline_examples.ipynb
