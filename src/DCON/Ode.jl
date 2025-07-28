@@ -50,61 +50,74 @@ function init_ode_state(mpert, msol)
     )
 end
 
-# Main integration routine
+
 function ode_run()
-    # Initialization logic
-    # if sing_start <= 0
-    #     ode_axis_init()
-    # elseif sing_start <= msing
-    #     ode_sing_init()
-    # else
-    #     error("sing_start > msing")
-    # end
+    # Initialization
+    if sing_start <= 0
+        ode_axis_init()
+    elseif sing_start <= msing
+        ode_sing_init()
+    else
+        message = "sing_start = $(sing_start) > msing = $(msing)"
+        program_stop(message)
+    end
     flag_count = 0
-    # ode_output_open()
-    # if diagnose_ca
-    #     ascii_open("ca.out")
-    # end
+    ode_output_open()
+    if diagnose_ca
+        ascii_open(ca_unit, "ca.out", "UNKNOWN")
+    end
 
     # Integration loop
     while true
         first = true
         while true
-            # if istep > 0
-            #     ode_unorm(false)
-            # end
-            # test = ode_test()
-            # force_output = first || test
-            # ode_output_step(unorm, op_force=force_output)
-            # ode_record_edge()
-            # if test
-            #     break
-            # end
-            # ode_step()
+            if istep > 0
+                ode_unorm(false)
+            end
+            # Always record the first and last point in an inter-rational region
+            test = ode_test()
+            force_output = first || test
+            ode_output_step(unorm; op_force=force_output)
+            ode_record_edge()
+            if test
+                break
+            end
+            ode_step()
             first = false
         end
-        # if ising == ksing
-        #     break
-        # end
-        # if next == "cross"
-        #     if res_flag
-        #         ode_resist_cross()
-        #     elseif kin_flag
-        #         ode_kin_cross()
-        #     else
-        #         ode_ideal_cross()
-        #     end
-        # else
-        #     break
-        # end
+
+        # Re-initialize
+        if ising == ksing
+            break
+        end
+        if next == "cross"
+            if res_flag
+                ode_resist_cross()
+            elseif kin_flag
+                ode_kin_cross()
+            else
+                ode_ideal_cross()
+            end
+        else
+            break
+        end
         flag_count = 0
     end
-    # ode_output_close()
-    # deallocate arrays
-    # if diagnose_ca
-    #     ascii_close("ca.out")
-    # end
+
+    # Finalize
+    ode_output_close()
+    # Deallocate arrays (in Julia, set to nothing or let GC handle)
+    rwork = nothing
+    atol = nothing
+    unorm0 = nothing
+    unorm = nothing
+    index = nothing
+    fixfac = nothing
+    if diagnose_ca
+        ascii_close(ca_unit)
+    end
 end
+
 
 # Example stub for axis initialization
 function ode_axis_init()
