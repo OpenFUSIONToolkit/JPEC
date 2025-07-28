@@ -121,7 +121,178 @@ end
 
 # Example stub for axis initialization
 function ode_axis_init()
-    # Implement axis initialization logic here
+    # Variable declarations
+    ipert = 0
+    key = zeros(Float64, mpert)
+    m = zeros(Float64, mpert)
+    jpsi = 0
+    it = 0
+    itmax = 50
+    dpsi = 0.0
+    q = 0.0
+    q1 = 0.0
+    eps = 1e-10
+
+    # Preliminary computations
+    global new = true
+    global ix = 0
+    global psiout = 1.0
+    global psifac = sq.xs[1]  # Fortran index 0 -> Julia index 1
+
+    # Use Newton iteration to find starting psi if qlow is above q0
+    if qlow > sq.fs[1, 5]  # Fortran fs(0,4) -> Julia fs[1,5]
+        # Start check from the edge for robustness in reverse shear cores
+        for jpsi = sq.mx:-1:2  # Fortran mx-1,1,-1; avoid endpoints
+            if sq.fs[jpsi - 1, 5] < qlow  # Fortran jpsi-1,4 -> Julia jpsi-1,5
+                break
+            end
+        end
+        psifac = sq.xs[jpsi]
+        it = 0
+        while true
+            it += 1
+            spline_eval(sq, psifac, 1)
+            q = sq.f[5]
+            q1 = sq.f1[5]
+            dpsi = (qlow - q) / q1
+            psifac += dpsi
+            if abs(dpsi) < eps * abs(psifac) || it > itmax
+                break
+            end
+        end
+    end
+
+    # Find inner singular surface
+    global ising = 0
+    if kin_flag
+        for ising = 1:kmsing
+            if kinsing[ising].psifac > psifac
+                break
+            end
+        end
+    else
+        for ising = 1:msing
+            if sing[ising].psifac > psifac
+                break
+            end
+        end
+    end
+    ising = max(0, ising - 1)
+
+    # Find next singular surface
+    if kin_flag
+        while true
+            ising += 1
+            if ising > kmsing
+                break
+            end
+            if psilim < kinsing[ising].psifac
+                break
+            end
+            q = kinsing[ising].q
+            if mlow <= nn * q && mhigh >= nn * q
+                break
+            end
+        end
+        if ising > kmsing || singfac_min == 0
+            psimax = psilim * (1 - eps)
+            next = "finish"
+        elseif psilim < kinsing[ising].psifac
+            psimax = psilim * (1 - eps)
+            next = "finish"
+        else
+            psimax = kinsing[ising].psifac - singfac_min / abs(nn * kinsing[ising].q1)
+            next = "cross"
+        end
+    else
+        while true
+            ising += 1
+            if ising > msing || psilim < sing[min(ising, msing)].psifac
+                break
+            end
+            q = sing[ising].q
+            if mlow <= nn * q && mhigh >= nn * q
+                break
+            end
+        end
+        if ising > msing || psilim < sing[min(ising, msing)].psifac || singfac_min == 0
+            psimax = psilim * (1 - eps)
+            next = "finish"
+        else
+            psimax = sing[ising].psifac - singfac_min / abs(nn * sing[ising].q1)
+            next = "cross"
+        end
+    end
+
+    # Allocate and sort solutions by increasing value of |m-ms1|
+    global u = zeros(ComplexF64, mpert, mpert, 2)
+    global du = zeros(ComplexF64, mpert, mpert, 2)
+    global u_save = zeros(ComplexF64, mpert, mpert, 2)
+    global unorm0 = zeros(Float64, 2 * mpert)
+    global unorm = zeros(Float64, 2 * mpert)
+    global index = collect(1:mpert)
+    m .= mlow - 1 .+ index
+    if sort_type == "absm"
+        key .= abs.(m)
+    elseif sort_type == "sing"
+        key .= m
+        if msing > 0
+            key .= key .- sing[1].m
+        end
+        key .= -abs.(key)
+    else
+        error("Cannot recognize sort_type = $sort_type")
+    end
+    bubble(key, index, 1, mpert)
+
+    # Initialize solutions
+    u .= 0
+    for ipert = 1:mpert
+        u[index[ipert], ipert, 2] = 1
+    end
+    global msol = mpert
+    global neq = 4 * mpert * msol
+    u_save .= u
+    global psi_save = psifac
+
+    # Initialize integrator parameters
+    global istep = 0
+    global iopt = 1
+    global itask = 5
+    global itol = 2
+    global mf = 10
+    global istate = 1
+
+    # Compute conditions at next singular surface
+    q = sq.fs[1, 5]
+    if kin_flag
+        if kmsing > 0
+            m1 = round(Int, nn * kinsing[ising].q)
+        else
+            m1 = round(Int, nn * qlim) + sign(one, nn * sq.fs1[mpsi, 5])
+        end
+    else
+        if msing > 0
+            m1 = round(Int, nn * sing[ising].q)
+        else
+            m1 = round(Int, nn * qlim) + sign(one, nn * sq.fs1[mpsi, 5])
+        end
+    end
+    global singfac = abs(m1 - nn * q)
+
+    # Set up work arrays
+    global liw = length(iwork)
+    global lrw = 22 + 64 * mpert * msol
+    global rwork = zeros(Float64, lrw)
+    global atol = zeros(ComplexF64, mpert, msol, 2)
+    global fixfac = zeros(ComplexF64, msol, msol)
+    iwork .= 0
+    rwork .= 0
+    rwork[1] = psimax
+    rwork[5] = psifac * 1e-3
+    rwork[11] = rwork[5]
+
+    # Terminate
     return
 end
 
