@@ -1,0 +1,3 @@
+module Vacuum
+
+end
