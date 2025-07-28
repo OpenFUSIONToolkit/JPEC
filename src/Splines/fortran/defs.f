@@ -28,6 +28,8 @@ c-----------------------------------------------------------------------
       real(r8), parameter :: six = 6.0_r8
       integer, parameter :: bin_unit = 10
       integer, parameter :: out_unit = 11
+      
+      complex(r8), PARAMETER :: ifac=(0,1)
 
       contains
 c-----------------------------------------------------------------------
@@ -37,78 +39,78 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     delcarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE timer(mode,unit,op_cpuseconds,op_wallseconds)
+      subroutine timer(mode,unit,op_cpuseconds,op_wallseconds)
       
-      INTEGER, INTENT(IN) :: mode,unit
-      REAL(r4), INTENT(OUT), OPTIONAL :: op_cpuseconds,op_wallseconds
+      integer, intent(in) :: mode,unit
+      real(r4), intent(out), optional :: op_cpuseconds,op_wallseconds
 
-      INTEGER(i8), SAVE :: count_rate, wall_start
-      REAL(r4), SAVE :: start
-      REAL(r4) :: seconds
-      INTEGER(i8) :: hrs,mins,secs, wall_seconds, count_max
+      integer(i8), save :: count_rate, wall_start
+      real(r4), save :: start
+      real(r4) :: seconds
+      integer(i8) :: hrs,mins,secs, wall_seconds, count_max
 c-----------------------------------------------------------------------
 c     format statements.
 c-----------------------------------------------------------------------
- 10   FORMAT(1x,a,1p,e10.3,a)
+ 10   format(1x,a,1p,e10.3,a)
 c-----------------------------------------------------------------------
 c     computations.
 c-----------------------------------------------------------------------
-      IF(mode == 0)THEN
-         CALL CPU_TIME(start)
-         CALL SYSTEM_CLOCK(wall_start)
-      ELSE
+      if(mode == 0)then
+         call CPU_TIME(start)
+         call SYSTEM_CLOCK(wall_start)
+      else
          ! report cpu time
-         CALL CPU_time(seconds)
+         call CPU_time(seconds)
          seconds=seconds-start
          secs = int(seconds)
          hrs = secs/(60*60)
          mins = (secs-hrs*60*60)/60
          secs = secs-hrs*60*60-mins*60
-         IF(PRESENT(op_cpuseconds))THEN
+         if(present(op_cpuseconds))then
             ! simply provide the time to the caller
             op_cpuseconds = seconds
-         ELSE
+         else
             ! write the time to terminal and file
-            IF(hrs>0)THEN
-               WRITE(*,'(1x,a,i3,a,i2,a,i2,a)') "Total cpu time = ",
+            if(hrs>0)then
+               write(*,'(1x,a,i3,a,i2,a,i2,a)') "Total cpu time = ",
      $            hrs," hours, ",mins," minutes, ",secs," seconds"
-            ELSEIF(mins>0)THEN
-               WRITE(*,'(1x,a,i2,a,i2,a)') "Total cpu time = ",
+            elseif(mins>0)then
+               write(*,'(1x,a,i2,a,i2,a)') "Total cpu time = ",
      $            mins," minutes, ",secs," seconds"
-            ELSEIF(secs>0)THEN
-               WRITE(*,'(1x,a,i2,a)') "Total cpu time = ",secs,
+            elseif(secs>0)then
+               write(*,'(1x,a,i2,a)') "Total cpu time = ",secs,
      $            " seconds"
-            ENDIF
-            WRITE(unit,10) "Total cpu time = ",seconds," seconds"
-         ENDIF
+            endif
+            write(unit,10) "Total cpu time = ",seconds," seconds"
+         endif
          ! report wall time
-         CALL SYSTEM_CLOCK(wall_seconds, count_rate, count_max)
-         seconds=REAL(wall_seconds-wall_start, r4)/REAL(count_rate, r4)
+         call SYSTEM_CLOCK(wall_seconds, count_rate, count_max)
+         seconds=real(wall_seconds-wall_start, r4)/real(count_rate, r4)
          secs = int(seconds)
          hrs = secs/(60*60)
          mins = (secs-hrs*60*60)/60
          secs = secs-hrs*60*60-mins*60
-         IF(PRESENT(op_wallseconds))THEN
+         if(present(op_wallseconds))then
             op_wallseconds = seconds
-         ELSE
-            IF(hrs>0)THEN
-               WRITE(*,'(1x,a,i3,a,i2,a,i2,a)') "Total wall time = ",
+         else
+            if(hrs>0)then
+               write(*,'(1x,a,i3,a,i2,a,i2,a)') "Total wall time = ",
      $            hrs," hours, ",mins," minutes, ",secs," seconds"
-            ELSEIF(mins>0)THEN
-               WRITE(*,'(1x,a,i2,a,i2,a)') "Total wall time = ",
+            elseif(mins>0)then
+               write(*,'(1x,a,i2,a,i2,a)') "Total wall time = ",
      $            mins," minutes, ",secs," seconds"
-            ELSEIF(secs>0)THEN
-               WRITE(*,'(1x,a,i2,a)') "Total wall time = ",secs,
+            elseif(secs>0)then
+               write(*,'(1x,a,i2,a)') "Total wall time = ",secs,
      $            " seconds"
-            ENDIF
-            WRITE(unit,10) "Total wall time = ",seconds," seconds"
-         ENDIF
-      ENDIF
+            endif
+            write(unit,10) "Total wall time = ",seconds," seconds"
+         endif
+      endif
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE timer
+      return
+      end subroutine timer
 c-----------------------------------------------------------------------
 c     subprogram 2. bin_open.
 c     opens a binary input or output file.
@@ -116,32 +118,32 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bin_open(unit,name,stat,pos,convert_type)
+      subroutine bin_open(unit,name,stat,pos,convert_type)
 
-      CHARACTER(*), INTENT(IN) :: name,stat,pos,convert_type
-      INTEGER, INTENT(IN) :: unit
+      character(*), intent(in) :: name,stat,pos,convert_type
+      integer, intent(in) :: unit
 c-----------------------------------------------------------------------
 c     open file.
 c-----------------------------------------------------------------------
-      SELECT CASE(convert_type)
-      CASE("none")
-         OPEN(UNIT=unit,FILE=name,STATUS=stat,POSITION=pos,
-     $        FORM="UNFORMATTED")
-      CASE("big")
-         OPEN(UNIT=unit,FILE=name,STATUS=stat,POSITION=pos,
-     $        FORM="UNFORMATTED",CONVERT="BIG_ENDIAN")
-      CASE("little")
-         OPEN(UNIT=unit,FILE=name,STATUS=stat,POSITION=pos,
-     $        FORM="UNFORMATTED",CONVERT="LITTLE_ENDIAN")
-      CASE DEFAULT
-         CALL program_stop
+      select case(convert_type)
+      case("none")
+         open(UNIT=unit,FILE=name,STATUS=stat,POSITION=pos,
+     $        FORM="UNformatTED")
+      case("big")
+         open(UNIT=unit,FILE=name,STATUS=stat,POSITION=pos,
+     $        FORM="UNformatTED",CONVERT="BIG_endIAN")
+      case("little")
+         open(UNIT=unit,FILE=name,STATUS=stat,POSITION=pos,
+     $        FORM="UNformatTED",CONVERT="LITTLE_endIAN")
+      case default
+         call program_stop
      $        ("Cannot recognize convert_type = "//TRIM(convert_type))
-      END SELECT
+      end select
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bin_open
+      return
+      end subroutine bin_open
 c-----------------------------------------------------------------------
 c     subprogram 3. bin_close.
 c     close a binary input or output file.
@@ -149,18 +151,18 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bin_close(unit)
+      subroutine bin_close(unit)
 
-      INTEGER, INTENT(IN) :: unit
+      integer, intent(in) :: unit
 c-----------------------------------------------------------------------
 c     work.
 c-----------------------------------------------------------------------
-      CLOSE(UNIT=unit)
+      close(UNIT=unit)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bin_close
+      return
+      end subroutine bin_close
 c-----------------------------------------------------------------------
 c     subprogram 4. ascii_open.
 c     opens a ascii input or output file.
@@ -168,19 +170,19 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE ascii_open(unit,name,stat)
+      subroutine ascii_open(unit,name,stat)
 
-      CHARACTER(*), INTENT(IN) :: name,stat
-      INTEGER, INTENT(IN) :: unit
+      character(*), intent(in) :: name,stat
+      integer, intent(in) :: unit
 c-----------------------------------------------------------------------
 c     open file.
 c-----------------------------------------------------------------------
-      OPEN(UNIT=unit,FILE=name,STATUS=stat)
+      open(UNIT=unit,FILE=name,STATUS=stat)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE ascii_open
+      return
+      end subroutine ascii_open
 c-----------------------------------------------------------------------
 c     subprogram 5. ascii_close.
 c     close a ascii input or output file.
@@ -188,18 +190,18 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE ascii_close(unit)
+      subroutine ascii_close(unit)
 
-      INTEGER, INTENT(IN) :: unit
+      integer, intent(in) :: unit
 c-----------------------------------------------------------------------
 c     work.
 c-----------------------------------------------------------------------
-      CLOSE(UNIT=unit)
+      close(UNIT=unit)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE ascii_close
+      return
+      end subroutine ascii_close
 c-----------------------------------------------------------------------
 c     subprogram 6. program_stop.
 c     terminates program with message, calls timer, closes output file.
@@ -207,19 +209,19 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE program_stop(message)
+      subroutine program_stop(message)
 
-      CHARACTER(*), INTENT(IN) :: message
+      character(*), intent(in) :: message
 c-----------------------------------------------------------------------
 c     write completion message.
 c-----------------------------------------------------------------------
-      CALL timer(1,out_unit)
-      CALL ascii_close(out_unit)
-      WRITE(*,'(1x,2a)') 'PROGRAM STOP => ', TRIM(message)
+      call timer(1,out_unit)
+      call ascii_close(out_unit)
+      write(*,'(1x,2a)') 'PROGRAM stop => ', TRIM(message)
 c-----------------------------------------------------------------------
 c     write completion message.
 c-----------------------------------------------------------------------
-      STOP
-      END SUBROUTINE program_stop
+      stop
+      end subroutine program_stop
 
       end module defs_mod

@@ -10,7 +10,7 @@ Full integration with JPEC equilibrium system based on:
 
 # Package setup using absolute path
 using Pkg
-Pkg.activate("../..")
+Pkg.activate("/Users/seoda-eun/JPEC/JPEC")
 Pkg.instantiate()
 using JPEC
 using LinearAlgebra
@@ -140,23 +140,23 @@ direct.jl 패턴을 따라 정확한 JPEC 인터페이스 사용
 """
     extract_jpec_equilibrium_data_v2(plasma_eq, mpsi, mtheta)
 
-Extract equilibrium data by directly evaluating splines from JPEC PlasmaEquilibrium.
-Uses the direct.jl pattern for accurate JPEC interface usage.
+JPEC PlasmaEquilibrium에서 직접 스플라인 평가하여 데이터 추출
+direct.jl 패턴을 따라 정확한 JPEC 인터페이스 사용
 """
 function extract_jpec_equilibrium_data_v2(plasma_eq, mpsi::Int, mtheta::Int)
     println("📊 Extracting equilibrium data using JPEC spline system...")
     
-    # JPEC module
+    # JPEC 모듈 접근
     JPEC_mod = get_jpec_module()
     if JPEC_mod === nothing
         error("JPEC module not available in global scope")
     end
     
-    # make grid
+    # 그리드 생성
     psi_norm_grid = collect(LinRange(0.0, 1.0, mpsi + 1))
     theta_grid = collect(LinRange(0.0, TWOPI, mtheta + 1))
-
-    # JPEC PlasmaEquilibrium structure validation
+    
+    # JPEC PlasmaEquilibrium 구조 검증
     required_fields = [:sq, :rzphi, :ro, :zo, :psio]
     for field in required_fields
         if !hasfield(typeof(plasma_eq), field)
@@ -167,8 +167,8 @@ function extract_jpec_equilibrium_data_v2(plasma_eq, mpsi::Int, mtheta::Int)
     println("  ✓ JPEC PlasmaEquilibrium structure validated")
     println("  ✓ Magnetic axis: R₀=$(plasma_eq.ro), Z₀=$(plasma_eq.zo)")
     println("  ✓ Flux normalization: ψ₀=$(plasma_eq.psio)")
-
-    # 1D profile evaluation (JPEC vs Mock)
+    
+    # 1D 프로파일 평가 (JPEC vs Mock)
     println("  📈 Evaluating 1D profiles...")
     
     F_profile = zeros(Float64, mpsi + 1)
@@ -184,8 +184,8 @@ function extract_jpec_equilibrium_data_v2(plasma_eq, mpsi::Int, mtheta::Int)
         try
             for i in 1:(mpsi + 1)
                 psi_norm = psi_norm_grid[i]
-
-                # JPEC spline evaluation (direct.jl:111-119 pattern)
+                
+                # JPEC 스플라인 평가 (direct.jl:111-119 패턴)
                 f_sq, f1_sq = JPEC_mod.Spl.spline_eval(plasma_eq.sq, psi_norm, 1)
                 
                 F_profile[i] = f_sq[1]      # F = R*B_phi
@@ -215,16 +215,16 @@ function extract_jpec_equilibrium_data_v2(plasma_eq, mpsi::Int, mtheta::Int)
         println("      P range: [$(round(minimum(P_profile), digits=3)), $(round(maximum(P_profile), digits=3))]") 
         println("      q range: [$(round(minimum(q_profile), digits=3)), $(round(maximum(q_profile), digits=3))]")
     end
-
-    # 2D geometry evaluation
+    
+    # 2D 기하학적 데이터 평가
     println("  🗺️  Evaluating 2D geometry...")
-
-    # Initialize geometric arrays
+    
+    # 기하학적 배열 초기화
     npts = (mpsi + 1) * (mtheta + 1)
     rzphi_f = zeros(Float64, npts, 5)      # [rfac², shift, stream, jac, extra]
-    rzphi_fx = zeros(Float64, npts, 5)     # psi derivative
-    rzphi_fy = zeros(Float64, npts, 5)     # theta derivative
-
+    rzphi_fx = zeros(Float64, npts, 5)     # psi 미분
+    rzphi_fy = zeros(Float64, npts, 5)     # theta 미분
+    
     # Check if real JPEC geometry exists
     has_real_geometry = (plasma_eq.rzphi !== nothing)
     
@@ -286,14 +286,14 @@ function extract_jpec_equilibrium_data_v2(plasma_eq, mpsi::Int, mtheta::Int)
                                    plasma_eq.ro, plasma_eq.zo, mpsi, mtheta)
         println("    ✅ Simplified geometry created successfully")
     end
-
-    # Compute derivatives
+    
+    # 미분 계산
     println("  🧮 Computing profile derivatives...")
     F_derivative = compute_derivative(F_profile, psi_norm_grid)
     P_derivative = compute_derivative(P_profile, psi_norm_grid) 
     q_derivative = compute_derivative(q_profile, psi_norm_grid)
     
-    # Build result dictionary
+    # 결과 딕셔너리 구성
     eq_data = Dict{String, Any}(
         "psi_grid" => psi_norm_grid,
         "theta_grid" => theta_grid,
@@ -1018,12 +1018,12 @@ function test_fourfit_with_jpec_equilibrium(plasma_eq)
     
     # Initialize fourfit parameters
     fourfit_data = OldFourfitData()
-    fourfit_data.mpsi = 128        # Moderate resolution for testing
+    fourfit_data.mpsi = 16        # Moderate resolution for testing
     fourfit_data.mtheta = 24      # Moderate resolution for testing  
-    fourfit_data.mpert = 33        # Number of perturbation modes
+    fourfit_data.mpert = 5        # Number of perturbation modes
     fourfit_data.mband = 2        # Bandwidth
-    fourfit_data.mlow = -12        # Lowest mode number
-    fourfit_data.mhigh = 20        # Highest mode number
+    fourfit_data.mlow = -2        # Lowest mode number
+    fourfit_data.mhigh = 2        # Highest mode number
     fourfit_data.nn = 1           # Toroidal mode number
     
     # Set flags
