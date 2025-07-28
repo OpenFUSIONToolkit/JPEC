@@ -160,6 +160,7 @@ and the inboard/outboard separatrix crossings on the midplane.
 - `zo`: Z-coordinate of the magnetic axis [m].
 - `rs1`: R-coordinate of the inboard separatrix crossing [m].
 - `rs2`: R-coordinate of the outboard separatrix crossing [m].
+- 
 """
 function direct_position(
     psi_in::Spl.BicubicSplineType,
@@ -212,6 +213,15 @@ function direct_position(
     # This step is preserved conceptually but does not modify the spline.
     direct_get_bfield!(bf_temp, ro, zo, psi_in, sq_in, psio, derivs=0)
     psi_at_axis = bf_temp.psi
+    fac = psio/psi_at_axis
+    new_psi_fs = psi_in.fs * fac
+    print(typeof(psi_in.xs))
+    print(typeof(psi_in.ys))
+    print(typeof(new_psi_fs))
+    x_coords = Vector(psi_in.xs)
+    y_coords = Vector(psi_in.ys)
+    psi_in_new = Spl.bicube_setup(x_coords, y_coords, new_psi_fs, bctypex=4, bctypey=4)
+
     if abs(psi_at_axis - psio) / psio > 1e-3
         @warn "Psi at located axis (O-point) differs from expected psio. " *
               "Psi(axis)=$(psi_at_axis), psio=$(psio). Proceeding without re-fitting."
@@ -227,8 +237,8 @@ function direct_position(
             r_sep = (start_r * (3.0 - 0.5 * ird) + end_r) / (4.0 - 0.5 * ird)
             @printf "  Restart attempt %d/6 with initial R = %.6f\n" (ird + 1) r_sep
             for _ in 1:max_newton_iter
-                direct_get_bfield!(bf_temp, r_sep, zo, psi_in, sq_in, psio, derivs=1)
-                # We are finding the root of f(r) = psi(r,z0) = 0
+                # Use psi_in_new for all subsequent physics calculations
+                direct_get_bfield!(bf_temp, r_sep, zo, psi_in_new, sq_in, psio, derivs=1)
                 if abs(bf_temp.psir) < 1e-14; @warn "d(psi)/dr is near zero."; break; end
                 dr = -bf_temp.psi / bf_temp.psir
                 r_sep += dr
@@ -244,7 +254,8 @@ function direct_position(
     rs1 = find_separatrix_crossing(ro, rmin, "inboard")
     rs2 = find_separatrix_crossing(ro, rmax, "outboard")
 
-    return ro, zo, rs1, rs2
+    # 4. Return the new spline
+    return ro, zo, rs1, rs2, psi_in_new
 end
 
 
@@ -453,10 +464,25 @@ function direct_run(raw_profile::DirectRunInput)
     ro_guess = (raw_profile.rmin + raw_profile.rmax) / 2.0
     zo_guess = (raw_profile.zmin + raw_profile.zmax) / 2.0
 
+
+
     # 3. Find key geometric positions and perform normalization
-    ro, zo, rs1, rs2 = direct_position(psi_in, sq_in, psio,
+    ro, zo, rs1, rs2, psi_in_norm = direct_position(psi_in, sq_in, psio,
                                         ro_guess, zo_guess, # initial guess
                                        raw_profile.rmin, raw_profile.rmax)
+
+
+
+    normalized_profile = DirectRunInput(
+        raw_profile.equil_input,
+        raw_profile.sq_in,
+        psi_in_norm, # <-- Using the new, normalized spline here
+        raw_profile.rmin,
+        raw_profile.rmax,
+        raw_profile.zmin,
+        raw_profile.zmax,
+        raw_profile.psio
+    )
 
     # 4. Main integration loop over flux surfaces
     local rzphi::Spl.BicubicSplineType
@@ -471,13 +497,13 @@ function direct_run(raw_profile::DirectRunInput)
         @printf "--> Processing surface ipsi = %d / %d (ψ_norm = %.4f)\n" (ipsi-1) mpsi psi_norm_surf
 
         # a. Integrate along the field line for this surface
-        y_out, bf_start = direct_fl_int(ipsi, psi_norm_surf, raw_profile, ro, zo, rs2)
+        y_out, bf_start = direct_fl_int(ipsi, psi_norm_surf, normalized_profile, ro, zo, rs2)
 
         # b. Process integration results into a temporary periodic spline `ff(θ_new)`
-        theta_new_nodes = y_out[:, 1] ./ y_out[end, 1]
+        theta_new_nodes = y_out[:, 2] ./ y_out[end, 2]
         ff_fs_nodes = hcat(
             y_out[:, 3].^2,                                            # 1: rfac²
-            y_out[:, 2] / (2*pi) .- theta_new_nodes,                   # 2: η/(2π) - θ_new
+            y_out[:, 1] / (2*pi) .- theta_new_nodes,                   # 2: η/(2π) - θ_new
             bf_start.f * (y_out[:, 4] .- theta_new_nodes .* y_out[end, 4]), # 3: Toroidal stream function term
             y_out[:, 5] ./ y_out[end, 5] .- theta_new_nodes            # 4: Jacobian-related term
         )
@@ -503,7 +529,7 @@ function direct_run(raw_profile::DirectRunInput)
         sq_fs_nodes[ipsi, 1] = bf_start.f
         sq_fs_nodes[ipsi, 2] = bf_start.p
         sq_fs_nodes[ipsi, 3] = y_out[end, 5] * psio / (2pi)  # Toroidal Flux / (2pi)^2
-        sq_fs_nodes[ipsi, 4] = y_out[end, 2] * bf_start.f / (2pi) # q-profile
+        sq_fs_nodes[ipsi, 4] = y_out[end, 4] * bf_start.f / (2pi) # q-profile
     end
     println("...Loop over flux surfaces finished.")
 
