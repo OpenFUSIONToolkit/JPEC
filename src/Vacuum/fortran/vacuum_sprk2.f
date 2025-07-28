@@ -279,7 +279,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine diff5 ( fin, h, df5 )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       dimension fin(*)
@@ -337,7 +337,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine matwrtn ( a, maxj1,maxj2,l1,l2,jmax1,jmax2,jn1,jn2,
      $     label, nout1,nout2 )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       character*(*) label
@@ -393,7 +393,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine matwrt9 ( a, maxj1,maxj2,l1,l2, label, nout1,nout2 )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       character*(*) label
@@ -442,7 +442,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine mtrans ( a, nd, n )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       dimension a(nd,nd)
@@ -469,7 +469,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine mtransr ( a, nd1,nd2, n1,n2, b )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       dimension a(nd1,nd2), b(nd2,nd1)

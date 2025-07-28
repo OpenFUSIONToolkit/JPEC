@@ -466,7 +466,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine readahg (ahgfile, ahgdir, mthin,lmin,lmax,ndcon,qa1,
      $     xinf, zinf, delta, vecin, mth )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       use vglobal_mod, only: dcon_set, mth_dcon, lmin_dcon,lmax_dcon,
      $     nn_dcon, qa1_dcon, x_dcon, z_dcon, delta_dcon
       implicit real(r8) (a-h,o-z)
@@ -532,7 +532,7 @@ c-----------------------------------------------------------------------
       subroutine readvacin ( mthin,rgato,ndum2,ngato,qa1,xinf,zinf,
      $     delta, vecin,xigr,xigi, mth,mth1,mth2, ndfel, dx0,
      $     ireig, nout1, nout2 )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
       integer mthin,ndum2,ngato,ith
@@ -587,7 +587,7 @@ c-----------------------------------------------------------------------
      $     mthin, lmin,lmax,ntor, qa1,
      $     xinf,zinf, delta, vecin, bnlr,bnli,
      $     mth, dx0,dx1, ireig5)
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
 c-----------------------------------------------------------------------
 c     read input.
 c-----------------------------------------------------------------------
@@ -658,7 +658,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine adjustm ( mth, mfel, mth1,mth2, ndfel, nout1,nout2 )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
 c-----------------------------------------------------------------------
@@ -713,7 +713,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       subroutine set_dcon_params ( mthin,lmin,lmax,nnin,qa1in,xin,
      $     zin, deltain )
-      use local_mod, only: r8
+      USE vglobal_mod, ONLY: r8
       use vglobal_mod, only: dcon_set, mth_dcon, lmin_dcon,lmax_dcon,
      $     nn_dcon, qa1_dcon, x_dcon, z_dcon, delta_dcon
       integer :: mthin,lmin,lmax,nnin,mthin1,mthin5,i

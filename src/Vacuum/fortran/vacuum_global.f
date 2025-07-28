@@ -16,9 +16,10 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       MODULE vglobal_mod
-      USE local_mod, ONLY: r8
       IMPLICIT NONE
 
+      INTEGER, PARAMETER :: r4_=SELECTED_REAL_KIND(6,37),
+     $     r8=SELECTED_REAL_KIND(13,307)
       LOGICAL :: lsymz,check1,check2,lanal,lkdis,lpest1,lpless,wall,
      $     lnova,checks,lfunin,checke,checkd,symvac,verbose_timer_output
 
