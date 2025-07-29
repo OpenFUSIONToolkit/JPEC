@@ -39,7 +39,7 @@ function inverse_output(;diagnostics=false)
 end
 
 """
-    inverse_run(input::InverseRunInput)
+    equilibrium_solver(input::InverseRunInput)
 
 Main routine for inverse equilibrium analysis.
 
@@ -49,7 +49,7 @@ Arguments:
 Returns:
     - PlasmaEquilibrium object (as in direct_run).
 """
-function inverse_run(input::InverseRunInput)
+function equilibrium_solver(input::InverseRunInput)
     equil_params = deepcopy(input.equil_input)
     sq_in = deepcopy(input.sq_in)
     println(sq_in)

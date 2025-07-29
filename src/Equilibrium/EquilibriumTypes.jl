@@ -1,15 +1,19 @@
 #=
 This file is the one stop shop for all the fundemental structures used in 
     creating equilibrium descriptions for the DCON ODE to use.
-
-- `EquilInput`:          User-facing input parameters.
-- `DirectRunInput`:      Internal data structure for the direct solver.
-- `InverseRunInput`:     Internal data structure for the inverse solver.
-- `PlasmaEquilibrium`:   The final, user-facing output object.
 =#
 
 using Base: @kwdef
 
+# --- Helper function --- 
+
+
+function symbolize_keys(dict::Dict{String, Any})
+    return Dict(Symbol(k) => v for (k, v) in dict)
+end
+
+
+# --- Main Structures for the Equilibrium Code ---
 
 
 @kwdef mutable struct EquilControl
@@ -87,10 +91,18 @@ end
     dump_flag::Bool = false
 end
 
+
+"""
+    EquilConfig(...)
+
+A container struct that bundles all necessary configuration settings originally specified in the equil
+    fortran namelsits.
+"""
 @kwdef mutable struct EquilConfig
     control::EquilControl = EquilControl()
     output::EquilOutput = EquilOutput()
 end
+
 
 """
 Constructor that allows users to form a EquilConfig struct from dictionaries
@@ -102,8 +114,124 @@ function EquilConfig(control::Dict, output::Dict)
     return EquilConfig(control=construct, output=outstruct)
 
 
+"""
+Outer constructor for EquilConfig that enables a toml file 
+    interface for specifying the configuration settings
+"""
+function EquilConfig(path::String = "equil.toml")
+    raw = TOML.parsefile(path)
+
+    # Extract EQUIL_CONTROL with default fallback
+    control_data = get(raw, "EQUIL_CONTROL", Dict())
+    output_data  = get(raw, "EQUIL_OUTPUT", Dict())
+
+    # Check for required fields in control_data
+    required_keys = ("eq_filename", "eq_type")
+    missingkeys = filter(k -> !haskey(control_data, k), required_keys)
+
+    if !isempty(missingkeys)
+        error("Missing required key(s) in [EQUIL_CONTROL]: $(join(missing, ", "))")
+    end
+
+    # Construct validated structs
+    control = EquilControl(; symbolize_keys(control_data)...)
+    output  = EquilOutput(; symbolize_keys(output_data)...)
+
+    return EquilConfig(control=control, output=output)
+end
 
 
+
+"""
+    LargeAspectRationConfig(...)  
+
+A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equilibrium model.
+
+## Fields:
+
+- `lar_r0`: The major radius of the plasma [m].
+- `lar_a`: The minor radius of the plasma [m].
+- `beta0`: The beta value on axis (normalized pressure).
+- `q0`: The safety factor on axis.
+- `p_pres`: The exponent for the pressure profile, defined as `p00 * (1 - (r / a)^2)^p_pres`.
+- `p_sig`: The exponent that determines the shape of the current-related function profile.
+- `sigma_type`: The type of sigma profile, can be "default" or "wesson". If "wesson", the sigma profile is defined as `sigma0 * (1 - (r / a)^2)^p_sig`.
+- `mtau`: The number of grid points in the poloidal direction.
+- `ma`: The number of grid points in the radial direction.
+- `zeroth`: If set to true, it neglects the Shafranov shift
+"""
+
+@kwdef mutable struct LargeAspectRationConfig
+    lar_r0::Float64 = 10.0    # Major radius of the plasma
+    lar_a::Float64 = 1.0      # Minor radius of the plasma
+
+    beta0::Float64 = 1e-3     # beta on axis
+    q0::Float64 = 1.5         # q (safety factor) on axis
+
+    p_pres::Float64 = 2.0     # p00 * (1-(r/a)**2)**p_pres
+    p_sig::Float64 = 1.0      # The exponent that determines the shape of the current-related function profile
+
+    sigma_type::String = 'default' # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
+
+    mtau::Float64 = 128       # the number of grid points in the poloidal direction
+    ma::Float64 = 128         # the number of grid points in the radial direction
+
+    zeroth ::Bool = false     #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
+end
+
+"""
+Outer constructor for LargeAspectRationConfig that enables a toml file 
+    interface for specifying the configuration settings
+"""
+function LargeAspectRationConfig(path::String = "lar.toml")
+    raw = TOML.parsefile(path)
+    input_data = get(raw, "LAR_INPUT", Dict())
+    return LargeAspectRationConfig(; symbolize_keys(input_data)...)
+end
+
+
+
+"""
+    SolevevConfig(...)  
+
+A mutable struct holding parameters for the Solev'ev (SOL) plasma equilibrium model.
+
+## Fields:
+
+- `mr`: number of radial grid zones
+- `mz`: number of axial grid zones
+- `ma`: number of flux grid zones
+- `e`:  elongation
+- `a`: minor radius
+- `r0`: major radius
+- `q0`: safety factor at the o-point
+- `p0fac`: scale on-axis pressure (P-> P+P0*p0fac. beta changes. Phi,q constant)
+- `b0fac`: scale toroidal field at constant beta (s*Phi,s*f,s^2*P. bt changes. Shape,beta constant)
+- `f0fac`: scale toroidal field at constant pressure (s*f. beta,q changes. Phi,p,bp constant)
+"""
+
+@kwdef mutable struct SolevevConfig
+    mr::Int = 128      # number of radial grid zones
+    mz::Int = 128      # number of axial grid zones
+    ma::Int = 128      # number of flux grid zones
+    e::Float64 = 1.6       # elongation
+    a::Float64 = 0.33      # minor radius
+    r0::Float64 = 1.0      # major radius
+    q0::Float64 = 1.9      # safety factor at the o-point
+    p0fac::Float64 = 1       # scale on-axis pressure (P-> P+P0*p0fac. beta changes. Phi,q constant)
+    b0fac::Float64 = 1       # scale toroidal field at constant beta (s*Phi,s*f,s^2*P. bt changes. Shape,beta constant)
+    f0fac::Float64 = 1       # scale toroidal field at constant pressure (s*f. beta,q changes. Phi,p,bp constant)
+end
+
+"""
+Outer constructor for LarConfig that enables a toml file 
+    interface for specifying the configuration settings
+"""
+function SolevevConfig(path::String = "sol.toml")
+    raw = TOML.parsefile(path)
+    input_data = get(raw, "SOL_INPUT", Dict())
+    return SolevevConfig(; symbolize_keys(input_data)...)
+end
 
 
 """
@@ -133,7 +261,7 @@ and preparing the initial splines.
 - `psio`: The total flux difference `abs(ψ_axis - ψ_boundary)` [Weber / radian].
 """
 mutable struct DirectRunInput
-    equil_input::EquilInput
+    config::EquilConfig
     sq_in::Any       # 1D profile spline (CubicSplineType)
     psi_in::Any      # 2D flux spline (BicubicSplineType)
     rmin::Float64
@@ -152,7 +280,7 @@ A container struct for inputs to the `inverse_run` function.
 - `equil_input`: The original `EquilInput` object.
 """
 mutable struct InverseRunInput
-    equil_input::EquilInput
+    config::EquilConfig
 
     sq_in::Any           # 1D spline input profile (e.g. F*Bt, Pressure, q)
     rz_in::Any           # 2D bicubic spline input for (R,Z) geometry
@@ -197,53 +325,11 @@ provides a complete representation of the processed plasma equilibrium in flux c
 - `psio`: Total flux difference `|Ψ_axis - Ψ_boundary|` [Weber / radian].
 """
 mutable struct PlasmaEquilibrium
-    equil_input::EquilInput
+    config::EquilConfig
     sq::Any             # Final 1D profile spline
     rzphi::Any          # Final 2D coordinate mapping spline
     eqfun::Any
     ro::Float64
     zo::Float64
     psio::Float64
-end
-
-
-"""
-    LarInput(...)  
-
-A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equilibrium model.
-
-## Fields:
-
-- `lar_r0`: The major radius of the plasma [m].
-- `lar_a`: The minor radius of the plasma [m].
-
-- `beta0`: The beta value on axis (normalized pressure).
-- `q0`: The safety factor on axis.
-
-- `p_pres`: The exponent for the pressure profile, defined as `p00 * (1 - (r / a)^2)^p_pres`.
-- `p_sig`: The exponent that determines the shape of the current-related function profile.
-
-- `sigma_type`: The type of sigma profile, can be "default" or "wesson". If "wesson", the sigma profile is defined as `sigma0 * (1 - (r / a)^2)^p_sig`.
-
-- `mtau`: The number of grid points in the poloidal direction.
-- `ma`: The number of grid points in the radial direction.
-- `zeroth`: If set to true, it neglects the Shafranov shift
-"""
-
-mutable struct LarInput
-    lar_r0::Float64     # Major radius of the plasma
-    lar_a::Float64      # Minor radius of the plasma
-
-    beta0::Float64      # beta on axis
-    q0::Float64         # q (safety factor) on axis
-
-    p_pres::Float64     # p00 * (1-(r/a)**2)**p_pres
-    p_sig::Float64      # The exponent that determines the shape of the current-related function profile
-
-    sigma_type::String  # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
-
-    mtau::Float64      # the number of grid points in the poloidal direction
-    ma::Float64        # the number of grid points in the radial direction
-
-    zeroth ::Bool      #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
 end
