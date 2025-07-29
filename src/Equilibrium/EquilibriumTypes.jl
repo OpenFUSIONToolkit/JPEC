@@ -1,11 +1,6 @@
 #=
 This file is the one stop shop for all the fundemental structures used in 
     creating equilibrium descriptions for the DCON ODE to use.
-
-- `EquilInput`:          User-facing input parameters.
-- `DirectRunInput`:      Internal data structure for the direct solver.
-- `InverseRunInput`:     Internal data structure for the inverse solver.
-- `PlasmaEquilibrium`:   The final, user-facing output object.
 =#
 
 using Base: @kwdef
@@ -87,6 +82,13 @@ end
     dump_flag::Bool = false
 end
 
+
+"""
+    EquilConfig(...)
+
+A container struct that bundles all necessary configuration settings originally specified in the equil
+    fortran namelsits.
+"""
 @kwdef mutable struct EquilConfig
     control::EquilControl = EquilControl()
     output::EquilOutput = EquilOutput()

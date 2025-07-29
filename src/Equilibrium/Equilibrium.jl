@@ -30,12 +30,6 @@ export setup_equilibrium, EquilInput, PlasmaEquilibrium
 # --- Constants ---
 const mu0 = 4.0 * pi * 1e-7
 
-# --- Internal Solver Dispatch ---
-# Uses multiple dispatch to select the correct solver based on input type.
-# Adding a new solver requires adding a new method here.
-_run_solver(input::DirectRunInput) = direct_run(input)
-_run_solver(input::InverseRunInput) = inverse_run(input)
-
 
 function symbolize_keys(dict::Dict{String, Any})
     return Dict(Symbol(k) => v for (k, v) in dict)
@@ -104,7 +98,7 @@ function setup_equilibrium(path::String = "equil.toml")
     end
 
     # Run the appropriate solver (direct or inverse) to get a PlasmaEquilibrium struct
-    plasma_equilibrium = run_solver(eq_input)
+    plasma_equilibrium = equilibrium_solver(eq_input)
 
     println("--- Equilibrium Setup Complete ---")
     return plasma_equilibrium

@@ -414,7 +414,7 @@ end
 
 
 """
-    direct_run(raw_profile)
+    equilibrium_solver(raw_profile)
 
 The main driver for the direct equilibrium reconstruction. It orchestrates the entire
 process from finding the magnetic axis to integrating along field lines and
@@ -429,7 +429,7 @@ constructing the final coordinate and physics quantity splines.
   including the profile spline (`sq`), the coordinate mapping spline (`rzphi`), and
   the physics quantity spline (`eqfun`).
 """
-function direct_run(raw_profile::DirectRunInput)
+function equilibrium_solver(raw_profile::DirectRunInput)
     println("--- Starting Direct Equilibrium Processing ---")
 
     # 1. Unpack initial data
