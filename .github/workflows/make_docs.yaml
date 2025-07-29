@@ -20,7 +20,7 @@ jobs:
           version: '1.11'
 
       - name: Instantiate Julia environment
-        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+        run: julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'
 
       - name: Download BLAS
         run: sudo apt install -y libopenblas-dev
