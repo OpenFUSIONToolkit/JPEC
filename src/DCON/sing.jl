@@ -111,14 +111,14 @@ function sing_find!(sing_surf_data, plasma_eq; nn=1, itmax=200)
 end
 
 # computes limiter values - function 3 from Fortran DCON
-function sing_lim()
+function sing_lim(equil::PlasmaEquilibrium)
     #declarations 
     itmax = 50
     eps = 1e-10
 
     #compute 
     qlim   = min(qmax, qhigh)
-    q1lim  = sq.fs1[mpsi, 4] #TODO: does sq have a field fs1?
+    q1lim  = equil.sq.fs1[mpsi, 4] #TODO: does equil.sq have a field fs1?
     psilim = psihigh
 
     #normalize dmlim to interval [0,1)
@@ -138,8 +138,8 @@ function sing_lim()
 
     #use newton iteration to find psilim
     if qlim < qmax
-        # Find index jpsi that minimizes |sq.fs[:,4] - qlim|
-        diffs = abs.(sq.fs[:,4] .- qlim) #broadcaasting, subtracts qlim from each element in sq.fs[:,4]
+        # Find index jpsi that minimizes |equil.sq.fs[:,4] - qlim|
+        diffs = abs.(equil.sq.fs[:,4] .- qlim) #broadcaasting, subtracts qlim from each element in equil.sq.fs[:,4]
         jpsi = argmin(diffs)
 
         # Ensure jpsi is within bounds
@@ -147,17 +147,17 @@ function sing_lim()
             jpsi = mpsi - 1
         end
 
-        psilim = sq.xs[jpsi]
+        psilim = equil.sq.xs[jpsi]
         it = 0
 
         while true
             it += 1
 
-            # Equivalent to CALL spline_eval(sq, psilim, 1)
-            spline_eval(sq, psilim, 1) #TODO: I don't think this is the correct call
+            # Equivalent to CALL spline_eval(equil.sq, psilim, 1)
+            spline_eval(equil.sq, psilim, 1) #TODO: I don't think this is the correct call
 
-            q  = sq.f[4]
-            q1 = sq.f1[4]
+            q  = equil.sq.f[4]
+            q1 = equil.sq.f1[4]
 
             dpsi = (qlim - q) / q1
             psilim += dpsi
@@ -176,7 +176,7 @@ function sing_lim()
 
     else
         qlim   = qmax
-        q1lim  = sq.fs1[mpsi,4]
+        q1lim  = equil.sq.fs1[mpsi,4]
         psilim = psihigh
     end
 
@@ -184,18 +184,18 @@ function sing_lim()
     #use Newton iteration to find psilim
     if qlim < qmax
         # Find closest index
-        _, jpsi = findmin(abs.(sq.fs[:,4] .- qlim))
+        _, jpsi = findmin(abs.(equil.sq.fs[:,4] .- qlim))
         jpsi = min(jpsi, mpsi - 1)
 
-        psilim = sq.xs[jpsi]
+        psilim = equil.sq.xs[jpsi]
         dpsi   = Inf
         q1     = NaN
 
         for it in 1:itmax
-            spline_eval!(sq, psilim, 1)
+            spline_eval!(equil.sq, psilim, 1)
 
-            q  = sq.f[4]
-            q1 = sq.f1[4]
+            q  = equil.sq.f[4]
+            q1 = equil.sq.f1[4]
 
             dpsi    = (qlim - q) / q1
             psilim += dpsi
@@ -209,7 +209,7 @@ function sing_lim()
 
     else
         qlim   = qmax
-        q1     = sq.fs1[mpsi,4]
+        q1     = equil.sq.fs1[mpsi,4]
         psilim = psihigh
         return qlim, q1, psilim
     end
@@ -217,9 +217,9 @@ function sing_lim()
 
     #set up record for determining the peak in dW near the boundary.
     if psiedge < psilim
-        spline_eval(sq, psiedge, 0) #TODO: I don't think this is the right function call
+        spline_eval(equil.sq, psiedge, 0) #TODO: I don't think this is the right function call
 
-        qedgestart = Int(sq.f[4])
+        qedgestart = Int(equil.sq.f[4])
 
         size_edge = ceil(Int, (qlim - qedgestart) * nn * nperq_edge)
 
@@ -230,7 +230,7 @@ function sing_lim()
         # monitor some deeper points for an informative profile
         pre_edge = 1
         for i in 1:size_edge
-            if q_edge[i] < sq.f[4]
+            if q_edge[i] < equil.sq.f[4]
                 pre_edge += 1
             end
         end
@@ -319,110 +319,101 @@ end
 
 
 # evaluates Euler-Lagrange differential equations
-function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{ComplexF64,3})
-    # Assumed globals/constants: mpert, msol, mband, kin_flag, fkg_kmats_flag, etc.
-    # Assumed: sq, amats, bmats, cmats, etc. are available and spline_eval/cspline_eval are defined
+function sing_der(neq::Int,
+    psifac::Float64,
+    u::Array{ComplexF64,3},
+    du::Array{ComplexF64,3},
+    cntrl::DconControl,
+    equil::PlasmaEquilibrium,
+    intr::DconInternal,
+    ffit::FourFitVars )
 
     # Workspace
-    singfac = zeros(Float64, mpert)
-    ipiv = zeros(Int, mpert)
-    work = zeros(ComplexF64, mpert*mpert)
-    fmatb = zeros(ComplexF64, mband+1, mpert)
-    gmatb = zeros(ComplexF64, mband+1, mpert)
-    kmatb = zeros(ComplexF64, 2*mband+1, mpert)
-    kaatb = zeros(ComplexF64, 2*mband+1, mpert)
-    gaatb = zeros(ComplexF64, 2*mband+1, mpert)
-    amatlu = zeros(ComplexF64, 3*mband+1, mpert)
-    fmatlu = zeros(ComplexF64, 3*mband+1, mpert)
-#= The fully written out version 30+ lines but slightly faster
-    # 2D arrays (mpert x mpert)
-    temp1 = zeros(ComplexF64, mpert, mpert)
-    temp2 = zeros(ComplexF64, mpert, mpert)
-    amat  = zeros(ComplexF64, mpert, mpert)
-    bmat  = zeros(ComplexF64, mpert, mpert)
-    cmat  = zeros(ComplexF64, mpert, mpert)
-    dmat  = zeros(ComplexF64, mpert, mpert)
-    emat  = zeros(ComplexF64, mpert, mpert)
-    hmat  = zeros(ComplexF64, mpert, mpert)
-    baat  = zeros(ComplexF64, mpert, mpert)
-    caat  = zeros(ComplexF64, mpert, mpert)
-    eaat  = zeros(ComplexF64, mpert, mpert)
-    dbat  = zeros(ComplexF64, mpert, mpert)
-    ebat  = zeros(ComplexF64, mpert, mpert)
-    fmat  = zeros(ComplexF64, mpert, mpert)
-    kmat  = zeros(ComplexF64, mpert, mpert)
-    gmat  = zeros(ComplexF64, mpert, mpert)
-    kaat  = zeros(ComplexF64, mpert, mpert)
-    gaat  = zeros(ComplexF64, mpert, mpert)
-    pmat  = zeros(ComplexF64, mpert, mpert)
-    paat  = zeros(ComplexF64, mpert, mpert)
-    umat  = zeros(ComplexF64, mpert, mpert)
-    aamat = zeros(ComplexF64, mpert, mpert)
-    b1mat = zeros(ComplexF64, mpert, mpert)
-    bkmat = zeros(ComplexF64, mpert, mpert)
-    bkaat = zeros(ComplexF64, mpert, mpert)
-    kkmat = zeros(ComplexF64, mpert, mpert)
-    kkaat = zeros(ComplexF64, mpert, mpert)
-    r1mat = zeros(ComplexF64, mpert, mpert)
-    r2mat = zeros(ComplexF64, mpert, mpert)
-    r3mat = zeros(ComplexF64, mpert, mpert)
-    f0mat = zeros(ComplexF64, mpert, mpert)
+    singfac = zeros(Float64, intr.mpert)
+    ipiv = zeros(Int, intr.mpert)
+    work = zeros(ComplexF64, intr.mpert*intr.mpert)
+    fmatb = zeros(ComplexF64, intr.mband+1, intr.mpert)
+    gmatb = zeros(ComplexF64, intr.mband+1, intr.mpert)
+    kmatb = zeros(ComplexF64, 2*intr.mband+1, intr.mpert)
+    kaatb = zeros(ComplexF64, 2*intr.mband+1, intr.mpert)
+    gaatb = zeros(ComplexF64, 2*intr.mband+1, intr.mpert)
+    amatlu = zeros(ComplexF64, 3*intr.mband+1, intr.mpert)
+    fmatlu = zeros(ComplexF64, 3*intr.mband+1, intr.mpert)
+    # 2D arrays (intr.mpert x intr.mpert)
+    temp1 = zeros(ComplexF64, intr.mpert, intr.mpert)
+    temp2 = zeros(ComplexF64, intr.mpert, intr.mpert)
+    amat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    bmat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    cmat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    dmat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    emat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    hmat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    baat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    caat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    eaat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    dbat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    ebat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    fmat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    kmat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    gmat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    kaat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    gaat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    pmat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    paat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    umat  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    aamat = zeros(ComplexF64, intr.mpert, intr.mpert)
+    b1mat = zeros(ComplexF64, intr.mpert, intr.mpert)
+    bkmat = zeros(ComplexF64, intr.mpert, intr.mpert)
+    bkaat = zeros(ComplexF64, intr.mpert, intr.mpert)
+    kkmat = zeros(ComplexF64, intr.mpert, intr.mpert)
+    kkaat = zeros(ComplexF64, intr.mpert, intr.mpert)
+    r1mat = zeros(ComplexF64, intr.mpert, intr.mpert)
+    r2mat = zeros(ComplexF64, intr.mpert, intr.mpert)
+    r3mat = zeros(ComplexF64, intr.mpert, intr.mpert)
+    f0mat = zeros(ComplexF64, intr.mpert, intr.mpert)
 
-    # 3D arrays (mpert x mpert x 6)
-    kwmat = zeros(ComplexF64, mpert, mpert, 6)
-    ktmat = zeros(ComplexF64, mpert, mpert, 6)
-=#
-
-    #TODO: This seems to work (and ChatGPT claims it will). Could be bad though
-    names_2d = [:temp1, :temp2, :amat, :bmat, :cmat, :dmat, :emat, :hmat, :baat, :caat, :eaat,
-            :dbat, :ebat, :fmat, :kmat, :gmat, :kaat, :gaat, :pmat, :paat, :umat, :aamat,
-            :b1mat, :bkmat, :bkaat, :kkmat, :kkaat, :r1mat, :r2mat, :r3mat, :f0mat]
-
-    for name in names_2d
-        @eval $name = zeros(ComplexF64, mpert, mpert)
-    end
-    kwmat = zeros(ComplexF64, mpert, mpert, 6)
-    ktmat = zeros(ComplexF64, mpert, mpert, 6)
-
+    # 3D arrays (intr.mpert x intr.mpert x 6)
+    kwmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
+    ktmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
     # Spline evaluation
-    spline_eval(sq, psifac, 0)
-    q = sq.f[4]
-    singfac .= mlow .- nn*q .+ collect(0:mpert-1) #TODO: does this have to be broadcast or is it all just numbers
+    spline_eval!(equil.sq, psifac, 0)
+    q = equil.sq.f[4]
+    singfac .= intr.mlow .- ctrl.nn*q .+ collect(0:intr.mpert-1)
     singfac .= 1.0 ./ singfac
-    chi1 = twopi * psio #TODO: 2*π or 2*pi instead of twopi? -> both defined in Julia
+    chi1 = 2pi * equil.psio
 
     #= kinetic stuff - skip for now
-    if kin_flag
-        cspline_eval(amats, psifac, 0)
-        cspline_eval(bmats, psifac, 0)
-        cspline_eval(cmats, psifac, 0)
-        cspline_eval!(dmats, psifac, 0)
-        cspline_eval(emats, psifac, 0)
-        cspline_eval(hmats, psifac, 0)
-        cspline_eval!(dbats, psifac, 0)
-        cspline_eval!(ebats, psifac, 0)
-        cspline_eval!(fbats, psifac, 0)
+    if ctrl.kin_flag
+        cspline_eval!(ffit.amats, psifac, 0)
+        cspline_eval!(ffit.bmats, psifac, 0)
+        cspline_eval!(ffit.cmats, psifac, 0)
+        cspline_eval!(ffit.dmats, psifac, 0)
+        cspline_eval!(ffit.emats, psifac, 0)
+        cspline_eval!(ffit.hmats, psifac, 0)
+        cspline_eval!(ffit.dbats, psifac, 0)
+        cspline_eval!(ffit.ebats, psifac, 0)
+        cspline_eval!(ffit.fbats, psifac, 0)
 
-        amat = reshape(amats.f, mpert, mpert)
-        bmat = reshape(bmats.f, mpert, mpert)
-        cmat = reshape(cmats.f, mpert, mpert)
-        dmat = reshape(dmats.f, mpert, mpert)
-        emat = reshape(emats.f, mpert, mpert)
-        hmat = reshape(hmats.f, mpert, mpert)
-        dbat = reshape(dbats.f, mpert, mpert)
-        ebat = reshape(ebats.f, mpert, mpert)
-        fmat = reshape(fbats.f, mpert, mpert)
+        amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
+        bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
+        cmat = reshape(ffit.cmats.f, intr.mpert, intr.mpert)
+        dmat = reshape(ffit.dmats.f, intr.mpert, intr.mpert)
+        emat = reshape(ffit.emats.f, intr.mpert, intr.mpert)
+        hmat = reshape(ffit.hmats.f, intr.mpert, intr.mpert)
+        dbat = reshape(ffit.dbats.f, intr.mpert, intr.mpert)
+        ebat = reshape(ffit.ebats.f, intr.mpert, intr.mpert)
+        fmat = reshape(ffit.fbats.f, intr.mpert, intr.mpert)
 
-        kwmat = zeros(ComplexF64, mpert, mpert, 6)
-        ktmat = zeros(ComplexF64, mpert, mpert, 6)
+        kwmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
+        ktmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
         for i in 1:6
-            cspline_eval(kwmats[i], psifac, 0)
-            cspline_eval(ktmats[i], psifac, 0)
-            kwmat[:,:,i] = reshape(kwmats[i].f, mpert, mpert)
-            ktmat[:,:,i] = reshape(ktmats[i].f, mpert, mpert)
+            cspline_eval!(ffit.kwmats[i], psifac, 0)
+            cspline_eval!(ffit.ktmats[i], psifac, 0)
+            kwmat[:,:,i] = reshape(ffit.kwmats[i].f, intr.mpert, intr.mpert)
+            ktmat[:,:,i] = reshape(ffit.ktmats[i].f, intr.mpert, intr.mpert)
         end
 
-        if fkg_kmats_flag
+        if intr.fkg_kmats_flag
             cspline_eval(akmats, psifac, 0)
             cspline_eval(bkmats, psifac, 0)
             cspline_eval(ckmats, psifac, 0)
@@ -469,15 +460,15 @@ function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{C
         # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else =#
         #TODO: find out what this function is actually called now and what to pass in
-        cspline_eval!(amats, psifac, 0)
-        cspline_eval!(bmats, psifac, 0)
-        cspline_eval!(cmats, psifac, 0)
-        cspline_eval!(fmats, psifac, 0)
-        cspline_eval!(kmats, psifac, 0)
-        cspline_eval!(gmats, psifac, 0)
-        amat = reshape(amats.f, mpert, mpert)
-        bmat = reshape(bmats.f, mpert, mpert)
-        cmat = reshape(cmats.f, mpert, mpert)
+        cspline_eval!(ffit.amats, psifac, 0)
+        cspline_eval!(ffit.bmats, psifac, 0)
+        cspline_eval!(ffit.cmats, psifac, 0)
+        cspline_eval!(ffit.fmats, psifac, 0)
+        cspline_eval!(ffit.kmats, psifac, 0)
+        cspline_eval!(ffit.gmats, psifac, 0)
+        amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
+        bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
+        cmat = reshape(ffit.cmats.f, intr.mpert, intr.mpert)
         # Factor Hermitian matrix amat, solve for bmat and cmat
         # Use LinearAlgebra.LAPACK.hetrf! and hetrs!
         # Fill in fmatb, gmatb, kmatb as above
@@ -514,7 +505,7 @@ function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{C
     du .= 0
     
     #= we are currently assuming it is not kinetic, so ignore for now
-    if kin_flag
+    if ctrl.kin_flag
         for isol in 1:msol
             du[:,isol,1] .= u[:,isol,2]
             # du[:,isol,1] .+= -kmatb * u[:,isol,1] (banded matvec)
@@ -574,10 +565,10 @@ function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{C
 
 
     # Store u-derivative and xss
-    global ud #TODO: UH OH why is this a global?!?
-    ud[:,:,1] = du[:,:,1]
-    ud[:,:,2] = -bmat * du[:,:,1] - cmat * u[:,:,1]
+    intr.ud[:,:,1] = du[:,:,1]
+    intr.ud[:,:,2] = -bmat * du[:,:,1] - cmat * u[:,:,1]
 
+    return nothing
 end
 
 #= Matrix stuff- ignore for now
@@ -588,7 +579,7 @@ function sing_solve(k, power, mmat, vmat) #do these need to have types specified
     for l in 1:k
         vmat[:,:,:,k+1] .+= sing_matmul(mmat[:,:,:,l], vmat[:,:,:,k-l+1])
     end
-    for isol in 1:2*mpert
+    for isol in 1:2*intr.mpert
         a = copy(m0mat)
         a[1,1] -= k/two - power[isol] #power needs to have a type specified, right?
         a[2,2] -= k/two - power[isol]
@@ -622,20 +613,20 @@ function sing_vmat(ising)
         return
     end
     singp = sing[ising]
-    singp.vmat = zeros(ComplexF64, mpert, 2*mpert, 2, 0:2*sing_order)
-    singp.mmat = zeros(ComplexF64, mpert, 2*mpert, 2, 0:2*sing_order+2)
+    singp.vmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 0:2*sing_order)
+    singp.mmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 0:2*sing_order+2)
 
-    ipert0 = round(Int, nn * singp.q) - mlow + 1
+    ipert0 = round(Int, ctrl.nn * singp.q) - intr.mlow + 1
     q = singp.q
-    if ipert0 <= 0 || mlow > nn*q || mhigh < nn*q
+    if ipert0 <= 0 || intr.mlow > ctrl.nn*q || mhigh < ctrl.nn*q
         singp.di = 0
         return
     end
 
     singp.r1 = [ipert0]
-    singp.r2 = [ipert0, ipert0 + mpert]
-    singp.n1 = [i for i in 1:mpert if i != ipert0]
-    singp.n2 = vcat(singp.n1, [i + mpert for i in singp.n1])
+    singp.r2 = [ipert0, ipert0 + intr.mpert]
+    singp.n1 = [i for i in 1:intr.mpert if i != ipert0]
+    singp.n2 = vcat(singp.n1, [i + intr.mpert for i in singp.n1])
 
     global r1 = singp.r1
     global r2 = singp.r2
@@ -653,25 +644,25 @@ function sing_vmat(ising)
     di = m0mat[1,1]*m0mat[2,2] - m0mat[2,1]*m0mat[1,2]
     singp.di = di
     singp.alpha = sqrt(-complex(singp.di))
-    singp.power = zeros(ComplexF64, 2*mpert)
+    singp.power = zeros(ComplexF64, 2*intr.mpert)
     singp.power[ipert0] = -singp.alpha
-    singp.power[ipert0 + mpert] = singp.alpha
+    singp.power[ipert0 + intr.mpert] = singp.alpha
 
     println(@sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e",
         ising, psifac, rho, q, q1, di0, singp.di, singp.di/di0-1))
 
     singp.vmat .= 0
-    for ipert in 1:mpert
+    for ipert in 1:intr.mpert
         singp.vmat[ipert, ipert, 1, 0] = 1
-        singp.vmat[ipert, ipert + mpert, 2, 0] = 1
+        singp.vmat[ipert, ipert + intr.mpert, 2, 0] = 1
     end
 
     singp.vmat[ipert0, ipert0, 1, 0] = 1
-    singp.vmat[ipert0, ipert0 + mpert, 1, 0] = 1
+    singp.vmat[ipert0, ipert0 + intr.mpert, 1, 0] = 1
     singp.vmat[ipert0, ipert0, 2, 0] = -(m0mat[1,1] + singp.alpha) / m0mat[1,2]
-    singp.vmat[ipert0, ipert0 + mpert, 2, 0] = -(m0mat[1,1] - singp.alpha) / m0mat[1,2]
-    det = conj(singp.vmat[ipert0, ipert0, 1, 0]) * singp.vmat[ipert0, ipert0 + mpert, 2, 0] -
-          conj(singp.vmat[ipert0, ipert0 + mpert, 1, 0]) * singp.vmat[ipert0, ipert0, 2, 0]
+    singp.vmat[ipert0, ipert0 + intr.mpert, 2, 0] = -(m0mat[1,1] - singp.alpha) / m0mat[1,2]
+    det = conj(singp.vmat[ipert0, ipert0, 1, 0]) * singp.vmat[ipert0, ipert0 + intr.mpert, 2, 0] -
+          conj(singp.vmat[ipert0, ipert0 + intr.mpert, 1, 0]) * singp.vmat[ipert0, ipert0, 2, 0]
     singp.vmat[ipert0, :, :, 0] ./= sqrt(det)
 
     for k in 1:2*sing_order
@@ -683,7 +674,7 @@ function sing_mmat(ising)
     # This is a direct translation, but you must define or adapt:
     # - zgbmv, zpbtrs, zhbmv (BLAS/LAPACK wrappers or custom)
     # - fmats, gmats, kmats, etc.
-    # - mband, mpert, sing_order, etc.
+    # - intr.mband, intr.mpert, sing_order, etc.
     # - r1, r2, n1, n2 as global or passed in
     # - sing as a global array of SingType
 
@@ -696,7 +687,7 @@ function sing_solve(k, power, mmat, vmat)
     for l in 1:k
         vmat[:,:,:,k+1] .+= sing_matmul(mmat[:,:,:,l], vmat[:,:,:,k-l+1])
     end
-    for isol in 1:2*mpert
+    for isol in 1:2*intr.mpert
         a = copy(m0mat)
         a[1,1] -= k/two - power[isol]
         a[2,2] -= k/two - power[isol]
