@@ -5,17 +5,7 @@ The `Inverse` submodule contains the logic for transforming an 'inverse' equilib
 representation into a straight-fieldline coordinate system and associated quantities.
 It uses bicubic splines for the geometry and supports several surface grid types.
 """
-module InverseEquilibrium
 
-# --- Dependencies ---
-
-import ..Spl
-
-using LinearAlgebra, Printf
-using ..EquilibriumTypes: PlasmaEquilibrium, EquilInput, InverseRunInput
-
-# --- Public API for this submodule ---
-export inverse_run
 
 # --- Lagrange Polynomial Extrapolation ---
 """
@@ -274,4 +264,3 @@ function inverse_run(input::InverseRunInput)
 end
 
 
-end # module Inverse

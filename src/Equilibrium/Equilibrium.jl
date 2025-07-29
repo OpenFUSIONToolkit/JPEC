@@ -7,14 +7,12 @@ import ..Spl
 using Printf, DifferentialEquations, LinearAlgebra
 
 # --- Internal Module Structure ---
-
-
-
-
 include("EquilibriumTypes.jl")
 include("ReadEquilibrium.jl")
 include("DirectEquilibrium.jl")
 include("InverseEquilibrium.jl")
+
+
 
 export setup_equilibrium, EquilInput, PlasmaEquilibrium
 
