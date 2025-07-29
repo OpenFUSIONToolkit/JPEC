@@ -68,7 +68,7 @@ function MainProgram()
 # -----------------------------------------------------------------------
 #      define poloidal mode numbers.
 # -----------------------------------------------------------------------
-    sing_find()
+    sing_find!(ctrl, intr, equil)
     if ctrl.cyl_flag
       intr.mlow = ctrl.delta_mlow
       intr.mhigh = ctrl.delta_mhigh

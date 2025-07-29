@@ -23,87 +23,84 @@ end
     sing_find!(sing_surf_data, plasma_eq; mex=2, nn=1, itmax=200)
 
 Finds and appends rational (singular) surfaces in a plasma equilibrium profile,
-where `m = nn*q` within each interval between extrema of the safety factor profile `q(ψ)`.
+where `m = nn*q` within each interval between extrema of the safety factor profile `q(psi)`.
 
 The results are stored as `NamedTuple`s in the supplied vector `sing_surf_data`, 
-with keys: `m`, `ψfac`, `ρ`, `q`, and `q1`.
+with keys: `m`, `psifac`, `ρ`, `q`, and `q1`.
 
-# Arguments
-- `sing_surf_data::Vector`: Container for output; will be emptied and updated in-place.
+# Arguments (TODO: update this once finalized)
+- `sing::Vector`: Container for output; will be emptied and updated in-place.
 - `plasma_eq`: Plasma equilibrium object with a field `.sq` suitable for spline evaluation.
 - `nn::Int`: Toroidal mode number `n`.
 - `itmax::Int`: Maximum allowed bisection iterations per root.
 
 # Details
 Searches each interval between adjacent `q`-profile extrema for all integer poloidal mode numbers `m`
-that satisfy the rational surface condition `m = n*q(ψ)`, using bisection to find the roots.
+that satisfy the rational surface condition `m = n*q(psi)`, using bisection to find the roots.
 Assumes a monotonic `q` profile, unless a generalized interface is implemented
 (TODO: support for non-monotonic profiles). Also TODO: decide how to deal with data structure output
 
 # Output
 For each rational surface found, a `NamedTuple` with:
 - `m`: Poloidal mode number at this surface
-- `ψfac`: Normalized flux label at the surface
-- `ρ`: Square root of `ψfac`
+- `psifac`: Normalized flux label at the surface
+- `ρ`: Square root of `psifac`
 - `q`: `q` value at the surface (`m/nn`)
 - `q1`: Derivative of `q` at the surface
 
 is pushed to `sing_surf_data`.
 """
-function sing_find!(sing_surf_data, plasma_eq; nn::Int=1, itmax::Int=200)
-
-    # Ensure sing_surf_data is empty before starting
-    empty!(sing_surf_data)
+function sing_find!(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal; itmax=200)
 
     # Define functions to evaluate q and its first derivative
-    qval(ψ) = JPEC.SplinesMod.spline_eval(plasma_eq.sq, ψ, 0)[4]
-    q1val(ψ) = JPEC.SplinesMod.spline_eval(plasma_eq.sq, ψ, 1)[2][4] 
+    # TODO: confirm that this is the correct way to get spline data
+    qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
+    q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4] 
 
-    # TODO: I assume monotonic here for checking, will need to provide some interface
-    #  for the actual values fo (mex, qex) determined from the equil code
+    # TODO: not sure if equil has these yet - assume monotonic for now
     qex = [qval(0.0), qval(1.0)]
-    ψex = [0.0, 1.0]
+    psiex = [0.0, 1.0]
     mex = 2
 
     # Loop over extrema of q, find all rational values in between
     for iex in 2:mex
         dq = qex[iex] - qex[iex-1]
-        m = floor(Int, nn * qex[iex-1])
+        m = floor(Int, ctrl.nn * qex[iex-1])
         if dq > 0
             m += 1
         end
-        dm = Int(sign(dq * nn))
+        dm = Int(sign(dq * ctrl.nn))
 
         # Loop over possible m's in interval
-        while (m - nn * qex[iex-1]) * (m - nn * qex[iex]) <= 0
+        while (m - ctrl.nn * qex[iex-1]) * (m - ctrl.nn * qex[iex]) <= 0
             it = 0
-            ψ0 = ψex[iex-1]
-            ψ1 = ψex[iex]
-            ψfac = 0.0
+            psi0 = psiex[iex-1]
+            psi1 = psiex[iex]
+            psifac = equil.psilow
 
             # Bisection method to find singular surface
             while it < itmax
                 it += 1
-                ψfac = (ψ0 + ψ1)/2
-                singfac = (m - nn * qval(ψfac)) * dm
+                psifac = (psi0 + psi1)/2
+                singfac = (m - nn * qval(psifac)) * dm
                 if abs(singfac) <= 1e-12
                     break
                 elseif singfac > 0
-                    ψ0 = ψfac
+                    psi0 = psifac
                 else
-                    ψ1 = ψfac
+                    psi1 = psifac
                 end
             end
+            
             if it == itmax
                 @warn "Bisection did not converge for m = $m"
-                # You may want to continue, break, or error here
             else
-                push!(sing_surf_data, (
+                push!(intr.sing, (
                     m = m,
-                    ψfac = ψfac,
-                    ρ = sqrt(ψfac),
+                    psifac = psifac,
+                    rho = sqrt(psifac),
                     q = m / nn,
-                    q1 = q1val(ψfac),
+                    q1 = q1val(psifac),
                 ))
             end
             m += dm
