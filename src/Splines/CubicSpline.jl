@@ -11,10 +11,10 @@ abstract type CubicSplineType end
 
 mutable struct RealSplineType <: CubicSplineType
 	handle::Ptr{Cvoid}
-	_xs::Vector{Float64}
-	_fs::Matrix{Float64}
-	mx::Int64
-	nqty::Int64
+	_xs::Vector{Float64} #x-coordinate (size mx)
+	_fs::Matrix{Float64} #spline values and their derivatives (size mx*nqty)
+	mx::Int64 #number of coordinate values in _xs
+	nqty::Int64 #number of quantities in _fs
     bctype::Int32  # Boundary condition type
 
 	_fsi::Matrix{Float64} # To store integrals at gridpoint
@@ -24,10 +24,10 @@ end
 
 mutable struct ComplexSplineType <: CubicSplineType
 	handle::Ptr{Cvoid}
-	_xs::Vector{Float64}
-	_fs::Matrix{ComplexF64}
-	mx::Int64
-	nqty::Int64
+	_xs::Vector{Float64} #x-coordinate (size mx)
+	_fs::Matrix{ComplexF64} #spline values and their derivatives (size mx*nqty)
+	mx::Int64 #number of coordinate values in _xs
+	nqty::Int64 #number of quantities in _fs
     bctype::Int32  # Boundary condition type
 
 	_fsi::Matrix{ComplexF64} # To store integrals at gridpoint
