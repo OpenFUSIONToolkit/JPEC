@@ -66,6 +66,7 @@ c-----------------------------------------------------------------------
       USE vglobal_mod
       USE vacuum_mod
       REAL(r8), DIMENSION(:,:), ALLOCATABLE :: gij, gil, cs
+      REAL(r8), DIMENSION(:), ALLOCATABLE :: x
       INTEGER :: mtheta=200, mthvac=900, mpert=34
       INTEGER :: i, j
       kernelsign=1
@@ -76,7 +77,11 @@ c-----------------------------------------------------------------------
       call global_alloc(nths0,nfm,mtot,ntsin0)
       CALL defglo(900)
 
+      lmin(1) = 1
+      lmax(1) = nfm
+
       WRITE(*,*) nths, nths2, nfm, nfm2
+      WRITE(*,*) "lmin(1)=", lmin(1), " lmax(1)=", lmax(1)
 
       nths = 905
       nths2 = 1810
@@ -84,16 +89,32 @@ c-----------------------------------------------------------------------
       nfm2 = 68
 
       ALLOCATE(gij(nths,nths), gil(nths2,nfm2), cs(nths,nfm))
-
+      ALLOCATE(x(nths))
+      
       gij = 0.0_r8
       gil = 0.0_r8
       cs = 0.0_r8
+
+      DO i=1, nths
+         x(i) = 6.28/REAL(i,r8)
+      ENDDO
+
+
+      DO i=1, nths
+         DO j=1, nths
+            gij(i,j) = SIN(x(i) + x(j))
+         ENDDO
+
+         DO j=1, nfm
+            cs(i,j) = SIN(j*x(i))**2
+         ENDDO
+      ENDDO
 
       CALL fouran(gij,gil,cs,0,34)
 
       WRITE(*,*) 'gil(1:5,1:5) matrix:'
       DO i = 1, 5
-         WRITE(*,'(5(F12.6,2X))') (gil(i,j), j=1,5)
+         WRITE(*,'(5(F12.6,2X))') (gil(109+i,33+j), j=1,5)
       END DO
 
       END SUBROUTINE test_fourier
