@@ -167,7 +167,7 @@ function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::PlasmaEquilibr
             end
         end
 
-        q1lim = q1
+        intr.q1lim = q1
 
         # abort if not found
         if it > itmax
