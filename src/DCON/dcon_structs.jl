@@ -177,6 +177,9 @@ end
 @kwdef struct FourFitVars
 
     # Spline matrices
+    amats::CsplineType
+    bmats::CsplineType
+    cmats::CsplineType
     dmats::CsplineType
     emats::CsplineType
     hmats::CsplineType
