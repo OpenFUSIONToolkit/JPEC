@@ -8,11 +8,12 @@ using LinearAlgebra.LAPACK #required for banded matrix operations
 #13-16 are for kinetic DCON so skip for now
 
 # scans singular surfaces and prints information about them - function 1 from Fortran DCON
-function sing_scan()
+function sing_scan(intr::DconInternal)
+    #mpert and msing  come from DconInternal struct
     println("\n Singular Surfaces:")
     println("  i    psi      rho      q        q1      di0      di      err")
-    global msol = mpert #TODO: why is msol a global variable and should it be declared elsewhere?
-    for ising in 1:msing #TODO: ising is supposed to be an int, I do not think we need to give it a type in Julia??
+    global msol = intr.mpert #TODO: why is msol a global variable and should it be declared elsewhere?
+    for ising in 1:intr.msing #TODO: ising is supposed to be an int, I do not think we need to give it a type in Julia??
         sing_vmat(ising) #TODO: we don't want to write this function yet; what to do instead?
     end
     println("  i    psi      rho      q        q1      di0      di      err")
@@ -49,7 +50,7 @@ For each rational surface found, a `NamedTuple` with:
 
 is pushed to `sing_surf_data`.
 """
-function sing_find!(sing_surf_data, plasma_eq; nn=1, itmax=200)
+function sing_find!(sing_surf_data, plasma_eq; nn::Int=1, itmax::Int=200)
 
     # Ensure sing_surf_data is empty before starting
     empty!(sing_surf_data)
@@ -111,35 +112,38 @@ function sing_find!(sing_surf_data, plasma_eq; nn=1, itmax=200)
 end
 
 # computes limiter values - function 3 from Fortran DCON
-function sing_lim()
+#This updates variables in the structs DconInternal and DconControl
+function sing_lim!(intr::DconInternal, cntrl::DconControl)
     #declarations 
     itmax = 50
     eps = 1e-10
 
-    #compute 
-    qlim   = min(qmax, qhigh)
-    q1lim  = sq.fs1[mpsi, 4] #TODO: does sq have a field fs1?
-    psilim = psihigh
+    #TODO: where does qmax and psihigh come from 
+    #compute and modify the DconInternal struct
+    intr.qlim = min(qmax, cntrl.qhigh)
+    intr.q1lim = sq.fs1[mpsi, 4] #TODO: does sq have a field fs1? And where does it come from
+    intr.psilim = psihigh
 
     #normalize dmlim to interval [0,1)
-    if sas_flag
-        while dmlim > 1.0
-            dmlim -= 1.0
+    #TODO: This is supposed to be modifying dmlim from the DconControl struct
+    if cntrl.sas_flag
+        while cntrl.dmlim > 1.0
+            cntrl.dmlim -= 1.0
         end
-        while dmlim < 0.0
-            dmlim += 1.0
+        while cntrl.dmlim < 0.0
+            cntrl.dmlim += 1.0
         end
         #compute qlim
-        qlim = (Int(nn * qlim) + dmlim) / nn
-        while qlim > qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
-            qlim -= 1.0 / nn
+        intr.qlim = (Int(cntrl.nn * intr.qlim) + cntrl.dmlim) / cntrl.nn
+        while intr.qlim > qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
+            intr.qlim -= 1.0 / cntrl.nn
         end
     end
 
     #use newton iteration to find psilim
-    if qlim < qmax
+    if intr.qlim < qmax
         # Find index jpsi that minimizes |sq.fs[:,4] - qlim|
-        diffs = abs.(sq.fs[:,4] .- qlim) #broadcaasting, subtracts qlim from each element in sq.fs[:,4]
+        diffs = abs.(sq.fs[:,4] .- intr.qlim) #broadcaasting, subtracts qlim from each element in sq.fs[:,4]
         jpsi = argmin(diffs)
 
         # Ensure jpsi is within bounds
@@ -147,22 +151,22 @@ function sing_lim()
             jpsi = mpsi - 1
         end
 
-        psilim = sq.xs[jpsi]
+        intr.psilim = sq.xs[jpsi]
         it = 0
 
         while true
             it += 1
 
             # Equivalent to CALL spline_eval(sq, psilim, 1)
-            spline_eval(sq, psilim, 1) #TODO: I don't think this is the correct call
+            spline_eval(sq, intr.psilim, 1) #TODO: I don't know if this is the correct call
 
             q  = sq.f[4]
             q1 = sq.f1[4]
 
-            dpsi = (qlim - q) / q1
-            psilim += dpsi
+            dpsi = (intr.qlim - q) / q1
+            intr.psilim += dpsi
 
-            if abs(dpsi) < eps * abs(psilim) || it > itmax
+            if abs(dpsi) < eps * abs(intr.psilim) || it > itmax
                 break
             end
         end
@@ -175,9 +179,9 @@ function sing_lim()
         end
 
     else
-        qlim   = qmax
-        q1lim  = sq.fs1[mpsi,4]
-        psilim = psihigh
+        intr.qlim = qmax
+        intr.q1lim = sq.fs1[mpsi,4]
+        intr.psilim = psihigh
     end
 
     #= More Julia version of the Newton iteration
@@ -216,22 +220,22 @@ function sing_lim()
     =#
 
     #set up record for determining the peak in dW near the boundary.
-    if psiedge < psilim
-        spline_eval(sq, psiedge, 0) #TODO: I don't think this is the right function call
+    if cntrl.psiedge < intr.psilim
+        spline_eval(sq, cntrl.psiedge, 0) #TODO: I don't think this is the right function call
 
         qedgestart = Int(sq.f[4])
 
-        size_edge = ceil(Int, (qlim - qedgestart) * nn * nperq_edge)
+        intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * cntrl.nn * cntrl.nperq_edge)
 
-        dw_edge  = fill(-typemax(Float64) * (1 + ifac), size_edge)
-        q_edge   = [qedgestart + i / (nperq_edge * nn) for i in 0:size_edge-1]
-        psi_edge = zeros(size_edge)
+        intr.dw_edge  = fill(-typemax(Float64) * (1 + im), intr.size_edge)
+        intr.q_edge   = [qedgestart + i / (cntrl.nperq_edge * cntrl.nn) for i in 0:intr.size_edge-1]
+        intr.psi_edge = zeros(intr.size_edge)
 
         # monitor some deeper points for an informative profile
-        pre_edge = 1
-        for i in 1:size_edge
-            if q_edge[i] < sq.f[4]
-                pre_edge += 1
+        intr.pre_edge = 1 #TODO: probably don't need to assign this here.
+        for i in 1:intr.size_edge
+            if intr.q_edge[i] < sq.f[4]
+                intr.pre_edge += 1
             end
         end
     end
@@ -242,9 +246,9 @@ end
 #   ising: index of the singularity
 #   psifac: input psi factor
 #   ua: output 3D complex array (will be mutated)
-function sing_get_ua!(ua, ising, psifac) #TODO: ua is being modified so from Julia conventions, it should be listed first. In Fortran, it is listed last
+function sing_get_ua!(ua::AbstractArray{ComplexF64,3}, intr::DconInternal, ising::Int, psifac::Real) #TODO: ua is being modified so from Julia conventions, it should be listed first. In Fortran, it is listed last
     # Set pointers (aliases) -> TODO: Do we want pointers in Julia?
-    singp = sing[ising]
+    singp = intr.sing[ising] #DconInternal is modified by any modifications made to singp
     vmat = singp.vmat # 4D array
     r1 = singp.r1 # Vector{Int}
     r2 = singp.r2 # Vector{Int}
