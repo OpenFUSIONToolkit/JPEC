@@ -37,10 +37,8 @@ function mscvac(
 )
 
     ahgfile_ptr = if op_ahgfile === nothing
-        # C_NULL_POINTER 사용 가능
         Ptr{UInt8}(C_NULL)
     else
-        # Cstring 로 변환
         Base.cconvert(Ptr{UInt8}, op_ahgfile)
     end
 
@@ -69,6 +67,8 @@ function mscvac(
         pointer(xzptso),
         ahgfile_ptr
     )
+
+    return wv
 end
 
 end
