@@ -13,7 +13,7 @@ F90 = $(FC) $(FFLAGS) $(RECURSFLAG)
 .f.o:
 	$(F90) -c $< -o $@
 
-
+# 3.  Object list
 OBJS = \
 	defs.o \
 	spline.o \
@@ -23,13 +23,13 @@ OBJS = \
 	fspline.o \
 	spline_c_api.o
 
-# targets
-
+# 4.  Targets
 all: $(OUTLIB)
 
 $(OUTLIB): $(OBJS)
 	$(FC) $(LDFLAGS) -o $@ $^ $(LIBS)
-	mv $(OUTLIB) ../../../deps/
+	@mkdir -p $(DEPSDIR)
+	mv -f $(OUTLIB)  $(DEPSDIR)
 
 clean:
 	rm -f *.o *.mod *.original *.dylib *.dll *.so
