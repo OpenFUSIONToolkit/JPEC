@@ -3,3 +3,5 @@
 .vscode
 *.o
 *.DS_Store
+notebooks/spline_examples.ipynb
+.gitattributes
