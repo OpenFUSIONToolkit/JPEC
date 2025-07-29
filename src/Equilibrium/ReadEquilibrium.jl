@@ -55,9 +55,9 @@ them into a `DirectRunInput` object.
 ## Returns:
 - A `DirectRunInput` object ready for the direct solver.
 """
-function read_efit(equil_in::EquilInput)
-    println("--> Processing EFIT g-file: $(equil_in.eq_filename)")
-    lines = readlines(equil_in.eq_filename)
+function read_efit(config::EquilConfig)
+    println("--> Processing EFIT g-file: $(config.control.eq_filename)")
+    lines = readlines(config.control.eq_filename)
 
     # --- Parse Header ---
     header1_parts = split(lines[1])
@@ -123,16 +123,16 @@ function read_efit(equil_in::EquilInput)
     println("--> 2D Spline fitting complete.")
 
     # --- Bundle everything for the solver ---
-    return DirectRunInput(equil_in, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
+    return DirectRunInput(config, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
 end
 
 """
-    _read_chease2(equil_input::EquilInput) -> InverseRunInput
+    _read_chease2(config::EquilInput) -> InverseRunInput
 
 Debug version: Reads ASCII CHEASE file and prints checking info at each read.
 """
-function read_chease2(equil_input::EquilInput)
-    println("--> Reading CHEASE file: $(equil_input.eq_filename)")
+function read_chease2(config::EquilConfig)
+    println("--> Reading CHEASE file: $(config.control.eq_filename)")
 
     # Robust splitting, also for glued numbers
     split_chease_numbers(str::String) = replace(str, r"([eE][+-]\d+)(?=[\-+]\d+\.)" => s"\1 ") |> split
@@ -161,7 +161,7 @@ function read_chease2(equil_input::EquilInput)
         arr
     end
 
-    open(equil_input.eq_filename, "r") do io
+    open(config.control.eq_filename, "r") do io
         # Header and axx
         header_line = readline(io)
         header = split(strip(header_line))

@@ -78,15 +78,15 @@ returning the final processed `PlasmaEquilibrium` object.
 - A `PlasmaEquilibrium` object containing the final result.
 """
 function setup_equilibrium(path::String = "equil.toml")
-    eqconfig = EquilConfig(path)
+    eq_config = EquilConfig(path)
 
-    @printf "Equilibrium file: %s\n" eqconfig.control.eq_filename
+    @printf "Equilibrium file: %s\n" eq_config.control.eq_filename
 
     # Parse file and prepare initial data structures and splines
-    if eqconfig.control..eq_type == "efit"
-        eq_input = read_efit(equil_in)
+    if eq_config.control..eq_type == "efit"
+        eq_input = read_efit(eq_config)
     elseif equil_in.eq_type == "chease2"
-        eq_input = read_chease2(equil_in)
+        eq_input = read_chease2(eq_config)
     elseif equil_in.eq_type == "lar"
         # todo: read the lar toml
         eq_input = lar_run(lar_config)

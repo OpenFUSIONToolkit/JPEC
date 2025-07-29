@@ -135,7 +135,7 @@ and preparing the initial splines.
 - `psio`: The total flux difference `abs(ψ_axis - ψ_boundary)` [Weber / radian].
 """
 mutable struct DirectRunInput
-    equil_input::EquilInput
+    config::EquilConfig
     sq_in::Any       # 1D profile spline (CubicSplineType)
     psi_in::Any      # 2D flux spline (BicubicSplineType)
     rmin::Float64
@@ -154,7 +154,7 @@ A container struct for inputs to the `inverse_run` function.
 - `equil_input`: The original `EquilInput` object.
 """
 mutable struct InverseRunInput
-    equil_input::EquilInput
+    config::EquilConfig
 
     sq_in::Any           # 1D spline input profile (e.g. F*Bt, Pressure, q)
     rz_in::Any           # 2D bicubic spline input for (R,Z) geometry
@@ -199,7 +199,7 @@ provides a complete representation of the processed plasma equilibrium in flux c
 - `psio`: Total flux difference `|Ψ_axis - Ψ_boundary|` [Weber / radian].
 """
 mutable struct PlasmaEquilibrium
-    equil_input::EquilInput
+    config::EquilConfig
     sq::Any             # Final 1D profile spline
     rzphi::Any          # Final 2D coordinate mapping spline
     eqfun::Any
