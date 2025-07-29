@@ -9,21 +9,36 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    env:
+      JULIA_PKG_SERVER: ""
+      
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Julia
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.11'
 
+      - name: Download BLAS
+        run: sudo apt install -y libopenblas-dev
+
       - name: Instantiate Julia environment
         run: julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'
 
-      - name: Download BLAS
-        run: sudo apt install -y libopenblas-dev
+      - name: Resolve & Instantiate (fresh registries)
+        run: |
+          rm -f Manifest.toml
+          rm -rf ~/.julia/registries
+          julia --project=. -e '
+            using Pkg;
+            Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/JuliaRegistries/General.git"));
+            Pkg.Registry.update();
+            Pkg.resolve();
+            Pkg.instantiate();
+            Pkg.precompile();
+      
       - name: Build package
         run: julia --project=. -e 'using Pkg; Pkg.build()'
       - name: Run tests
