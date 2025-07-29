@@ -28,10 +28,8 @@
 # All functions use Julia built-in or standard package features for clarity and efficiency.
 #############################################################
 
-using Dates
 using Interpolations
 using SpecialFunctions
-
 
 #############################################################
 # Cubic spline and derivatives for line 1d array and return point value, 
@@ -46,8 +44,6 @@ function spline1d_deriv(x::Vector, y::Vector, xq::Real)
     itp = CubicSplineInterpolation(x, y)
     return Interpolations.gradient(itp, xq)
 end
-
-
 
 #############################################################
 # lagrange spline for line 1d array and return point value
@@ -68,8 +64,6 @@ function lagrange1d(x::Vector, y::Vector, xq::Real)
     return s
 end
 
-
-
 #############################################################
 # smoothing array, replacing smooth0, smooth
 #############################################################
@@ -84,8 +78,6 @@ function smooth(y::Vector{Float64}, w::Int)
     return y_smooth
 end
 
-
-
 #############################################################
 # shift array, replacing shift
 #############################################################
@@ -94,8 +86,6 @@ function shift(y::Vector, nshift::Int)
     nshift = mod(nshift, n)
     return vcat(y[end-nshift+1:end], y[1:end-nshift])
 end
-
-
 
 #############################################################
 # cumtrapz integration for same intervals
@@ -109,8 +99,6 @@ function cumtrapz(y::Vector{Float64}, dx::Float64)
     end
     return fin
 end
-
-
 
 #############################################################
 # cubic spline for periodic 1d datas and return array
@@ -145,8 +133,6 @@ function trans(vecin::Vector{Float64}, mth::Int; dx0=0.0, dx1=0.0)
     return vecout
 end
 
-
-
 #############################################################
 # Searching index , replacing search, serachx
 #############################################################
@@ -170,7 +156,6 @@ function search(xbar, x::AbstractVector{<:Real})
     end
 end
 
-
 #############################################################
 # Legendre function of the first kind eq.(47)~(50) , replacing aleg
 #############################################################
@@ -181,6 +166,11 @@ function P0_minus_half(s)
     return 2 / π * sqrt(m1) * ellipk(m1)
 end
 
+# Chance eq.(49) (wrong/original)
+function P0_minus_half_wrong(s)
+    m1 = 2 / (s + 1)
+    return 2 / π * sqrt(m1) * ellipkwrong(m1)
+end
 
 # Chance eq.(50)
 function P0_plus_half(s)
@@ -188,12 +178,34 @@ function P0_plus_half(s)
     return 2 / π * sqrt(m1) * ellipe(m1)
 end
 
+# Chance eq.(50) (wrong/original)
+function P0_plus_half_wrong(s)
+    m1 = (s + sqrt(s^2 - 1))
+    return 2 / π * sqrt(m1) * ellipewrong(1/m1^2)
+end
 
 # Chance eq.(48)
 function P1_minus_half(s)
     return 0.5 / ((s^2 - 1)^0.5) * (P0_plus_half(s) - s * P0_minus_half(s))
 end
 
+# Chance eq.(48) (wrong/original)
+function P1_minus_half_wrong(s)
+    return 0.5 / ((s^2 - 1)^0.5) * (P0_plus_half_wrong(s) - s * P0_minus_half_wrong(s))
+end
+
+# Polynomial elliptical integrals from original Chance code
+function ellipewrong(m1)
+    # This is a placeholder for the polynomial ellipe used by chance.
+    # Not yet implemented, error.
+    error("ellipewrong is not implemented yet.")
+end
+
+function ellipkwrong(m1)
+    # This is a placeholder for the polynomial ellipk used by chance.
+    # Not yet implemented, error.
+    error("ellipkwrong is not implemented yet.")
+end
 
 """
     Pn_minus_half(s, n)
@@ -235,11 +247,35 @@ function Pn_minus_half(s::Real, n::Int)
     return P
 end
 
+function Pn_minus_half_wrong(s::Real, n::Int)
+
+    #initialize
+    P = zeros(n + 1)
+
+    # n = 0
+    P[1] = P0_minus_half(s)
+    if n == 0
+        return P
+    end
+
+    # n = 1
+    P[2] = P1_minus_half_wrong(s)
+    if n == 1
+        return P
+    end
+
+    # n > 1
+    for i in 1:n-1
+        # Chance eq.(47)
+        P[i+2] = -2 * i * s / sqrt(s^2 - 1) * P[i+1] - (i - 0.5)^2 * P[i]
+    end
+
+    return P
+end
 
 #############################################################
 # Green function eq.(36)~(42). replacing green
 #############################################################
-
 
 """
     green(xs, zs, xt, zt, n)
@@ -255,7 +291,7 @@ end
 - aval :    𝒥 ∇'𝒢ⁿ∇'ℒ
 - aval0:    𝒥 ∇'𝒢⁰∇'ℒ
 """
-function green(xs, zs, xt, zt, xtp, ztp, n)
+function green(xs, zs, xt, zt, xtp, ztp, n, usechancebugs=false)
 
     xs2 = xs^2
     xt2 = xt^2
@@ -276,14 +312,18 @@ function green(xs, zs, xt, zt, xtp, ztp, n)
     
     # Legendre functions for 
     # P⁰ = p0, P¹ = p1, Pⁿ = pn, Pⁿ⁺¹ = pp 
-    legendre = Pn_minus_half(s, n+1)
+    if usechancebugs
+        legendre = Pn_minus_half_wrong(s, n)
+    else
+        legendre = Pn_minus_half(s, n+1)
+    end
     p0 = legendre[1]
     p1 = legendre[2]
     pp = legendre[end]
     pn = legendre[end-1]
 
     # Chance eq.(40) 2π⅁ⁿ = G
-    gg = 2 * sqrt(π) * gamma(0.5 - n) / R
+    gg = -2 * sqrt(π) * gamma(0.5 - n) / R
     G = gg * pn
 
     # Chance eq.(44)
@@ -317,7 +357,6 @@ function green(xs, zs, xt, zt, xtp, ztp, n)
     return G, aval, aval0, bval
 end
 
-
 #############################################################
 # Inverse Fourier transform
 #############################################################
@@ -348,8 +387,6 @@ function foranv(gil, cs, dth ; jmax1=size(cs,2))
     end
     return gll
 end
-
-
 
 #############################################################
 # Utilities
