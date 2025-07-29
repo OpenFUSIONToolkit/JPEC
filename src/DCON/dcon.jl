@@ -150,7 +150,7 @@ function MainProgram()
       if ctrl.verbose
         println("Starting integration of ODE's")
       end
-      ode_run(ctrl, intr, equil)
+      ode_run(ctrl, equil, intr)
       if intr.size_edge > 0
         # Find peak index in dw_edge[pre_edge:i_edge]
         dw_slice = real.(intr.dw_edge[intr.pre_edge:intr.i_edge])
@@ -165,7 +165,7 @@ function MainProgram()
         if outp.bin_euler
             bin_close(euler_bin_unit) # TODO: Need to decide ho we're handling io
         end
-        ode_run(ctrl, intr, equil)
+        ode_run(ctrl, equil, intr)
       end
     end
 

@@ -57,19 +57,19 @@ function init_ode_state(mpert, msol)
 end
 
 
-function ode_run(ctrl, intr, equil)
+function ode_run(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal)
     # Initialization
-    if sing_start <= 0
-        ode_axis_init(ctrl, intr, equil)
-    elseif sing_start <= msing
+    if ctrl.sing_start <= 0
+        ode_axis_init(ctrl, equil, intr)
+    elseif ctrl.sing_start <= intr.msing
         @warn "sing_start = 0 not implemented yet!"
         ode_sing_init()
     else
-        message = "sing_start = $(sing_start) > msing = $(msing)"
+        message = "sing_start = $(ctrl.sing_start) > msing = $(intr.msing)"
         program_stop(message)
     end
     flag_count = 0
-    ode_output_open()
+    #ode_output_open() # TODO: have to handle io
     if diagnose_ca
         ascii_open(ca_unit, "ca.out", "UNKNOWN")
     end
@@ -165,7 +165,7 @@ Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are
 """
 
 #function ode_axis_init(sing_surf_data, plasma_eq; nn = 1, ψlim=0.9936, ψlow = 0.01, mlow = -12, mhigh = 20, singfac_min = 1e-5, qlow = 0.0, sort_type = "absm")
-function ode_axis_init(ctrl, intr, equil)
+function ode_axis_init(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal)
 
     # JMH - I think all default values here will be supplied by inputs
     # Right now, there are a lot of globals - not sure how we want to handle these
