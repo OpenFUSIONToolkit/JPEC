@@ -54,11 +54,10 @@ function setup_equilibrium(path::String = "equil.toml")
     elseif equil_in.eq_type == "chease2"
         eq_input = read_chease2(eq_config)
     elseif equil_in.eq_type == "lar"
-        # todo: read the lar toml
-        lar_config = LarConfig(eq_config.control.eq_filename)
+        lar_config = LargeAspectRationConfig(eq_config.control.eq_filename)
         eq_input = lar_run(lar_config)
     elseif equil_in.eq_type == "sol"
-        # todo: read the sol toml
+        sol_config = SolevevConfig(eq_config.control.eq_filename)
         eq_input = sol_run(sol_config)
     else
         error("Equilibrium type $(equil_in.eq_type) is not implemented")
