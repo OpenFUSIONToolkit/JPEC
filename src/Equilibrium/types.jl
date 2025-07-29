@@ -155,7 +155,7 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
 - `p00`: The pressure at the magnetic axis [Pa].
 - `p_pres`: The exponent for the pressure profile.
 - `p_sig`: The exponent for the parallel current profile.
-- `sigma0`: The scaling factor for the parallel current profile.
+- `sigma_type`: The scaling factor for the parallel current profile.
 - `lar_r0`: The reference radius for the q-profile [m].
 - `q0`: The target q-value at the magnetic axis.
 """
@@ -163,11 +163,14 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
 mutable struct LarInput
     lar_r0::Float64 # Major radius of the plasma
     lar_a::Float64 # Minor radius of the plasma
+
     p00::Float64  # Pressure at the magnetic axis 
     p_pres::Float64 # p0*(1-(r/a)**2)**p_pres
     p_sig::Float64 # default sigma=J.B/B^2 is given by sigma0/(1+(r/a))**(2*p_sig)**(1+1/p_sig)
-    sigma0::Float64 # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
+
     q0::Float64 # q (safety factor) on axis
+
+    sigma_type::String # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
 end
 
 end # module Types
