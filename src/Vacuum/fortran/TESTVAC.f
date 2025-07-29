@@ -65,7 +65,7 @@ c-----------------------------------------------------------------------
       SUBROUTINE test_fourier
       USE vglobal_mod
       USE vacuum_mod
-      REAL(r8), DIMENSION(:,:), ALLOCATABLE :: gij, gil, cs
+      REAL(r8), DIMENSION(:,:), ALLOCATABLE :: gij, gil, cs, gll
       REAL(r8), DIMENSION(:), ALLOCATABLE :: x
       INTEGER :: mtheta=200, mthvac=900, mpert=34
       INTEGER :: i, j
@@ -89,11 +89,13 @@ c-----------------------------------------------------------------------
       nfm2 = 68
 
       ALLOCATE(gij(nths,nths), gil(nths2,nfm2), cs(nths,nfm))
+      ALLOCATE(gll(nfm,nfm))
       ALLOCATE(x(nths))
       
       gij = 0.0_r8
       gil = 0.0_r8
       cs = 0.0_r8
+      gll = 0.0_r8
 
       DO i=1, nths
          x(i) = 6.28/REAL(i,r8)
@@ -115,6 +117,16 @@ c-----------------------------------------------------------------------
       WRITE(*,*) 'gil(1:5,1:5) matrix:'
       DO i = 1, 5
          WRITE(*,'(5(F12.6,2X))') (gil(109+i,33+j), j=1,5)
+      END DO
+
+      mth = nths
+      dth = twopi / mth
+
+      CALL foranv(gil,gll,cs,0,34)
+
+      WRITE(*,*) 'gll(1:5,1:5) matrix:'
+      DO i = 1, 5
+            WRITE(*,'(5(F12.6,2X))') (gll(i,j), j=1,5)
       END DO
 
       END SUBROUTINE test_fourier
