@@ -49,7 +49,7 @@ For each rational surface found, a `NamedTuple` with:
 
 is pushed to `sing_surf_data`.
 """
-function sing_find!(sing, intr, equil; itmax=200)
+function sing_find!(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal; itmax=200)
 
     # Define functions to evaluate q and its first derivative
     # TODO: confirm that this is the correct way to get spline data
@@ -68,14 +68,14 @@ function sing_find!(sing, intr, equil; itmax=200)
         if dq > 0
             m += 1
         end
-        dm = Int(sign(dq * nn))
+        dm = Int(sign(dq * ctrl.nn))
 
         # Loop over possible m's in interval
         while (m - ctrl.nn * qex[iex-1]) * (m - ctrl.nn * qex[iex]) <= 0
             it = 0
             psi0 = psiex[iex-1]
             psi1 = psiex[iex]
-            psifac = 0.0
+            psifac = equil.psilow
 
             # Bisection method to find singular surface
             while it < itmax
@@ -90,14 +90,14 @@ function sing_find!(sing, intr, equil; itmax=200)
                     psi1 = psifac
                 end
             end
+            
             if it == itmax
                 @warn "Bisection did not converge for m = $m"
-                # You may want to continue, break, or error here
             else
-                push!(sing, (
+                push!(intr.sing, (
                     m = m,
                     psifac = psifac,
-                    ρ = sqrt(psifac),
+                    rho = sqrt(psifac),
                     q = m / nn,
                     q1 = q1val(psifac),
                 ))
