@@ -1,9 +1,12 @@
 # === CONFIGURABLE ===
-FC      = gfortran                 
-FFLAGS  ?= -fPIC                    
-RECURS  ?= -frecursive
-LDFLAGS ?= -shared     
-DEPSDIR = ../../../deps
+FC ?= gfortran  # You can override this: `make FC=ifort`
+FFLAGS ?= -fPIC
+LDFLAGS ?= -shared
+LIBS ?= -framework Accelerate
+RECURSFLAG ?= -frecursive
+LIBSUFFIX ?= .dylib
+
+OUTLIB = libspline$(LIBSUFFIX)
 
 # 1.  Simple OS/CPU detection (works on MSYS/MinGW, Linux, macOS)
 
