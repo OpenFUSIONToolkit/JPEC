@@ -62,9 +62,10 @@ Returns:
     - PlasmaEquilibrium object (as in direct_run).
 """
 function inverse_run(input::InverseRunInput)
-    equil_params = input.equil_input
-    sq_in = input.sq_in
-    rz_in = input.rz_in
+    equil_params = deepcopy(input.equil_input)
+    sq_in = deepcopy(input.sq_in)
+    println(sq_in)
+    rz_in = deepcopy(input.rz_in)
     ro = input.ro
     zo = input.zo
     psio = input.psio
@@ -78,11 +79,15 @@ function inverse_run(input::InverseRunInput)
     power_b  = equil_params.power_b
     power_r  = equil_params.power_r
 
+
     # ---- Spline Preprocessing ----
-    sq_in.fs[:,4] = sqrt.(sq_in.xs)
-    sq_in.name  = "  sq  "
-    sq_in.title = ["psifac", "  f   ", "mu0 p ", "  q   ", " rho  "]
-    Spl.spline_fit!(sq_in, "extrap")
+    #!!!!!!NEED TO CHANGE THIS!!!!!! #sq_in.fs[:,4] = sqrt.(sq_in.xs)
+    for name in fieldnames(typeof(sq_in))
+        println("sq_in.$name = ", getfield(sq_in, name))
+    end    
+    #sq_in.name  = "  sq  "
+    #sq_in.title = ["psifac", "  f   ", "mu0 p ", "  q   ", " rho  "]
+    #Spl.spline_fit!(sq_in, "extrap")
 
     # Prepare rz_in grid
     rz_in.xs = sq_in.xs

@@ -10,13 +10,14 @@ using Printf, DifferentialEquations, LinearAlgebra
 include("types.jl")
 include("io.jl")
 include("direct.jl")
-include("inverse.jl")
+#include("inverse.jl")
+include("InverseEquilibrium.jl")
 
 # --- Expose types and functions to the user ---
 using .Types: EquilInput, PlasmaEquilibrium, DirectRunInput, InverseRunInput
 using .IO: prepare_solver_input
 using .Direct: direct_run
-using .Inverse: inverse_run
+using .InverseEquilibrium: inverse_run
 
 
 export setup_equilibrium, EquilInput, PlasmaEquilibrium
