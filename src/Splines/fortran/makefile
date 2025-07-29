@@ -1,4 +1,3 @@
-# === CONFIGURABLE ===
 FC ?= gfortran  # You can override this: `make FC=ifort`
 FFLAGS ?= -fPIC
 LDFLAGS ?= -shared
