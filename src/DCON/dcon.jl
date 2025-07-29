@@ -1,8 +1,6 @@
-module DCON
 
 using LinearAlgebra
 using TOML
-include("dcon_mod.jl")
 
 # --- Placeholder for global variables, modules and utilities --- #
 # using Equil, ODE, Ball, Mercier, FreeBoundary, Resist, Pentrc
@@ -21,12 +19,13 @@ function MainProgram()
     ctrl=DconControl(inputs["DCON_CONTROL"])
     outp=DconOutput(inputs["DCON_OUTPUT"])
 
+    intr=DconInternal() 
 
 # -----------------------------------------------------------------------
 #     set variables
 # -----------------------------------------------------------------------
     #delta_mhigh=delta_mhigh*2 # do we need this?
-    plasma_eq = LoadEquilibrium()
+    equil = LoadEquilibrium()
 #    CALL equil_out_global # these need to be addressed
 #    CALL equil_out_qfind
 
@@ -58,7 +57,7 @@ function MainProgram()
       #   CALL mercier_scan
       #ENDIF
       #IF(bal_flag)THEN
-      #   IF(verbose) WRITE(*,*)"Evaluating ballooning criterion"
+      #   IF(ctrl.verbose) WRITE(*,*)"Evaluating ballooning criterion"
       #   CALL bal_scan
       #ENDIF
 # -----------------------------------------------------------------------
@@ -70,47 +69,48 @@ function MainProgram()
 #      define poloidal mode numbers.
 # -----------------------------------------------------------------------
     sing_find()
-    if cyl_flag
-      mlow = delta_mlow
-      mhigh = delta_mhigh
-    elseif sing_start == 0
-      mlow = min(nn * qmin, zero) - 4 - delta_mlow
-      mhigh = nn * qmax + delta_mhigh
+    if ctrl.cyl_flag
+      intr.mlow = ctrl.delta_mlow
+      intr.mhigh = ctrl.delta_mhigh
+    elseif ctrl.sing_start == 0
+      intr.mlow = min(ctrl.nn * equil.qmin, zero) - 4 - ctrl.delta_mlow
+      intr.mhigh = ctrl.nn * equil.qmax + ctrl.delta_mhigh
     else
-      mmin = typemax(typeof(sing[1].m))  # HUGE in Fortran
-      for ising in Int(sing_start):msing
-        mmin = min(mmin, sing[ising].m)
+      intr.mmin = typemax(typeof(sing[1].m))  # HUGE in Fortran
+      for ising in Int(ctrl.sing_start):intr.msing
+        intr.mmin = min(intr.mmin, sing[ising].m)
       end
-      mlow = mmin - delta_mlow
-      mhigh = nn * qmax + delta_mhigh
+      intr.mlow = intr.mmin - ctrl.delta_mlow
+      intr.mhigh = intr.nn * equil.qmax + ctrl.delta_mhigh
     end
 
-    mpert = mhigh - mlow + 1
-    mband = mpert - 1 - delta_mband
-    mband = min(max(mband, 0), mpert - 1)
+    intr.mpert = intr.mhigh - intr.mlow + 1
+    intr.mband = intr.mpert - 1 - ctrl.delta_mband
+    intr.mband = min(max(intr.mband, 0), intr.mpert - 1)
 
 # -----------------------------------------------------------------------
 #      fit equilibrium quantities to Fourier-spline functions.
+# TODO: need to tie in the equilibrium quantities.
 # -----------------------------------------------------------------------
-    if mat_flag || ode_flag
-      if verbose
-        println("   q0 = $(q0), qmin = $(qmin), qmax = $(qmax), q95 = $(q95)")
-        println("   sas_flag = $(sas_flag), dmlim = $(dmlim), qlim = $(qlim), psilim = $(psilim)")
-        println("   betat = $(betat), betan = $(betan), betap1 = $(betap1)")
-        println("   nn = $(nn), mlow = $(mlow), mhigh = $(mhigh), mpert = $(mpert), mband = $(mband)")
+    if ctrl.mat_flag || ctrl.ode_flag
+      if ctrl.verbose
+        println("   q0 = $(equil.q0), qmin = $(equil.qmin), qmax = $(equil.qmax), q95 = $(equil.q95)")
+        println("   sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
+        println("   betat = $(equil.betat), betan = $(equil.betan), betap1 = $(equil.betap1)")
+        println("   nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
         println(" Fourier analysis of metric tensor components")
       end
 
       fourfit_make_metric()
-      if verbose
+      if ctrl.verbose
         println("Computing F, G, and K Matrices")
       end
       fourfit_make_matrix(out_fund)
-      println("mlow = $(mlow), mhigh = $(mhigh), mpert = $(mpert), mband = $(mband), nn = $(nn), sas_flag = $(sas_flag), dmlim = $(dmlim), qlim = $(qlim), psilim = $(psilim)")
+      println("mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband), nn = $(ctrl.nn), sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
 
  #     if kin_flag
  #       fourfit_action_matrix()
- #       if verbose
+ #       if ctrl.verbose
  #           println("Initializing PENTRC")
  #       end
  #       # Automatic reading and distributing of inputs
@@ -127,7 +127,7 @@ function MainProgram()
  #       xtmp = fill(1e-4, length(psitmp), length(mtmp))
  #       set_peq(psitmp, mtmp, xtmp, xtmp, xtmp, false, tdebug)
  #       # No need to deallocate in Julia; garbage collection handles it
- #       if verbose
+ #       if ctrl.verbose
  #           println("Computing Kinetic Matrices")
  #       end
  #       fourfit_kinetic_matrix(kingridtype, out_fund)
@@ -143,12 +143,12 @@ function MainProgram()
     end
       
 # -----------------------------------------------------------------------
-#      integrate main ODE's.
+#  TODO     integrate main ODE's.
 # -----------------------------------------------------------------------
 
     ud = zeros(ComplexF64, mpert, mpert, 2)
     if ode_flag
-      if verbose
+      if ctrl.verbose
         println("Starting integration of ODE's")
       end
       ode_run()
@@ -175,7 +175,7 @@ function MainProgram()
 # -----------------------------------------------------------------------
 
     if vac_flag && !(ksing > 0 && ksing <= msing + 1 && bin_sol)
-      if verbose
+      if ctrl.verbose
         println("Computing free boundary energies")
       end
       ud = zeros(ComplexF64, mpert, mpert, 2)
@@ -203,18 +203,18 @@ function MainProgram()
 #      the bottom line.
 # -----------------------------------------------------------------------
     if nzero != 0
-      if verbose
+      if ctrl.verbose
         println("Fixed-boundary mode unstable for nn = $nn.")
       end
     end
 
     if vac_flag && !(ksing > 0 && ksing <= msing + 1 && bin_sol)
       if real(total1) < 0
-        if verbose
+        if ctrl.verbose
             println("Free-boundary mode unstable for nn = $nn.")
         end
       else
-        if verbose
+        if ctrl.verbose
             println("All free-boundary modes stable for nn = $nn.")
         end
       end
@@ -334,8 +334,6 @@ function timer_start()
 end
 
 const Version = "JULIA-PORT-1.0"
-
-end # module
 
 # Entrypoint
 using .DCONMain
