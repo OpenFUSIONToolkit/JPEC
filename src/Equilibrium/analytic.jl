@@ -20,7 +20,7 @@ Also evaluates the initial derivative using the analytic model.
 ## Arguments:
 - `rmin`: Normalized starting radius (as a fraction of `lar_a`).
 - `sigma_type`: A string specifying the sigma model (e.g., `"wesson"`).
-- `params`: A `LarParams` object containing equilibrium parameters.
+- `params`: A `LarInput` object containing equilibrium parameters.
 
 ## Returns:
 - `r`: Physical radius corresponding to `rmin * lar_a`.
@@ -62,7 +62,7 @@ at a given radius `r`, using the current state vector `y` and equilibrium parame
 - `dy`: A preallocated vector where the computed derivatives will be stored (in-place).
 - `r`: The radial position at which the derivative is evaluated.
 - `y`: The current state vector `[Bθ·r, Bζ, ψ, W_t, W_v]`.
-- `params`: A `LarParams` object containing equilibrium shaping parameters.
+- `params`: A `LarInput` object containing equilibrium shaping parameters.
 - `sigma_type`: A string specifying the form of the parallel current profile (e.g., `"wesson"` or `"solovev"`).
 
 ## Returns:
@@ -109,7 +109,7 @@ Solves the LAR (Large Aspect Ratio) plasma equilibrium ODE system using analytic
 defined by `lar_input`, and returns the full solution table including derived quantities.
 
 ## Arguments:
-- `lar_input`: A `LarParams` object containing profile and geometric parameters.
+- `lar_input`: A `LarInput` object containing profile and geometric parameters.
 - `ma`: Number of radial grid points (excluding boundaries).
 - `mtau`: Number of poloidal angular grid points (unused in this version).
 - `sigma_type`: A string specifying the type of parallel current profile (e.g., `"wesson"` or `"solovev"`).

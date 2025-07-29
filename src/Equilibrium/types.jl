@@ -146,7 +146,7 @@ end
 
 
 """
-    LarParams(...)  
+    LarInput(...)  
 
 A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equilibrium model.
 
@@ -161,13 +161,13 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
 """
 
 mutable struct LarInput
-    lar_a::Float64
-    p00::Float64
-    p_pres::Float64
-    p_sig::Float64
-    sigma0::Float64
-    lar_r0::Float64
-    q0::Float64
+    lar_r0::Float64 # Major radius of the plasma
+    lar_a::Float64 # Minor radius of the plasma
+    p00::Float64  # Pressure at the magnetic axis 
+    p_pres::Float64 # p0*(1-(r/a)**2)**p_pres
+    p_sig::Float64 # default sigma=J.B/B^2 is given by sigma0/(1+(r/a))**(2*p_sig)**(1+1/p_sig)
+    sigma0::Float64 # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
+    q0::Float64 # q (safety factor) on axis
 end
 
 end # module Types
