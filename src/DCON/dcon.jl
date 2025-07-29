@@ -172,7 +172,8 @@ function MainProgram()
 # -----------------------------------------------------------------------
 #      compute free boundary energies.
 # -----------------------------------------------------------------------
-
+# TODO: The initial set up in Julia will only handle psiedge = psilim and no free 
+# boundary modes. This will need to be expanded to handle free boundary conditions.
     if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
       if ctrl.verbose
         println("Computing free boundary energies")
