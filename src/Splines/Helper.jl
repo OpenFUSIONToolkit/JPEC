@@ -26,26 +26,23 @@ Internal helper to parse a boundary condition into a validated integer code.
 ## Returns:
 - A validated `Int` code (1-4).
 """
-function parse_bctype(bctype::Union{String, Int})
-    if bctype isa String
-
-        normalized_bctype = replace(lowercase(bctype), r"[-_\s]" => "")
-        if haskey(BCTYPE_MAP, normalized_bctype)
-            return BCTYPE_MAP[normalized_bctype]
-        else
-            error("Invalid string for `bctype`: '$bctype'. Valid options are: $(keys(BCTYPE_MAP))")
-        end
-    elseif bctype isa Int
-        # If it's already an integer, validate it.
-        if bctype in values(BCTYPE_MAP)
-            return bctype
-        else
-            error("Invalid integer for `bctype`: $bctype. Valid options are: $(collect(values(BCTYPE_MAP)))")
-        end
+function parse_bctype(bctype::String)
+    normalized_bctype = replace(lowercase(bctype), r"[-_\s]" => "")
+    if haskey(BCTYPE_MAP, normalized_bctype)
+        return BCTYPE_MAP[normalized_bctype]
+    else
+        error("Invalid string for `bctype`: '$bctype'. Valid options are: $(keys(BCTYPE_MAP))")
     end
 end
 
-
+function parse_bctype(bctype::Int)
+    # If it's already an integer, validate it.
+    if bctype in values(BCTYPE_MAP)
+        return bctype
+    else
+        error("Invalid integer for `bctype`: $bctype. Valid options are: $(collect(values(BCTYPE_MAP)))")
+    end
+end
 
 #==============================================================================#
 #                            Read-Only Interface Utilities
