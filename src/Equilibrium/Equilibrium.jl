@@ -8,9 +8,18 @@ using Printf, DifferentialEquations, LinearAlgebra
 
 # --- Internal Module Structure ---
 include("EquilibriumTypes.jl")
-include("ReadEquilibrium.jl")
 include("DirectEquilibrium.jl")
 include("InverseEquilibrium.jl")
+include("AnalyticEquilibrium.jl")
+include("ReadEquilibrium.jl")
+
+# --- Expose types and functions to the user ---
+using .EquilibriumTypes: EquilInput, PlasmaEquilibrium, DirectRunInput, InverseRunInput, LarInput
+using .ReadEquilibrium: prepare_solver_input
+using .DirectEquilibrium: direct_run
+using .InverseEquilibrium: inverse_run
+using .AnalyticEquilibrium: lar_run, sol_run
+
 
 
 
