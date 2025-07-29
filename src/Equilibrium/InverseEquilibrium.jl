@@ -5,134 +5,6 @@ The `Inverse` submodule contains the logic for transforming an 'inverse' equilib
 representation into a straight-fieldline coordinate system and associated quantities.
 It uses bicubic splines for the geometry and supports several surface grid types.
 """
-module InverseEquilibrium
-
-# --- Dependencies ---
-
-import ..Spl
-
-using LinearAlgebra, Printf
-#susing ..EquilibriumTypes: PlasmaEquilibrium, EquilInput, InverseRunInput
-
-include("EquilibriumTypes.jl")
-
-
-# --- Public API for this submodule ---
-export inverse_run
-
-"""
-Outline of the Inverse submodule:
-1. inverse_run.
-2. inverse_output.
-3. inverse_extrap.
-4. inverse_chease4_run
-"""
-
-# rz_in::BicubicSplineType
-
-# function inverse_run(raw_profile::InverseRunInput)
-#     println("--- Starting Direct Equilibrium Processing ---")
-
-#     #Unpack initial data
-#     equil_params = raw_profile.equil_input
-#     sq_in = raw_profile.sq_in
-#     rz_in = raw_profile.rz_in
-#     ro = raw_profile.ro
-#     zo = raw_profile.zo
-#     psio = raw_profile.psio
-
-#     # Declare variables
-#     ipsi::Int
-#     itheta::Int
-#     mx::Int
-#     my::Int
-#     const me = 3
-#     psifac::Float64
-#     theta::Float64
-#     f0::Float64
-#     f0fac::Float64
-#     ffac::Float64
-#     r::Float64
-#     rfac::Float64
-#     jacfac::Float64
-#     w11::Float64
-#     w12::Float64
-#     bp::Float64
-#     bt::Float64
-#     b::Float64
-#     xm::Float64
-#     dx::Float64
-#     rholow::Float64
-#     rhohigh::Float64
-#     eta::Float64
-#     delpsi::Float64
-#     q::Float64
-#     v::Matrix{Float64}             # 3×3 matrix, e.g. Jacobian or transformation matrix
-#     xdx::Matrix{Float64}           # 2×(mpsi+1), holds position and derivative info
-
-#     #------------------------------------------------------------
-#     # Array allocations for coordinate transformation
-#     # (0:mx,0:my) indexing in Fortran => size = (mx+1, my+1)
-#     #------------------------------------------------------------
-
-#     x = Array{Float64}(undef, rz_in.mx + 1, rz_in.my + 1)      # R coordinate
-#     y = Array{Float64}(undef, rz_in.mx + 1, rz_in.my + 1)      # Z coordinate
-#     r2 = Array{Float64}(undef, rz_in.mx + 1, rz_in.my + 1)     # R² = R² + Z²
-#     deta = Array{Float64}(undef, rz_in.mx + 1, rz_in.my + 1)   # Toroidal angle difference
-
-#     #------------------------------------------------------------
-#     # Prepare 1D spline input and fit using extrapolation
-#     #------------------------------------------------------------
-
-#     direct_flag = false   # disable direct transform mode
-
-#     # Fill in 4th spline channel with sqrt(psi), used in straight-fieldline mapping
-#     #sq_in.fs[:, 4] .= sqrt.(sq_in.xs)
-#     sq_in._fs[:, :, 4] .= sqrt.(sq_in._xs)
-
-#     # Set spline metadata (used for diagnostics or output)
-#     sq_in.name = "  sq  "
-#     sq_in.title = ["psifac", "  f   ", "mu0 p ", "  q   ", " rho  "]
-
-#     # Perform cubic spline fitting with extrapolation
-#     spline_fit!(sq_in, "extrap")
-
-#     #------------------------------------------------------------
-#     # Prepare rz_in grid: ψ and θ coordinate values for 2D mapping
-#     #------------------------------------------------------------
-
-#     rz_in.xs = sq_in.xs                              # Use same ψ grid as in sq_in
-#     rz_in.ys = collect(0:rz_in.my) ./ rz_in.my       # Normalized θ values from 0 to 1
-
-#     # Set 2D field metadata
-#     rz_in.name = "  rz  "
-#     rz_in.xtitle = "psifac"
-#     rz_in.ytitle = "theta "
-#     rz_in.title = ["  r   ", "  z   "]
-
-
-#     # ---- Spline Preprocessing ----
-#     # Need to change this if sq_in.fs[:,4] is not sqrt(sq_in.xs)
-#     for name in fieldnames(typeof(sq_in))
-#         println("sq_in.$name = ", getfield(sq_in, name))
-#     end    
-#     #sq_in.name  = "  sq  "
-#     #sq_in.title = ["psifac", "  f   ", "mu0 p ", "  q   ", " rho  "]
-#     #Spl.spline_fit!(sq_in, "extrap")
-
-#     # Prepare rz_in grid
-#     rz_in.xs = sq_in.xs
-#     npsi = size(rz_in.fs, 1)
-#     ntheta = size(rz_in.fs, 2)
-#     rz_in.ys = range(0.0, stop=1.0, length=ntheta)
-
-#     rz_in.name = "  rz  "
-#     rz_in.xtitle = "psifac"
-#     rz_in.ytitle = "theta "
-#     rz_in.title = ["  r   ", "  z   "]
-
-#     inverse_output()  # Diagnostics (by default does nothing)
-
 
 
 # --- Lagrange Polynomial Extrapolation ---
@@ -168,26 +40,6 @@ function inverse_output(;diagnostics=false)
     @info "inverse_output called (output stubs not implemented)"
 end
 
-
-function update_rz_in_from_sq_in(rz_in::Spl.BicubicSplineType, sq_in::Spl.RealSplineType, ntheta::Int)
-    # Create a new BicubicSplineType copying all fields, 
-    # but replace _xs and _ys with updated arrays
-    return Spl.BicubicSplineType(
-        rz_in.handle,
-        copy(sq_in._xs),                           # Replace _xs with copy from sq_in
-        collect(range(0.0, stop=1.0, length=ntheta)),  # Replace _ys with range vector
-        copy(rz_in._fs),                          # Copy fs arrays as needed
-        rz_in.mx,
-        ntheta,
-        rz_in.nqty,
-        rz_in.bctypex,
-        rz_in.bctypey,
-        copy(rz_in._fsx),
-        copy(rz_in._fsy),
-        copy(rz_in._fsxy)
-    )
-end
-
 """
     inverse_run(input::InverseRunInput)
 
@@ -217,39 +69,35 @@ function inverse_run(input::InverseRunInput)
     power_b  = equil_params.power_b
     power_r  = equil_params.power_r
 
-    # ---- Spline Preprocessing ----
-    # Here you may want to perform operations on sq_in.fs or related,
-    # but you must do so by creating new instances or mutating arrays inside fields
-    # (assuming arrays inside fields are mutable).
-    # For example, to replace sq_in._fs[:,4] with sqrt(sq_in._xs):
-    # sq_in._fs[:,4] .= sqrt.(sq_in._xs)
 
+    # ---- Spline Preprocessing ----
+    #!!!!!!NEED TO CHANGE THIS!!!!!! #sq_in.fs[:,4] = sqrt.(sq_in.xs)
     for name in fieldnames(typeof(sq_in))
         println("sq_in.$name = ", getfield(sq_in, name))
     end    
+    #sq_in.name  = "  sq  "
+    #sq_in.title = ["psifac", "  f   ", "mu0 p ", "  q   ", " rho  "]
+    #Spl.spline_fit!(sq_in, "extrap")
 
-    # Prepare rz_in grid with updated _xs and _ys arrays:
-    ntheta = size(rz_in._fs, 2)
-    rz_in = update_rz_in_from_sq_in(rz_in, sq_in, ntheta)
+    # Prepare rz_in grid
+    rz_in.xs = sq_in.xs
+    npsi = size(rz_in.fs, 1)
+    ntheta = size(rz_in.fs, 2)
+    rz_in.ys = range(0.0, stop=1.0, length=ntheta)
 
-    # rz_in.name = "  rz  "
-    # rz_in.xtitle = "psifac"
-    # rz_in.ytitle = "theta "
-    # rz_in.title = ["  r   ", "  z   "]
+    rz_in.name = "  rz  "
+    rz_in.xtitle = "psifac"
+    rz_in.ytitle = "theta "
+    rz_in.title = ["  r   ", "  z   "]
 
     inverse_output()  # Diagnostics (by default does nothing)
 
-    println("rz_in._fs size = ", size(rz_in._fs))
-    (npsi, ntheta, _) = size(rz_in._fs)
-    if size(rz_in._fs, 3) < 2
-        rz_in._fs = zeros(npsi, ntheta, 2)
-    end
-
-    # Compute Cartesian coordinates relative to axis
-    x = rz_in._fs[:,:,1] .- ro   # This currently might be zeros, so maybe you want original R data here?
-    y = rz_in._fs[:,:,2] .- zo   # Same as above
+    # ---- Coordinates: Cartesian to Polar Transform ----
+    x = rz_in.fs[:,:,1] .- ro   # R - Raxis
+    y = rz_in.fs[:,:,2] .- zo   # Z - Zaxis
     r2 = x.^2 .+ y.^2
 
+    # Calculate angle in units of 2π, care at r2==0 (origin)
     deta = zeros(size(r2))
     for ipsi in 1:npsi, itheta in 1:ntheta
         if r2[ipsi, itheta] == 0.0
@@ -258,42 +106,32 @@ function inverse_run(input::InverseRunInput)
             deta[ipsi, itheta] = atan(y[ipsi, itheta], x[ipsi, itheta]) / (2π)
         end
     end
-
-    # Unwrapping and further deta corrections here...
-
-    # Now store back into rz_in._fs
-    rz_in._fs[:,:,1] .= r2
-    rz_in._fs[:,:,2] .= deta
-
-
-    # Unwrap deta to avoid discontinuities
-    for ipsi in 1:size(deta, 1)
-        for itheta in 2:size(deta, 2)
-            diff = deta[ipsi, itheta] - deta[ipsi, itheta-1]
-            if diff > 0.5
+    # Unwrapping: correct jumps over the periodicity boundary
+    for ipsi in 1:npsi
+        for itheta in 2:ntheta
+            if deta[ipsi, itheta] - deta[ipsi, itheta-1] > 0.5
                 deta[ipsi, itheta] -= 1.0
-            elseif diff < -0.5
+            elseif deta[ipsi, itheta] - deta[ipsi, itheta-1] < -0.5
                 deta[ipsi, itheta] += 1.0
             end
         end
-        for itheta in 1:size(deta, 2)
+        for itheta in 1:ntheta
             if r2[ipsi, itheta] > 0
-                deta[ipsi, itheta] -= rz_in._ys[itheta]
+                deta[ipsi, itheta] -= rz_in.ys[itheta]
             end
         end
     end
-
-    # Extrapolate deta at origin from next rows
+    # Extrapolate deta at origin (first row) from next 3 rows
     me = 3
-    if size(deta, 1) >= me+1
+    if npsi >= me
         deta[1, :] .= inverse_extrap(r2[2:me+1, :], deta[2:me+1, :], 0.0)
     end
 
     # Store new coordinates back into rz_in for next phase
-    rz_in._fs[:,:,1] .= r2
-    rz_in._fs[:,:,2] .= deta
+    rz_in.fs[:,:,1] .= r2
+    rz_in.fs[:,:,2] .= deta
 
-    Spl.bicube_fit(rz_in, "extrap", "periodic")
+    Spl.bicube_fit!(rz_in, "extrap", "periodic")
 
     # ---- Set up Output Surface Grid ----
     sq_nodes = zeros(mpsi+1)
@@ -317,7 +155,6 @@ function inverse_run(input::InverseRunInput)
 
     # Local spline
     spl = Spl.alloc_spline(mtheta+1, 5)
-
     # ---- Loop Over Surfaces ----
     for ipsi in 1:(mpsi+1)
         psifac = rzphi_x_nodes[ipsi]
@@ -413,14 +250,13 @@ function inverse_run(input::InverseRunInput)
         v[2,2] = (1+fy[2])*2π*rfac
         v[2,3] = fy[3]*r
         v[3,3] = 2π*r
-        w11 = (1+fy[2])*(2π)^2 * rfac * r / jacfac
+        w11 = (1+fy[2])* (2π)^2 * rfac * r / jacfac
         w12 = -fy[1]*π*r / (rfac*jacfac)
         delpsi = sqrt(w11^2 + w12^2)
         eqfun_fs_nodes[ipsi,itheta,1] = sqrt(((2π*psio*delpsi)^2 + f[1]^2)/(2π*r)^2)
         eqfun_fs_nodes[ipsi,itheta,2] = (dot(v[1,:], v[2,:]) + q*v[3,3]*v[1,3]) / (jacfac*eqfun_fs_nodes[ipsi,itheta,1]^2)
         eqfun_fs_nodes[ipsi,itheta,3] = (v[2,3]*v[3,3] + q*v[3,3]*v[3,3]) / (jacfac*eqfun_fs_nodes[ipsi,itheta,1]^2)
     end
-
     eqfun = Spl.bicube_setup(rzphi_x_nodes, collect(rzphi_y_nodes), eqfun_fs_nodes, bctypex=4, bctypey=2)
     Spl.bicube_fit!(eqfun, "extrap", "periodic")
 
@@ -428,4 +264,3 @@ function inverse_run(input::InverseRunInput)
 end
 
 
-end # module Inverse

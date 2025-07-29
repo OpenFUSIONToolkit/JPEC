@@ -186,8 +186,8 @@ mutable struct LarInput
 
     sigma_type::String  # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
 
-    mtau::Float64      # the number of grid points in the poloidal direction
-    ma::Float64        # the number of grid points in the radial direction
+    mtau::Int      # the number of grid points in the poloidal direction
+    ma::Int        # the number of grid points in the radial direction
 
     zeroth ::Bool      #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
 end
