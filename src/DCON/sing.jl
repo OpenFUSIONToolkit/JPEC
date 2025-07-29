@@ -124,7 +124,7 @@ function sing_lim()
             it += 1
 
             # Equivalent to CALL spline_eval(sq, psilim, 1)
-            spline_eval!(sq, psilim, 1) #TODO: I don't think this is the correct call
+            spline_eval(sq, psilim, 1) #TODO: I don't think this is the correct call
 
             q  = sq.f[4]
             q1 = sq.f1[4]
@@ -187,7 +187,7 @@ function sing_lim()
 
     #set up record for determining the peak in dW near the boundary.
     if psiedge < psilim
-        spline_eval!(sq, psiedge, 0) #TODO: I don't think this is the right function call
+        spline_eval(sq, psiedge, 0) #TODO: I don't think this is the right function call
 
         qedgestart = Int(sq.f[4])
 
@@ -208,12 +208,85 @@ function sing_lim()
 end
 
 #computes asymptotic series solutions
-function sing_get_ua() #replace with a single vector 
+# Inputs:
+#   ising: index of the singularity
+#   psifac: input psi factor
+#   ua: output 3D complex array (will be mutated)
+function sing_get_ua!(ua, ising, psifac) #TODO: ua is being modified so from Julia conventions, it should be listed first. In Fortran, it is listed last
+    # Set pointers (aliases) -> TODO: Do we want pointers in Julia?
+    singp = sing[ising]
+    vmat = singp.vmat # 4D array
+    r1 = singp.r1 # Vector{Int}
+    r2 = singp.r2 # Vector{Int}
+
+    # Compute distance from singular surface
+    dpsi = psifac - singp.psifac
+    sqrtfac = sqrt(dpsi)
+    pfac = abs(dpsi)^singp.alpha
+
+    # Compute power series via Horner's method
+    ua .= vmat[:,:,:,2*sing_order]   # copy initial term
+    for iorder in (2*sing_order-1):-1:0 #decrement by 1 from 2*sing_order-1 to 0
+        ua .= ua .* sqrtfac .+ vmat[:,:,:,iorder+1]  
+        # +1 since Julia arrays are 1-based, Fortran arrays start at 0
+    end
+
+    # Restore powers
+    ua[r1, :, 1] ./= sqrtfac
+    ua[r1, :, 2] .*= sqrtfac
+    ua[:, r2[1], :] ./= pfac
+    ua[:, r2[2], :] .*= pfac
+
+    # Renormalize if psifac < singp.psifac
+    if psifac < singp.psifac
+        factor1 = abs(ua[r1[1], r2[1], 1]) / ua[r1[1], r2[1], 1]
+        factor2 = abs(ua[r1[1], r2[2], 1]) / ua[r1[1], r2[2], 1]
+
+        ua[:, r2[1], :] .*= factor1
+        ua[:, r2[2], :] .*= factor2
+    end
+
+    return ua
 end
 
-#computes asymptotic coefficients
-function sing_get_ca() #replace with a single vector - optional with diagnose
+#TODO: Are these comments correct?
+#Compute asymptotic coefficients 
+# Inputs:
+#   ising is just passed through if needed externally
+#   psifac: input psi factor
+#   u: input array
+# Output:
+#   ca::Array{ComplexF64,3}
+function sing_get_ca!(ca, ising, psifac, u) #TODO: ca is being modified so from Julia conventions, it should be listed first. In Fortran, it is listed last
+
+    # number of solutions
+    msol = size(u,2)
+
+    # call asymptotic solution generator
+    ua = sing_get_ua!(ua, ising, psifac)
+
+    # build system matrix temp1 (2*mpert × 2*mpert)
+    temp1 = Array{ComplexF64}(undef, 2*mpert, 2*mpert)
+    temp1[1:mpert, :] .= ua[:, :, 1]
+    temp1[mpert+1:2*mpert, :] .= ua[:, :, 2]
+
+    # build right-hand side temp2 (2*mpert × msol)
+    temp2 = Array{ComplexF64}(undef, 2*mpert, msol)
+    temp2[1:mpert, :] .= u[:, :, 1]
+    temp2[mpert+1:2*mpert, :] .= u[:, :, 2]
+
+    # LU factorization and solve
+    F = lu(temp1)
+    temp2 .= F \ temp2
+
+    # output coefficients ca (mpert × msol × 2)
+    ca = Array{ComplexF64}(undef, mpert, msol, 2)
+    ca[:, 1:msol, 1] .= temp2[1:mpert, :]
+    ca[:, 1:msol, 2] .= temp2[mpert+1:2*mpert, :]
+
+    return ca
 end
+
 
 # evaluates Euler-Lagrange differential equations
 function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{ComplexF64,3})
@@ -483,18 +556,6 @@ function sing_vmat_diagnose(ising)
     singp = sing[ising]
     # Write diagnostics to file or stdout as needed
     # For brevity, not implemented here
-end
-
-function sing_get_ua(singp, dpsi)
-    r2 = singp.r2
-    pfac = abs(dpsi)^singp.alpha
-    # Continue as needed...
-end
-
-function sing_get_ua(singp, dpsi) #partial, AI says context is missing
-    r2 = singp.r2
-    pfac = abs(dpsi)^singp.alpha
-    # Continue as needed...
 end
 
 NOTES
