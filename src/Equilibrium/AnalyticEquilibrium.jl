@@ -11,7 +11,8 @@ module AnalyticEquilibrium
 import ..Spl
 
 using Printf, DifferentialEquations, LinearAlgebra
-using ..EquilibriumTypes: InverseRunInput, LarInput
+
+include("EquilibriumTypes.jl")
 
 """
     lar_init_conditions(rmin, sigma_type, params)
