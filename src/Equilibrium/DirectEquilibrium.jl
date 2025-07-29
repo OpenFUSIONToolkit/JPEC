@@ -1,10 +1,9 @@
-# src/Equilibrium/DirectEquilibrium.jl
-
-"""
-The `Direct` submodule contains the logic for the "direct" equilibrium reconstruction method.
+#=
+This file contains the logic for the "direct" equilibrium reconstruction method.
 It takes parsed data and splines from the IO module and calculates the final flux-coordinate
 representation of the plasma equilibrium.
-"""
+=#
+
 
 # --- Internal Helper Structs ---
 """

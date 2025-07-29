@@ -1,10 +1,7 @@
-# src/Equilibrium/AnalyticEquilibrium.jl
-
-"""
-The `Analytic` submodule builds analytic equilibria from numerical inputs (e.g. `lar.in`, `sol.in`),
-bypassing the need for file-based equilibrium data.
-"""
-
+#=
+Analytic equilibrium functions that prepare all the necessary equilibrium
+input information for a direct or inverse equilibrium construction
+=#
 
 """
     lar_init_conditions(rmin, sigma_type, params)

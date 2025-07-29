@@ -1,10 +1,8 @@
-# src/Equilibrium/InverseEquilibrium.jl
-
-"""
-The `Inverse` submodule contains the logic for transforming an 'inverse' equilibrium
+#=
+This contains the logic for transforming an 'inverse' equilibrium
 representation into a straight-fieldline coordinate system and associated quantities.
 It uses bicubic splines for the geometry and supports several surface grid types.
-"""
+=#
 
 
 # --- Lagrange Polynomial Extrapolation ---

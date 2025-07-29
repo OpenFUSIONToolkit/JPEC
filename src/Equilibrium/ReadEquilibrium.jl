@@ -1,71 +1,9 @@
-# src/Equilibrium/ReadEquilibrium.jl
+#=
+This file contains functions for reading equilibrium files from diferent codes
+    that use different formating and collecting the inputs required to form
+    a complete PlasmaEquilibrium using either direct or inverse construction
+=#
 
-"""
-The `IO` submodule is responsible for reading and parsing raw plasma equilibrium
-data from files. It translates the raw data into the initial data structures and
-fitted splines required by the coordinate solvers.
-"""
-
-
-
-"""
-    prepare_solver_input(equil_in)
-
-Prepares the appropriate solver input object based on the `eq_type` defined
-in the `equil_in` object.
-
-## Arguments:
-- `equil_in`: An `EquilInput` object containing user-defined parameters.
-## Returns:
-- A solver-specific input object, e.g., `DirectRunInput`, ready for a solver.
-"""
-function prepare_solver_input(equil_in::EquilInput)
-    if equil_in.jac_type == "hamada"
-        equil_in.power_bp = 0
-        equil_in.power_r = 0
-        equil_in.power_b = 0
-    # Add other jac_type conditions here
-    end
-
-    solver_input = nothing # Initialize
-    if equil_in.eq_type == "efit"
-        solver_input = _read_efit(equil_in)
-    elseif equil_in.eq_type == "chease"
-        # solver_input = _read_chease(equil_in) # Example for future extension
-        error("Equilibrium type '$(equil_in.eq_type)' is not yet implemented.")
-    elseif equil_in.eq_type == "chease2"
-        solver_input = _read_chease2(equil_in)
-    elseif equil_in.eq_type == "inverse_testing"
-        # Example 1D spline setup
-        xs = collect(0.0:0.1:1.0)
-        fs = sin.(2π .* xs)  # vector of Float64
-        spline_ex = Spl.spline_setup(xs, fs)
-        #println(spline_ex)
-        # Example 2D bicubic spline setup
-        xs = 0.0:0.1:1.0
-        ys = 0.0:0.2:1.0
-        fs = [sin(2π*x)*cos(2π*y) for x in xs, y in ys, _ in 1:1]  # shape: (11, 6, 1)
-        bicube_ex = Spl.bicube_setup(collect(xs), collect(ys), fs)
-        #println(bicube_ex)
-        solver_input = InverseRunInput(
-            equil_in,
-            spline_ex, #sq_in
-            bicube_ex, #rz_in
-            0.0, #ro
-            0.0, #zo
-            1.0 #psio
-        )
-    else
-        error("Unknown equilibrium type: '$(equil_in.eq_type)'")
-    end
-
-    return solver_input
-end
-
-
-# ==============================================================================
-#  MAIN FILE READER
-# ==============================================================================
 
 """
 _read_1d_gfile_format(lines_block, num_values)
@@ -117,7 +55,7 @@ them into a `DirectRunInput` object.
 ## Returns:
 - A `DirectRunInput` object ready for the direct solver.
 """
-function _read_efit(equil_in::EquilInput)
+function read_efit(equil_in::EquilInput)
     println("--> Processing EFIT g-file: $(equil_in.eq_filename)")
     lines = readlines(equil_in.eq_filename)
 
@@ -193,7 +131,7 @@ end
 
 Debug version: Reads ASCII CHEASE file and prints checking info at each read.
 """
-function _read_chease2(equil_input::EquilInput)
+function read_chease2(equil_input::EquilInput)
     println("--> Reading CHEASE file: $(equil_input.eq_filename)")
 
     # Robust splitting, also for glued numbers
