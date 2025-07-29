@@ -24,41 +24,34 @@ flag_count = 0
 
 # Example types for variables (adjust as needed)
 # These should be replaced with proper structs and types
-mutable struct OdeState
-    istate::Int
-    liw::Int
-    lrw::Int
-    iopt::Int
-    itask::Int
-    itol::Int
-    mf::Int
-    ix::Int
-    iwork::Vector{Int}
-    rwork::Vector{Float64}
-    atol::Array{ComplexF64,3}
-    index::Vector{Int}
-    unorm::Vector{Float64}
-    unorm0::Vector{Float64}
-    fixfac::Array{ComplexF64,2}
+@kwdef struct OdeState(mpert::Int, msol::Int)
+    istate::Int=1
+    istep::Int=0
+    liw::Int=20
+    lrw::Int=22+64*mpert*msol
+    iopt::Int=1
+    itask::Int=5
+    itol::Int=2
+    mf::Int=10
+    ix::Int=0
+    iwork::Vector{Int}=zeros(Int, 20)
+    rwork::Vector{Float64}=zeros(Float64, 22+64*mpert*msol)
+    atol::Array{ComplexF64,3}=zeros(ComplexF64, mpert, msol, 2)
+    index::Vector{Int}=collect(1:mpert)
+    unorm::Vector{Float64}=zeros(Float64, 2*mpert)
+    unorm0::Vector{Float64}=zeros(Float64, 2*mpert)
+    fixfac::Array{ComplexF64,2}=zeros(ComplexF64, msol, msol)
 end
 
-# Example initialization (replace with actual logic)
 function init_ode_state(mpert, msol)
-    OdeState(
-        1, 20, 22+64*mpert*msol, 1, 5, 2, 10, 0,
-        zeros(Int, 20),
-        zeros(Float64, 22+64*mpert*msol),
-        zeros(ComplexF64, mpert, msol, 2),
-        collect(1:mpert),
-        zeros(Float64, 2*mpert),
-        zeros(Float64, 2*mpert),
-        zeros(ComplexF64, msol, msol)
-    )
+    return OdeState(mpert, msol)
 end
 
 
 function ode_run(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal)
     # Initialization
+    odet = init_ode_state(intr.mpert, intr.msol)
+
     if ctrl.sing_start <= 0
         ode_axis_init(ctrl, equil, intr)
     elseif ctrl.sing_start <= intr.msing
@@ -78,7 +71,7 @@ function ode_run(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal)
     while true
         first = true
         while true
-            if istep > 0
+            if odet.istep > 0
                 ode_unorm(false)
             end
             # Always record the first and last point in an inter-rational region
