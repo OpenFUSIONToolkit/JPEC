@@ -8,7 +8,7 @@
 """
 module Types
 
-export EquilInput, DirectRunInput, InverseRunInput, PlasmaEquilibrium
+export EquilInput, DirectRunInput, InverseRunInput, LarInput, PlasmaEquilibrium
 
 """
     EquilInput(...)
@@ -142,6 +142,48 @@ mutable struct PlasmaEquilibrium
     ro::Float64
     zo::Float64
     psio::Float64
+end
+
+
+"""
+    LarInput(...)  
+
+A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equilibrium model.
+
+## Fields:
+
+- `lar_r0`: The major radius of the plasma [m].
+- `lar_a`: The minor radius of the plasma [m].
+
+- `beta0`: The beta value on axis (normalized pressure).
+- `q0`: The safety factor on axis.
+
+- `p_pres`: The exponent for the pressure profile, defined as `p00 * (1 - (r / a)^2)^p_pres`.
+- `p_sig`: The exponent that determines the shape of the current-related function profile.
+
+- `sigma_type`: The type of sigma profile, can be "default" or "wesson". If "wesson", the sigma profile is defined as `sigma0 * (1 - (r / a)^2)^p_sig`.
+
+- `mtau`: The number of grid points in the poloidal direction.
+- `ma`: The number of grid points in the radial direction.
+- `zeroth`: If set to true, it neglects the Shafranov shift
+"""
+
+mutable struct LarInput
+    lar_r0::Float64     # Major radius of the plasma
+    lar_a::Float64      # Minor radius of the plasma
+
+    beta0::Float64      # beta on axis
+    q0::Float64         # q (safety factor) on axis
+
+    p_pres::Float64     # p00 * (1-(r/a)**2)**p_pres
+    p_sig::Float64      # The exponent that determines the shape of the current-related function profile
+
+    sigma_type::String  # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
+
+    mtau::Float64      # the number of grid points in the poloidal direction
+    ma::Float64        # the number of grid points in the radial direction
+
+    zeroth ::Bool      #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
 end
 
 end # module Types

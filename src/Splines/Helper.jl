@@ -1,8 +1,3 @@
-module Helper
-
-export parse_bctype
-
-
 const BCTYPE_MAP = Dict(
     "natural"      => 1, # unstable
     "periodic"     => 2,
@@ -113,5 +108,3 @@ macro expose_fields(typ, fields...)
         end
     end
 end
-
-end 
