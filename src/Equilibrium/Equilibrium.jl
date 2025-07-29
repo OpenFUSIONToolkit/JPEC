@@ -7,12 +7,14 @@ import ..Spl
 using Printf, DifferentialEquations, LinearAlgebra
 
 # --- Internal Module Structure ---
-include("types.jl")
-include("io.jl")
-include("direct.jl")
-#include("inverse.jl") # Uncomment when inverse.jl is ready
 
 
+
+
+include("EquilibriumTypes.jl")
+include("ReadEquilibrium.jl")
+include("DirectEquilibrium.jl")
+include("InverseEquilibrium.jl")
 
 export setup_equilibrium, EquilInput, PlasmaEquilibrium
 
@@ -23,7 +25,7 @@ const mu0 = 4.0 * pi * 1e-7
 # Uses multiple dispatch to select the correct solver based on input type.
 # Adding a new solver requires adding a new method here.
 _run_solver(input::DirectRunInput) = direct_run(input)
-# _run_solver(input::InverseRunInput) = inverse_run(input) # For future use
+_run_solver(input::InverseRunInput) = inverse_run(input)
 
 """
     setup_equilibrium(equil_input::EquilInput)

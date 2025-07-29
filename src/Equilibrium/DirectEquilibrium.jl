@@ -1,4 +1,4 @@
-# src/Equilibrium/direct.jl
+# src/Equilibrium/DirectEquilibrium.jl
 
 """
 The `Direct` submodule contains the logic for the "direct" equilibrium reconstruction method.

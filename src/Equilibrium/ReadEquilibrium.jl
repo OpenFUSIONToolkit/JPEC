@@ -1,7 +1,7 @@
-# src/Equilibrium/io.jl
+# src/Equilibrium/ReadEquilibrium.jl
 
 """
-The `io.jl` is responsible for reading and parsing raw plasma equilibrium
+The `IO` submodule is responsible for reading and parsing raw plasma equilibrium
 data from files. It translates the raw data into the initial data structures and
 fitted splines required by the coordinate solvers.
 """
@@ -33,6 +33,28 @@ function prepare_solver_input(equil_in::EquilInput)
     elseif equil_in.eq_type == "chease"
         # solver_input = _read_chease(equil_in) # Example for future extension
         error("Equilibrium type '$(equil_in.eq_type)' is not yet implemented.")
+    elseif equil_in.eq_type == "chease2"
+        solver_input = _read_chease2(equil_in)
+    elseif equil_in.eq_type == "inverse_testing"
+        # Example 1D spline setup
+        xs = collect(0.0:0.1:1.0)
+        fs = sin.(2π .* xs)  # vector of Float64
+        spline_ex = Spl.spline_setup(xs, fs)
+        #println(spline_ex)
+        # Example 2D bicubic spline setup
+        xs = 0.0:0.1:1.0
+        ys = 0.0:0.2:1.0
+        fs = [sin(2π*x)*cos(2π*y) for x in xs, y in ys, _ in 1:1]  # shape: (11, 6, 1)
+        bicube_ex = Spl.bicube_setup(collect(xs), collect(ys), fs)
+        #println(bicube_ex)
+        solver_input = InverseRunInput(
+            equil_in,
+            spline_ex, #sq_in
+            bicube_ex, #rz_in
+            0.0, #ro
+            0.0, #zo
+            1.0 #psio
+        )
     else
         error("Unknown equilibrium type: '$(equil_in.eq_type)'")
     end
@@ -164,5 +186,85 @@ function _read_efit(equil_in::EquilInput)
 
     # --- Bundle everything for the solver ---
     return DirectRunInput(equil_in, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
+end
+
+"""
+    _read_chease2(equil_input::EquilInput) -> InverseRunInput
+
+Debug version: Reads ASCII CHEASE file and prints checking info at each read.
+"""
+function _read_chease2(equil_input::EquilInput)
+    println("--> Reading CHEASE file: $(equil_input.eq_filename)")
+
+    # Robust splitting, also for glued numbers
+    split_chease_numbers(str::String) = replace(str, r"([eE][+-]\d+)(?=[\-+]\d+\.)" => s"\1 ") |> split
+    parse_chease_floats(str::String) = [parse(Float64, s) for s in split_chease_numbers(str) if !isempty(s)]
+    function read_n_floats(io::Any, n::Int; label="unknown")
+        vals = Float64[]
+        read_lines = 0
+        while length(vals) < n && !eof(io)
+            line = readline(io)
+            read_lines += 1
+            newvals = parse_chease_floats(line)
+            if !isempty(newvals)
+                append!(vals, newvals)
+            end
+        end
+        println("    [DEBUG] $label: read $n floats, actually got $(length(vals)); lines read = $read_lines")
+        length(vals) < n && error("[DEBUG] Unexpected EOF while reading $label — needed $n, got $(length(vals))")
+        return vals[1:n]
+    end
+    function read_2d(io::Any, rows::Int, cols::Int; label="unknown")
+        arr = Array{Float64}(undef, rows, cols)
+        for j in 1:cols
+            arr[:,j] .= read_n_floats(io, rows; label="$label col $j")
+        end
+        println("    [DEBUG] $label: finished 2D read of ($rows x $cols) values")
+        arr
+    end
+
+    open(equil_input.eq_filename, "r") do io
+        # Header and axx
+        header_line = readline(io)
+        header = split(strip(header_line))
+        ntnova, npsi1, nsym = parse.(Int, header)
+        println("--> Header: ntnova=$ntnova, npsi1=$npsi1, nsym=$nsym")
+        axxline = readline(io)
+        println("    [DEBUG] axx raw: $axxline")
+        axx = parse_chease_floats(axxline)
+        println("    [DEBUG] axx parsed: $axx")
+        ma = npsi1 - 1
+        nrc = ntnova + 3
+
+        # 1D arrays
+        zcpr   = read_n_floats(io, ma;      label="zcpr  (ma = $ma)")
+        zcppr  = read_n_floats(io, npsi1;   label="zcppr (npsi1 = $npsi1)")
+        zq     = read_n_floats(io, npsi1;   label="zq")
+        zdq    = read_n_floats(io, npsi1;   label="zdq")
+        ztmf   = read_n_floats(io, npsi1;   label="ztmf")
+        ztp    = read_n_floats(io, npsi1;   label="ztp")
+        zfb    = read_n_floats(io, npsi1;   label="zfb")
+        zfbp   = read_n_floats(io, npsi1;   label="zfbp")
+        zpsi   = read_n_floats(io, npsi1;   label="zpsi")
+        zpsim  = read_n_floats(io, ma;      label="zpsim")
+
+        # 2D arrays
+        println("    [DEBUG] About to read 2D: zrcp nrc=$nrc npsi1=$npsi1 (should be $((nrc)*(npsi1)) numbers)")
+        zrcp  = read_2d(io, nrc, npsi1;     label="zrcp")
+        println("    [DEBUG] About to read 2D: zzcp")
+        zzcp  = read_2d(io, nrc, npsi1;     label="zzcp")
+        println("    [DEBUG] About to read 2D: zjacm")
+        zjacm = read_2d(io, nrc, npsi1;     label="zjacm")
+        println("    [DEBUG] About to read 2D: zjac")
+        zjac  = read_2d(io, nrc, npsi1;     label="zjac")
+
+        ro = zrcp[1, 1]
+        zo = zzcp[1, 1]
+        psio = abs(zpsi[end] - zpsi[1])
+
+        println("--> Finished reading CHEASE equilibrium.")
+        println("    Magnetic axis at (ro=$ro, zo=$zo), psio=$psio")
+        return nothing # replace with construction of your InverseRunInput, if desired
+    end
 end
 
