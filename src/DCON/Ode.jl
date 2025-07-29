@@ -126,60 +126,79 @@ end
 
 
 # Example stub for axis initialization
-function ode_axis_init()
-    # Variable declarations
-    ipert = 0
-    key = zeros(Float64, mpert)
-    m = zeros(Float64, mpert)
-    jpsi = 0
-    it = 0
-    itmax = 50
-    dpsi = 0.0
-    q = 0.0
-    q1 = 0.0
-    eps = 1e-10
+"""
+    ode_axis_init(sing_surf_data, sq; nn = 1, ψlim = 0.9936, ψlow = 0.01, mlow = -12, mhigh = 20, singfac_min = 1e-5, qlow = 0.0, sort_type = "absm")
+
+Initializes the ODE system near the magnetic axis for MHD or kinetic-MHD stability
+analysis. This routine prepares solution vectors and sorting indices, locates
+the relevant singular surfaces in the plasma equilibrium based on input data,
+and sets integration boundaries and normalization factors for subsequent ODE integration
+through singularities.
+
+# Arguments
+- `sing_surf_data`: Array of structures, each containing information about singular surfaces,
+    including fields like `.ψfac`, `.q`, and `.q1`. Filled from sing_find function
+- `sq`: Spline object controlling the equilibrium safety factor profile (typically contains equilibrium profile splines).
+
+# Keyword Arguments (these are likely to be replaced by the user input file structure)
+- `nn`: Integer. Toroidal mode number.
+- `ψlim`: Float. Upper bound for normalized flux coordinate ψ.
+- `ψlow`: Float. Lower bound for normalized flux coordinate ψ.
+- `mlow`: Integer. Lowest poloidal mode number to consider.
+- `mhigh`: Integer. Highest poloidal mode number to consider.
+- `singfac_min`: Float. Minimum separation from a singular surface.
+- `qlow`: Float. Lower bound for safety factor q. (Currently not implemented if > 0.)
+- `sort_type`: String. Sorting criteria for mode numbers (`"absm"` for |m|, or
+    `"sing"` for proximity to the first singular surface's m).
+
+# Details
+This function does the following:
+- Determines relevant singular surfaces from the provided equilibrium/singularity data.
+- Sets up arrays for the ODE solution and related workspaces for all poloidal harmonics in the range [`mlow`, `mhigh`].
+- Sorts the initial harmonics according to the specified `sort_type`.
+- Initializes normalization factors and solution arrays for use in the ODE integrator.
+- Computes the initial offset (`singfac`) from the next singular surface.
+
+Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are noted but not yet implemented.
+
+"""
+
+function ode_axis_init(sing_surf_data, plasma_eq; nn = 1, ψlim=0.9936, ψlow = 0.01, mlow = -12, mhigh = 20, singfac_min = 1e-5, qlow = 0.0, sort_type = "absm")
+    # JMH - I think all default values here will be supplied by inputs
+    # Right now, there are a lot of globals - not sure how we want to handle these
+    # But at least the major outputs here match fortran dcon
+
+    # maybe change how this is passed in?
+    qval(ψ) = JPEC.SplinesMod.spline_eval(plasma_eq.sq, ψ, 0)[4]
+    q1val(ψ) = JPEC.SplinesMod.spline_eval(plasma_eq.sq, ψ, 1)[2][4] 
 
     # Preliminary computations
-    global new = true
-    global ix = 0
-    global psiout = 1.0
-    global psifac = sq.xs[1]  # Fortran index 0 -> Julia index 1
+    new = true
+    ix = 0
+    psiout = 1.0
+    ψfac = 0.0  # TODO: this was Fortran sq%xs(0)?
+    msing = size(sing_surf_data)[1]
+    
+    # TODO: defined elsewhere
+    mpert = mhigh - mlow + 1
 
     # Use Newton iteration to find starting psi if qlow is above q0
-    if qlow > sq.fs[1, 5]  # Fortran fs(0,4) -> Julia fs[1,5]
-        # Start check from the edge for robustness in reverse shear cores
-        for jpsi = sq.mx:-1:2  # Fortran mx-1,1,-1; avoid endpoints
-            if sq.fs[jpsi - 1, 5] < qlow  # Fortran jpsi-1,4 -> Julia jpsi-1,5
-                break
-            end
-        end
-        psifac = sq.xs[jpsi]
-        it = 0
-        while true
-            it += 1
-            #spline_eval(sq, psifac, 1)
-            #q = sq.f[5]
-            #q1 = sq.f1[5]
-            q, q1 = JPEC.SplinesMod.spline_eval(sq, psifac, 1)
-            dpsi = (qlow - q) / q1
-            psifac += dpsi
-            if abs(dpsi) < eps * abs(psifac) || it > itmax
-                break
-            end
-        end
+    # TODO: add this. For now, assume qlow = 0.0 and start at the first singular surface
+    if qlow > 0.0
+        @warn "qlow > 0.0 is not implemented in ode_axis_init"
     end
 
     # Find inner singular surface
     global ising = 0
-    if kin_flag
-        for ising = 1:kmsing
-            if kinsing[ising].psifac > psifac
-                break
-            end
-        end
+    if false #(TODO: kin_flag)
+        # for ising = 1:kmsing
+        #     if kinsing[ising].psifac > psifac
+        #         break
+        #     end
+        # end
     else
-        for ising = 1:msing
-            if sing[ising].psifac > psifac
+        for ising in 1:msing
+            if sing_surf_data[ising].ψfac > ψfac
                 break
             end
         end
@@ -187,46 +206,46 @@ function ode_axis_init()
     ising = max(0, ising - 1)
 
     # Find next singular surface
-    if kin_flag
-        while true
-            ising += 1
-            if ising > kmsing
-                break
-            end
-            if psilim < kinsing[ising].psifac
-                break
-            end
-            q = kinsing[ising].q
-            if mlow <= nn * q && mhigh >= nn * q
-                break
-            end
-        end
-        if ising > kmsing || singfac_min == 0
-            psimax = psilim * (1 - eps)
-            next = "finish"
-        elseif psilim < kinsing[ising].psifac
-            psimax = psilim * (1 - eps)
-            next = "finish"
-        else
-            psimax = kinsing[ising].psifac - singfac_min / abs(nn * kinsing[ising].q1)
-            next = "cross"
-        end
+    if false # TODO: (kin_flag)
+        # while true
+        #     ising += 1
+        #     if ising > kmsing
+        #         break
+        #     end
+        #     if psilim < kinsing[ising].psifac
+        #         break
+        #     end
+        #     q = kinsing[ising].q
+        #     if mlow <= nn * q && mhigh >= nn * q
+        #         break
+        #     end
+        # end
+        # if ising > kmsing || singfac_min == 0
+        #     psimax = psilim * (1 - eps)
+        #     next = "finish"
+        # elseif psilim < kinsing[ising].psifac
+        #     psimax = psilim * (1 - eps)
+        #     next = "finish"
+        # else
+        #     psimax = kinsing[ising].psifac - singfac_min / abs(nn * kinsing[ising].q1)
+        #     next = "cross"
+        # end
     else
         while true
             ising += 1
-            if ising > msing || psilim < sing[min(ising, msing)].psifac
+            if ising > msing || ψlim < sing_surf_data[min(ising, msing)].ψfac
                 break
             end
-            q = sing[ising].q
+            q = sing_surf_data[ising].q
             if mlow <= nn * q && mhigh >= nn * q
                 break
             end
         end
-        if ising > msing || psilim < sing[min(ising, msing)].psifac || singfac_min == 0
-            psimax = psilim * (1 - eps)
+        if ising > msing || ψlim < sing_surf_data[min(ising, msing)].ψfac || singfac_min == 0
+            ψmax = ψlim * (1 - eps)
             next = "finish"
         else
-            psimax = sing[ising].psifac - singfac_min / abs(nn * sing[ising].q1)
+            ψmax = sing_surf_data[ising].ψfac - singfac_min / abs(nn * sing_surf_data[ising].q1)
             next = "cross"
         end
     end
@@ -238,19 +257,21 @@ function ode_axis_init()
     global unorm0 = zeros(Float64, 2 * mpert)
     global unorm = zeros(Float64, 2 * mpert)
     global index = collect(1:mpert)
-    m .= mlow - 1 .+ index
+    m = mlow - 1 .+ index
     if sort_type == "absm"
-        key .= abs.(m)
+        key = abs.(m)
     elseif sort_type == "sing"
-        key .= m
+        key = m
         if msing > 0
-            key .= key .- sing[1].m
+            key = key .- sing[1].m
         end
-        key .= -abs.(key)
+        key = -abs.(key)
     else
         error("Cannot recognize sort_type = $sort_type")
     end
-    index .= sortperm_subrange(key, 1, mpert) # in original Fortran: bubble(key, index, 1, mpert)
+    bubble!(key, index, 1, mpert) # in original Fortran: bubble(key, index, 1, mpert)
+    println(key)
+    println(index)
 
     # Initialize solutions
     u .= 0
@@ -260,47 +281,48 @@ function ode_axis_init()
     global msol = mpert
     global neq = 4 * mpert * msol
     u_save .= u
-    global psi_save = psifac
+    global psi_save = ψfac
 
-    # Initialize integrator parameters
-    global istep = 0
-    global iopt = 1
-    global itask = 5
-    global itol = 2
-    global mf = 10
-    global istate = 1
+    # Initialize integrator parameters (JMH - not sure if these are needed in Julia)
+    # global istep = 0
+    # global iopt = 1
+    # global itask = 5
+    # global itol = 2
+    # global mf = 10
+    # global istate = 1
 
     # Compute conditions at next singular surface
-    q = sq.fs[1, 5]
-    if kin_flag
-        if kmsing > 0
-            m1 = round(Int, nn * kinsing[ising].q)
-        else
-            m1 = round(Int, nn * qlim) + sign(one, nn * sq.fs1[mpsi, 5])
-        end
+    q = qval(ψlow) # Fortran: q=sq%fs(0,4)
+    println(q)
+    if false #TODO: (kin_flag)
+        # if kmsing > 0
+        #     m1 = round(Int, nn * kinsing[ising].q)
+        # else
+        #     m1 = round(Int, nn * qlim) + sign(one, nn * sq.fs1[mpsi, 5])
+        # end
     else
         if msing > 0
-            m1 = round(Int, nn * sing[ising].q)
+            m1 = round(Int, nn * sing_surf_data[ising].q)
         else
-            m1 = round(Int, nn * qlim) + sign(one, nn * sq.fs1[mpsi, 5])
+            m1 = round(Int, nn * qlim) + sign(nn * q1val[end])
         end
     end
     global singfac = abs(m1 - nn * q)
 
-    # Set up work arrays
-    global liw = length(iwork)
-    global lrw = 22 + 64 * mpert * msol
-    global rwork = zeros(Float64, lrw)
-    global atol = zeros(ComplexF64, mpert, msol, 2)
-    global fixfac = zeros(ComplexF64, msol, msol)
-    iwork .= 0
-    rwork .= 0
-    rwork[1] = psimax
-    rwork[5] = psifac * 1e-3
-    rwork[11] = rwork[5]
+    println(m1)
+    println(singfac)
 
-    # Terminate
-    return
+    # Set up work arrays (JMH - not sure if these are needed in Julia)
+    # global liw = length(iwork)
+    # global lrw = 22 + 64 * mpert * msol
+    # global rwork = zeros(Float64, lrw)
+    # global atol = zeros(ComplexF64, mpert, msol, 2)
+    # global fixfac = zeros(ComplexF64, msol, msol)
+    # iwork = 0
+    # rwork = 0
+    # rwork[1] = psimax
+    # rwork[5] = psifac * 1e-3
+    # rwork[11] = rwork[5]
 end
 
 function ode_sing_init()

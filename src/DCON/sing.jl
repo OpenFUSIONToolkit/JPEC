@@ -18,68 +18,96 @@ function sing_scan()
     println("  i    psi      rho      q        q1      di0      di      err")
 end
 
-# finds the positions of singular values of q - function 2 from Fortran DCON
-function sing_find()
-    #declarations
-    itmax = 200
-    nsing = 1000
-    m_sing = zeros(Int, nsing)
-    psising = zeros(Float64, nsing)
-    qsing = zeros(Float64, nsing)
-    q1sing = zeros(Float64, nsing)
-    ising = 0
+"""
+    sing_find!(sing_surf_data, plasma_eq; mex=2, nn=1, itmax=200)
 
-    #loops for the extrema to find the singular surfaces
-    for iex in 1:mex
+Finds and appends rational (singular) surfaces in a plasma equilibrium profile,
+where `m = nn*q` within each interval between extrema of the safety factor profile `q(ψ)`.
+
+The results are stored as `NamedTuple`s in the supplied vector `sing_surf_data`, 
+with keys: `m`, `ψfac`, `ρ`, `q`, and `q1`.
+
+# Arguments
+- `sing_surf_data::Vector`: Container for output; will be emptied and updated in-place.
+- `plasma_eq`: Plasma equilibrium object with a field `.sq` suitable for spline evaluation.
+- `nn::Int`: Toroidal mode number `n`.
+- `itmax::Int`: Maximum allowed bisection iterations per root.
+
+# Details
+Searches each interval between adjacent `q`-profile extrema for all integer poloidal mode numbers `m`
+that satisfy the rational surface condition `m = n*q(ψ)`, using bisection to find the roots.
+Assumes a monotonic `q` profile, unless a generalized interface is implemented
+(TODO: support for non-monotonic profiles). Also TODO: decide how to deal with data structure output
+
+# Output
+For each rational surface found, a `NamedTuple` with:
+- `m`: Poloidal mode number at this surface
+- `ψfac`: Normalized flux label at the surface
+- `ρ`: Square root of `ψfac`
+- `q`: `q` value at the surface (`m/nn`)
+- `q1`: Derivative of `q` at the surface
+
+is pushed to `sing_surf_data`.
+"""
+function sing_find!(sing_surf_data, plasma_eq; nn=1, itmax=200)
+
+    # Ensure sing_surf_data is empty before starting
+    empty!(sing_surf_data)
+
+    # Define functions to evaluate q and its first derivative
+    qval(ψ) = JPEC.SplinesMod.spline_eval(plasma_eq.sq, ψ, 0)[4]
+    q1val(ψ) = JPEC.SplinesMod.spline_eval(plasma_eq.sq, ψ, 1)[2][4] 
+
+    # TODO: I assume monotonic here for checking, will need to provide some interface
+    #  for the actual values fo (mex, qex) determined from the equil code
+    qex = [qval(0.0), qval(1.0)]
+    ψex = [0.0, 1.0]
+    mex = 2
+
+    # Loop over extrema of q, find all rational values in between
+    for iex in 2:mex
         dq = qex[iex] - qex[iex-1]
-        m = nn * qex[iex-1] #TODO: Make sure nn (toroidal mode number?) is passed in correctly - global?
+        m = floor(Int, nn * qex[iex-1])
         if dq > 0
             m += 1
         end
-        dm = sign(dq * nn)
-        #find singular surfaces by binary search
-        while true #TODO: while true is not usually good - acts like a normal while loop in this case
-            if (m - nn * qex[iex-1]) * (m - nn * qex[iex]) > 0
-                break
-            end
-            it = 0 #iteration counter
-            psifac0 = psiex[iex-1]
-            psifac1 = psiex[iex]
-            #Really want to set singfac = 0.1 here and then use abs(singfac) <= 1e-12 as the while loop condition 
-            while true #TODO: while true is not usually good - sounding like an infinite loop
+        dm = Int(sign(dq * nn))
+
+        # Loop over possible m's in interval
+        while (m - nn * qex[iex-1]) * (m - nn * qex[iex]) <= 0
+            it = 0
+            ψ0 = ψex[iex-1]
+            ψ1 = ψex[iex]
+            ψfac = 0.0
+
+            # Bisection method to find singular surface
+            while it < itmax
                 it += 1
-                psifac = (psifac0 + psifac1) / 2
-                spline_eval(sq, psifac, 0) #TODO: is this call correct?
-                singfac = (m - nn * sq.f[4]) * dm
-                if singfac > 0
-                    psifac0 = psifac
-                    psifac = (psifac + psifac1) / 2
-                else
-                    psifac1 = psifac
-                    psifac = (psifac + psifac0) / 2
-                end
-                if abs(singfac) <= 1e-12 #TODO: this could potentially be a while loop condition (need to set singfac before entering)
+                ψfac = (ψ0 + ψ1)/2
+                singfac = (m - nn * qval(ψfac)) * dm
+                if abs(singfac) <= 1e-12
                     break
-                end
-                if it > itmax
-                    error("sing_find can't find root")
+                elseif singfac > 0
+                    ψ0 = ψfac
+                else
+                    ψ1 = ψfac
                 end
             end
-            #store singular surfaces
-            ising += 1
-            spline_eval(sq, psifac, 1)
-            m_sing[ising] = m
-            qsing[ising] = m / nn
-            q1sing[ising] = sq.f1[4]
-            psising[ising] = psifac
+            if it == itmax
+                @warn "Bisection did not converge for m = $m"
+                # You may want to continue, break, or error here
+            else
+                push!(sing_surf_data, (
+                    m = m,
+                    ψfac = ψfac,
+                    ρ = sqrt(ψfac),
+                    q = m / nn,
+                    q1 = q1val(ψfac),
+                ))
+            end
             m += dm
         end
     end
-
-    #transfering to permanent storage - TODO: we probably don't want globals here
-    global msing = ising
-    global sing = [SingType(m=m_sing[i], psifac=psising[i], rho=sqrt(psising[i]), q=qsing[i], q1=q1sing[i]) for i in 1:msing]
-    # No need to deallocate in Julia
 end
 
 # computes limiter values - function 3 from Fortran DCON

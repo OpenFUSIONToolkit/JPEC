@@ -17,3 +17,23 @@ function sortperm_subrange!(key::Vector{Float64}, index::Vector{Int}, mrange::Un
         index[first(mrange) + j - 1] = i
     end
 end
+
+"""
+    bubble!(key::AbstractVector, index::AbstractVector{Int}, mmin::Int, mmax::Int)
+
+Sorts the indices in `index` in place such that `key[index[i]]` are in decreasing order
+from `mmin` to `mmax` (inclusive).
+"""
+function bubble!(key::AbstractVector, index::AbstractVector{Int}, mmin::Int, mmax::Int)
+    switched = true
+    while switched
+        switched = false
+        for i in mmin:(mmax-1)
+            if key[index[i]] < key[index[i+1]]
+                index[i], index[i+1] = index[i+1], index[i]
+                switched = true
+            end
+        end
+    end
+    return nothing
+end
