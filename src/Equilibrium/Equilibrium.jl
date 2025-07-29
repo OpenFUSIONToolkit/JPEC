@@ -31,40 +31,6 @@ export setup_equilibrium, EquilInput, PlasmaEquilibrium
 const mu0 = 4.0 * pi * 1e-7
 
 
-function symbolize_keys(dict::Dict{String, Any})
-    return Dict(Symbol(k) => v for (k, v) in dict)
-end
-
-
-"""
-Outer constructor for EquilConfig that enables a toml file 
-    interface for specifying the configuration settings
-"""
-function EquilConfig(path::String = "equil.toml")
-    raw = TOML.parsefile(path)
-    @show raw 
-
-    # Extract EQUIL_CONTROL with default fallback
-    control_data = get(raw, "EQUIL_CONTROL", Dict())
-    output_data  = get(raw, "EQUIL_OUTPUT", Dict())
-    @show control_data
-
-    # Check for required fields in control_data
-    required_keys = ("eq_filename", "eq_type")
-    missingkeys = filter(k -> !haskey(control_data, k), required_keys)
-
-    if !isempty(missingkeys)
-        error("Missing required key(s) in [EQUIL_CONTROL]: $(join(missing, ", "))")
-    end
-
-    # Construct validated structs
-    control = EquilControl(; symbolize_keys(control_data)...)
-    output  = EquilOutput(; symbolize_keys(output_data)...)
-
-    return EquilConfig(control=control, output=output)
-end
-
-
 """
     setup_equilibrium(equil_input::EquilInput)
 
@@ -89,6 +55,7 @@ function setup_equilibrium(path::String = "equil.toml")
         eq_input = read_chease2(eq_config)
     elseif equil_in.eq_type == "lar"
         # todo: read the lar toml
+        lar_config = LarConfig(eq_config.control.eq_filename)
         eq_input = lar_run(lar_config)
     elseif equil_in.eq_type == "sol"
         # todo: read the sol toml

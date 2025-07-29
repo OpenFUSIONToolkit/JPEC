@@ -5,6 +5,15 @@ This file is the one stop shop for all the fundemental structures used in
 
 using Base: @kwdef
 
+# --- Helper function --- 
+
+
+function symbolize_keys(dict::Dict{String, Any})
+    return Dict(Symbol(k) => v for (k, v) in dict)
+end
+
+
+# --- Main Structures for the Equilibrium Code ---
 
 
 @kwdef mutable struct EquilControl
@@ -94,6 +103,7 @@ A container struct that bundles all necessary configuration settings originally 
     output::EquilOutput = EquilOutput()
 end
 
+
 """
 Constructor that allows users to form a EquilConfig struct from dictionaries
     for convinience when most of the defaults are fine.
@@ -103,6 +113,32 @@ function EquilConfig(control::Dict, output::Dict)
     outstruct = EquilOutput(;output...)
     return EquilConfig(control=construct, output=outstruct)
 
+
+"""
+Outer constructor for EquilConfig that enables a toml file 
+    interface for specifying the configuration settings
+"""
+function EquilConfig(path::String = "equil.toml")
+    raw = TOML.parsefile(path)
+
+    # Extract EQUIL_CONTROL with default fallback
+    control_data = get(raw, "EQUIL_CONTROL", Dict())
+    output_data  = get(raw, "EQUIL_OUTPUT", Dict())
+
+    # Check for required fields in control_data
+    required_keys = ("eq_filename", "eq_type")
+    missingkeys = filter(k -> !haskey(control_data, k), required_keys)
+
+    if !isempty(missingkeys)
+        error("Missing required key(s) in [EQUIL_CONTROL]: $(join(missing, ", "))")
+    end
+
+    # Construct validated structs
+    control = EquilControl(; symbolize_keys(control_data)...)
+    output  = EquilOutput(; symbolize_keys(output_data)...)
+
+    return EquilConfig(control=control, output=output)
+end
 
 
 
@@ -210,7 +246,7 @@ end
 
 
 """
-    LarInput(...)  
+    LarConfig(...)  
 
 A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equilibrium model.
 
@@ -232,7 +268,7 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
 - `zeroth`: If set to true, it neglects the Shafranov shift
 """
 
-mutable struct LarInput
+@kwdef mutable struct LarConfig
     lar_r0::Float64     # Major radius of the plasma
     lar_a::Float64      # Minor radius of the plasma
 
@@ -248,4 +284,13 @@ mutable struct LarInput
     ma::Float64        # the number of grid points in the radial direction
 
     zeroth ::Bool      #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
+end
+
+"""
+Outer constructor for LarConfig that enables a toml file 
+    interface for specifying the configuration settings
+"""
+function LarConfig(path::String = "lar.toml")
+    raw = TOML.parsefile(path)
+    return LarConfig(; symbolize_keys(raw)...)
 end
