@@ -1,3 +1,6 @@
+! First export:
+!     export FFLAGS='-O0 -fbacktrace -g -fcheck=all -fPIC'
+!     export FC=gfortran
 ! run using: make && gfortran TESTVAC.f *.o -std=legacy -framework Accelerate -o testvac && ./testvac
 
 
