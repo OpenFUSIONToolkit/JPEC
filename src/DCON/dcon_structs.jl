@@ -79,9 +79,11 @@ end
     q_edge::Union{Nothing, Vector{Float64}} = nothing
     psi_edge::Union{Nothing, Vector{Float64}} = nothing
     dw_edge::Union{Nothing, Vector{Complex{Float64}}} = nothing
+    ud::Union{Nothing, Matrix{Float64,3} } = nothing #storage for u-derivative and xss
 end
 
 @kwdef struct DconControl
+    verbose::Bool = true
     bal_flag::Bool = false
     mat_flag::Bool = false
     ode_flag::Bool = false
@@ -172,7 +174,7 @@ end
     out_ahg2msc::Bool = true
 end
 
-@kwdef struct FourFit
+@kwdef struct FourFitVars
 
     # Spline matrices
     dmats::CsplineType
@@ -212,4 +214,18 @@ end
     # kinetic ABCDEH mats for sing_mod
     kwmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
     ktmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
+end
+
+@kwdef struct SingVars
+
+      msol::Int = 0
+      sing_order::Int = 2
+      det_max::Float64 = 0
+      r1::Vector{Int} = Int[]
+      r2::Vector{Int} = Int[]
+      n1::Vector{Int} = Int[]
+      n2::Vector{Int} = Int[]
+
+      m0mat::Union{Nothing, Matrix{ComplexF64,2}} = nothing
+      sing_detf::Union{Nothing, Matrix{ComplexF64,2}} = nothing
 end
