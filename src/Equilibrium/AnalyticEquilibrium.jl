@@ -30,7 +30,6 @@ Also evaluates the initial derivative using the analytic model.
 - `y`: Initial state vector of length 5.
 """
 
-
 function lar_init_conditions(rmin::Float64, lar_input::LarInput)
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
@@ -192,7 +191,6 @@ function lar_run(lar_input::LarInput)
         sq_fs[ia, 3] = qval
     end
 
-
     sq_in = Spl.spline_setup(sq_xs, sq_fs, bctype=4)
 
     rzphi_y_nodes = range(0.0, 2π, length=mtau + 1)
@@ -205,6 +203,9 @@ function lar_run(lar_input::LarInput)
         q = f[8]
         dψdr = f1[3]
         r2 = -(y4 * r / q) / dψdr
+        if lar_input.zeroth
+            r2 = 0.0
+        end
 
         for itau in 1:(mtau + 1)
             θ = 2π * (itau - 1) / mtau
@@ -216,12 +217,11 @@ function lar_run(lar_input::LarInput)
     end
 
     rz_in = Spl.bicube_setup(r_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
-
     # plasma_eq = inverse_run(
     #     InverseRunInput(nothing,sq_in,rz_in,lar_r0,0.0,psio)
     # )
 
-    # return InverseRunInput(dummy_input,sq_in,rz_in,lar_r0,0.0,psio)
+    return sq_in,rz_in
 end
 
 
