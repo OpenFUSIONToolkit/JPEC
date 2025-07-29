@@ -132,41 +132,40 @@ function MainProgram()
  #       end
  #       fourfit_kinetic_matrix(kingridtype, out_fund)
  #     end
-
-      sing_scan()
-      for ising in 1:msing
-        resist_eval(sing[ising])
-      end
-#      if kin_flag
-#        ksing_find()
-#      end
+ #     sing_scan()
+ #     for ising in 1:msing
+ #       resist_eval(sing[ising])
+ #     end
+ #     if kin_flag
+ #       ksing_find()
+ #     end
     end
       
 # -----------------------------------------------------------------------
 #  TODO     integrate main ODE's.
 # -----------------------------------------------------------------------
 
-    ud = zeros(ComplexF64, mpert, mpert, 2)
-    if ode_flag
+    ud = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
+    if ctrl.ode_flag
       if ctrl.verbose
         println("Starting integration of ODE's")
       end
-      ode_run()
-      if size_edge > 0
+      ode_run(ctrl, intr, equil)
+      if intr.size_edge > 0
         # Find peak index in dw_edge[pre_edge:i_edge]
-        dw_slice = real.(dw_edge[pre_edge:i_edge])
-        peak_index = findmax(dw_slice)[2] + (pre_edge - 1)
-        qhigh = q_edge[peak_index]
-        sas_flag = false
-        psiedge = psihigh
+        dw_slice = real.(intr.dw_edge[intr.pre_edge:intr.i_edge])
+        peak_index = findmax(dw_slice)[2] + (intr.pre_edge - 1)
+        ctrl.qhigh = intr.q_edge[peak_index]
+        ctrl.sas_flag = false
+        ctrl.psiedge = equil.psihigh
         sing_lim()
-        println("Re-Integrating to peak dW @ qlim = $(qlim), psilim = $(psilim)")
+        println("Re-Integrating to peak dW @ qlim = $(intr.qlim), psilim = $(intr.psilim)")
         # Full re-run because outputs were written to disk each step
         # making it hard to backtrack
-        if bin_euler
-            bin_close(euler_bin_unit)
+        if outp.bin_euler
+            bin_close(euler_bin_unit) # TODO: Need to decide ho we're handling io
         end
-        ode_run()
+        ode_run(ctrl, intr, equil)
       end
     end
 
@@ -174,19 +173,19 @@ function MainProgram()
 #      compute free boundary energies.
 # -----------------------------------------------------------------------
 
-    if vac_flag && !(ksing > 0 && ksing <= msing + 1 && bin_sol)
+    if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
       if ctrl.verbose
         println("Computing free boundary energies")
       end
-      ud = zeros(ComplexF64, mpert, mpert, 2)
-      free_run(plasma1, vacuum1, total1, nzero, netcdf_out)
+      ud = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
+      free_run(plasma1, vacuum1, total1, nzero, netcdf_out) # TODO: this needs love
     else
       plasma1 = 0
       vacuum1 = 0
       total1 = 0
     end
 
-    if mat_flag || ode_flag
+    if ctrl.mat_flag || ctrl.ode_flag
       # If these are arrays, set to nothing for GC
       asmat = nothing
       bsmat = nothing
@@ -195,7 +194,7 @@ function MainProgram()
       jmat = nothing
     end
 
-    if bin_euler
+    if outp.bin_euler
       bin_close(euler_bin_unit) # We have to decide how we're handling the file io
     end
     
@@ -208,14 +207,14 @@ function MainProgram()
       end
     end
 
-    if vac_flag && !(ksing > 0 && ksing <= msing + 1 && bin_sol)
+    if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
       if real(total1) < 0
         if ctrl.verbose
-            println("Free-boundary mode unstable for nn = $nn.")
+            println("Free-boundary mode unstable for nn = $ctrl.nn.")
         end
       else
         if ctrl.verbose
-            println("All free-boundary modes stable for nn = $nn.")
+            println("All free-boundary modes stable for nn = $ctrl.nn.")
         end
       end
     end
