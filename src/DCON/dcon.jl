@@ -253,10 +253,18 @@ function AnalyzeMode(n, ctrl, outp)
     W_P = SolveODE(F, G, H, ctrl)
     
     # 3. (Optional) Ballooning stability
-    W_bal = CheckBallooning(W_P, ctrl) if ctrl["bal_flag"]
+    if ctrl.bal_flag
+      W_bal = CheckBallooning
+    else
+      W_bal = nothing
+    end
 
     # 4. (Optional) Vacuum/free boundary
-    W_V = ComputeVacuum(W_P, ctrl) if ctrl["vac_flag"]
+    if ctrl.vac_flag
+        W_V = ComputeVacuum(W_P, ctrl)
+    else
+        W_V = nothing
+    end
 
     # 5. Eigenvalue analysis
     eig_results = AnalyzeEigenvalues(W_P, W_V, ctrl)
