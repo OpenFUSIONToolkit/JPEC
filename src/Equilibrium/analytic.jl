@@ -12,7 +12,6 @@ import ..Spl
 
 using Printf, DifferentialEquations, LinearAlgebra
 using ..Types: InverseRunInput, LarInput
-using ..Direct
 
 """
     lar_init_conditions(rmin, sigma_type, params)
@@ -27,7 +26,6 @@ Also evaluates the initial derivative using the analytic model.
 ## Returns:
 - `r`: Physical radius corresponding to `rmin * lar_a`.
 - `y`: Initial state vector of length 5.
-- `dy`: Derivative vector evaluated at the initial point.
 """
 
 
@@ -51,7 +49,7 @@ function lar_init_conditions(rmin::Float64, lar_input::LarInput)
     q = r^2 * y[2] / (lar_r0 * y[1])
     y[4] = (q / r)^2 * y[5] / 2
 
-    return r, y, dy
+    return r, y
 end
 
 """
@@ -63,7 +61,7 @@ at a given radius `r`, using the current state vector `y` and equilibrium parame
 ## Arguments:
 - `dy`: A preallocated vector where the computed derivatives will be stored (in-place).
 - `r`: The radial position at which the derivative is evaluated.
-- `y`: The current state vector `[Bθ·r, Bζ, ψ, W_t, W_v]`.
+- `y`: The current state vector.
 - `lar_input`: A `LarInput` object containing equilibrium shaping parameters.
 
 ## Returns:
@@ -74,19 +72,18 @@ function lar_der(dy::Vector{Float64}, r::Float64, y::Vector{Float64}, lar_input:
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
 
-    p00 = lar_input.p00
+    q0 = lar_input.q0
+
+    beta0 = lar_input.beta0
+    p00 = beta0 / 2.0
     p_pres = lar_input.p_pres
     p_sig = lar_input.p_sig
 
     sigma_type = lar_input.sigma_type
-
-    q0 = lar_input.q0
-
     x = r / lar_a
     xfac = 1 - x^2
-
-    p = p00 * xfac^p_pres
-    pp = -2 * p_pres * p00 * x * xfac^(p_pres - 1)
+    pp = -2 * p_pres * p00 * x * xfac^(p_pres - 1)  # p'
+    sigma0 = 2.0 / (q0 * lar_r0)
 
     sigma = if sigma_type == "wesson"
         sigma0 * xfac^p_sig
@@ -94,7 +91,7 @@ function lar_der(dy::Vector{Float64}, r::Float64, y::Vector{Float64}, lar_input:
         sigma0 / (1 + x^(2 * p_sig))^(1 + 1 / p_sig)
     end
 
-    bsq = (y[1] / max(r, eps()))^2 + y[2]^2
+    bsq = (y[1] / max(r, eps()))^2 + y[2]^2     # B²
     q = r^2 * y[2] / (lar_r0 * max(y[1], eps()))
 
     dy[1] = -pp/bsq*y[1] + sigma*y[2]*r
@@ -107,40 +104,41 @@ function lar_der(dy::Vector{Float64}, r::Float64, y::Vector{Float64}, lar_input:
 end
 
 """
-    lar_run(lar_input, ma, mtau)
+    lar_run(lar_input)
 
 Solves the LAR (Large Aspect Ratio) plasma equilibrium ODE system using analytic profiles
 defined by `lar_input`, and returns the full solution table including derived quantities.
 
 ## Arguments:
 - `lar_input`: A `LarInput` object containing profile and geometric parameters.
-- `ma`: Number of radial grid points (excluding boundaries).
-- `mtau`: Number of poloidal angular grid points (unused in this version).
 
 ## Returns:
  - working on it not yet implemented
 """
 
 
-function lar_run(lar_input::LarInput, ma::Int, mtau::Int)
+function lar_run(lar_input::LarInput)
     rmin = 1e-4
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
     q0 = lar_input.q0
-    beta0 = lar_input.p00 * 2.0
+    beta0 = lar_input.beta0
     sigma_type = lar_input.sigma_type
 
-    lar_input.p00 = beta0 / 2.0
+    p00 = beta0 / 2.0
     lar_input.p_pres = max(lar_input.p_pres, 1.001)
 
     sigma0 = 2.0 / (q0 * lar_r0)
+
+    ma = lar_input.ma
+    mtau = lar_input.mtau
 
     function dydr(du, u, p, r)
         lar_input = p
         lar_der(du, r, u, lar_input)
     end
 
-    r0, y0, dy = lar_init_conditions(rmin, lar_input)
+    r0, y0 = lar_init_conditions(rmin, lar_input)
     tspan = (r0, lar_a)
     p = lar_input
 
@@ -157,7 +155,7 @@ function lar_run(lar_input::LarInput, ma::Int, mtau::Int)
         y = y_mat[i, :]
         x = r / lar_a
         xfac = 1 - x^2
-        pval = lar_input.p00 * xfac^lar_input.p_pres
+        pval = p00 * xfac^lar_input.p_pres
         sigma = (sigma_type == "wesson") ?
             sigma0 * xfac^lar_input.p_sig :
             sigma0 / (1 + x^(2 * lar_input.p_sig))^(1 + 1 / lar_input.p_sig)
@@ -276,4 +274,4 @@ function sol_run(
 
 end
 
-end # module Analytic
+end
