@@ -114,11 +114,11 @@ function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::PlasmaEquilibr
     itmax = 50
     eps = 1e-10
 
-    #TODO: where does qmax and psihigh come from 
-    #compute and modify the DconInternal struct
-    intr.qlim   = min(qmax, cntrl.qhigh)
+    #TODO: where does qmax and psihigh come from? Is it equil like we have right now?
+    #compute and modify the DconInternal struct 
+    intr.qlim   = min(equil.qmax, cntrl.qhigh)
     intr.q1lim  = equil.sq.fs1[mpsi, 4] #TODO: does equil.sq have a field fs1?
-    intr.psilim = psihigh
+    intr.psilim = equil.psihigh #TODO: do we need to deepcopy psihigh?
 
     #normalize dmlim to interval [0,1)
     #TODO: This is supposed to be modifying dmlim from the DconControl struct
@@ -175,8 +175,8 @@ function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::PlasmaEquilibr
         end
 
     else
-        intr.qlim   = qmax
-        intr.q1lim  = equil.sq.fs1[mpsi,4]
+        intr.qlim = qmax
+        intr.q1lim = equil.sq.fs1[mpsi,4]
         intr.psilim = psihigh
     end
 
