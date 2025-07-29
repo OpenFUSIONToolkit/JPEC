@@ -198,6 +198,27 @@ function MainProgram()
     if bin_euler
       bin_close(euler_bin_unit) # We have to decide how we're handling the file io
     end
+    
+# -----------------------------------------------------------------------
+#      the bottom line.
+# -----------------------------------------------------------------------
+    if nzero != 0
+      if verbose
+        println("Fixed-boundary mode unstable for nn = $nn.")
+      end
+    end
+
+    if vac_flag && !(ksing > 0 && ksing <= msing + 1 && bin_sol)
+      if real(total1) < 0
+        if verbose
+            println("Free-boundary mode unstable for nn = $nn.")
+        end
+      else
+        if verbose
+            println("All free-boundary modes stable for nn = $nn.")
+        end
+      end
+    end
 
     # 5. Output/cleanup
     OutputResults(outp)
