@@ -2,6 +2,9 @@
 
 using LinearAlgebra #standard Julia library for linear algebra operations
 
+#keep 1-3, 11 is CRUCIAL
+#13-16 are for kinetic DCON so skip for now
+
 # scans singular surfaces and prints information about them - function 1 from Fortran DCON
 function sing_scan()
     println("\n Singular Surfaces:")
@@ -27,23 +30,24 @@ function sing_find()
     #loops for the extrema to find the singular surfaces
     for iex in 1:mex
         dq = qex[iex] - qex[iex-1]
-        m = nn * qex[iex-1]
+        m = nn * qex[iex-1] #TODO: Make sure nn (toroidal mode number?) is passed in correctly - global?
         if dq > 0
             m += 1
         end
         dm = sign(dq * nn)
         #find singular surfaces by binary search
-        while true #TODO: while true is NOT good - sounding like an infinite loop
+        while true #TODO: while true is not usually good - acts like a normal while loop in this case
             if (m - nn * qex[iex-1]) * (m - nn * qex[iex]) > 0
                 break
             end
-            it = 0
+            it = 0 #iteration counter
             psifac0 = psiex[iex-1]
             psifac1 = psiex[iex]
-            while true #TODO: while true is NOT good - sounding like an infinite loop
+            #Really want to set singfac = 0.1 here and then use abs(singfac) <= 1e-12 as the while loop condition 
+            while true #TODO: while true is not usually good - sounding like an infinite loop
                 it += 1
                 psifac = (psifac0 + psifac1) / 2
-                spline_eval(sq, psifac, 0)
+                spline_eval(sq, psifac, 0) #TODO: is this call correct?
                 singfac = (m - nn * sq.f[4]) * dm
                 if singfac > 0
                     psifac0 = psifac
@@ -52,7 +56,7 @@ function sing_find()
                     psifac1 = psifac
                     psifac = (psifac + psifac0) / 2
                 end
-                if abs(singfac) <= 1e-12
+                if abs(singfac) <= 1e-12 #TODO: this could potentially be a while loop condition (need to set singfac before entering)
                     break
                 end
                 if it > itmax
@@ -79,7 +83,23 @@ end
 # computes limiter values - function 3 from Fortran DCON
 function sing_lim()
     #declarations 
+    itmax = 50
+    eps = 1e-10
 
+    #compute 
+    qlim   = min(qmax, qhigh)
+    q1lim  = sq.fs1[mpsi, 4] #TODO: does sq have a field fs1?
+    psilim = psihigh
+
+
+    
+end
+
+
+function sing_get_ua() #replace with a single vector 
+end
+
+function sing_get_ca() #replace with a single vector - optional with diagnose
 end
 
 # evaluates Euler-Lagrange differential equations
@@ -372,6 +392,3 @@ For brevity, some repetitive or highly technical code (e.g., the full sing_mmat 
 If you need a specific subroutine fully expanded, let me know!
 
 =#
-
-#keep 1-3, 11 is CRUCIAL
-#13-16 are for kinetic DCON so skip for now
