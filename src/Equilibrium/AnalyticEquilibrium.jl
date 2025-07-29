@@ -116,7 +116,6 @@ defined by `lar_input`, and returns the full solution table including derived qu
  - working on it not yet implemented
 """
 
-
 function lar_run(lar_input::LarInput)
     rmin = 1e-4
     lar_a = lar_input.lar_a
@@ -163,8 +162,65 @@ function lar_run(lar_input::LarInput)
         temp[i, :] = [r; y; pval; sigma; q]
     end
 
-    return temp
+    xs_r = temp[:, 1]
+    fs_r = temp[:, 2:9]
+    spl = JPEC.Spl.spline_setup(xs_r, fs_r, bctype=4)
+
+    dr = lar_a / (ma + 1)
+    r = 0.0
+    psio = temp[end, 4]  # ψ_edge
+
+    sq_xs = zeros(ma + 1)
+    sq_fs = zeros(ma + 1, 3)
+    r_nodes = zeros(ma + 1)
+
+    for ia in 1:(ma + 1)
+        r += dr
+        r_nodes[ia] = r
+        f, f1 = JPEC.Spl.spline_eval(spl, r,1)
+        ψ     = f[3]
+        Bphi  = f[2]
+        pval  = f[6]
+        qval  = f[8]
+        dψdr  = f1[3]
+        r2    = -(f[4] * r / f[8]) / dψdr
+        sq_xs[ia]    = ψ / psio
+        sq_fs[ia, 1] = lar_r0 * Bphi
+        sq_fs[ia, 2] = pval
+        sq_fs[ia, 3] = qval
+    end
+
+
+    sq_in = JPEC.Spl.spline_setup(sq_xs, sq_fs, bctype=4)
+
+    rzphi_y_nodes = range(0.0, 2π, length=mtau + 1)
+    rzphi_fs_nodes = zeros(ma + 1, mtau + 1, 2)
+
+    for ia in 1:(ma + 1)
+        r = r_nodes[ia]
+        f, f1 = JPEC.Spl.spline_eval(spl, r, 1)
+        y4 = f[4]
+        q = f[8]
+        dψdr = f1[3]
+        r2 = -(y4 * r / q) / dψdr
+
+        for itau in 1:(mtau + 1)
+            θ = 2π * (itau - 1) / mtau
+            cosθ, sinθ = cos(θ), sin(θ)
+            rfac = r + r2 * cosθ
+            rzphi_fs_nodes[ia, itau, 1] = lar_r0 + rfac * cosθ
+            rzphi_fs_nodes[ia, itau, 2] = rfac * sinθ
+        end
+    end
+
+    rz_in = JPEC.Spl.bicube_setup(r_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
+
+    # plasma_eq = inverse_run(
+    #     InverseRunInput(nothing,sq_in,rz_in,lar_r0,0.0,psio)
+    # )
+    return InverseRunInput(nothing,sq_in,rz_in,lar_r0,0.0,psio)
 end
+
 
 """
 This is a Julia version of the Fortran code in sol.f, implementing Soloviev's analytical equilibrium.
