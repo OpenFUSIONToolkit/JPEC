@@ -157,7 +157,7 @@ function lar_run(lar_input::LarInput)
 
     xs_r = temp[:, 1]
     fs_r = temp[:, 2:9]
-    spl = JPEC.Spl.spline_setup(xs_r, fs_r, bctype=4)
+    spl = Spl.spline_setup(xs_r, fs_r, bctype=4)
 
     dr = lar_a / (ma + 1)
     r = 0.0
@@ -170,7 +170,7 @@ function lar_run(lar_input::LarInput)
     for ia in 1:(ma + 1)
         r += dr
         r_nodes[ia] = r
-        f, f1 = JPEC.Spl.spline_eval(spl, r,1)
+        f, f1 = Spl.spline_eval(spl, r,1)
         ψ     = f[3]
         Bphi  = f[2]
         pval  = f[6]
@@ -184,14 +184,14 @@ function lar_run(lar_input::LarInput)
     end
 
 
-    sq_in = JPEC.Spl.spline_setup(sq_xs, sq_fs, bctype=4)
+    sq_in = Spl.spline_setup(sq_xs, sq_fs, bctype=4)
 
     rzphi_y_nodes = range(0.0, 2π, length=mtau + 1)
     rzphi_fs_nodes = zeros(ma + 1, mtau + 1, 2)
 
     for ia in 1:(ma + 1)
         r = r_nodes[ia]
-        f, f1 = JPEC.Spl.spline_eval(spl, r, 1)
+        f, f1 = Spl.spline_eval(spl, r, 1)
         y4 = f[4]
         q = f[8]
         dψdr = f1[3]
@@ -206,12 +206,13 @@ function lar_run(lar_input::LarInput)
         end
     end
 
-    rz_in = JPEC.Spl.bicube_setup(r_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
+    rz_in = Spl.bicube_setup(r_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
 
     # plasma_eq = inverse_run(
     #     InverseRunInput(nothing,sq_in,rz_in,lar_r0,0.0,psio)
     # )
-    return InverseRunInput(nothing,sq_in,rz_in,lar_r0,0.0,psio)
+
+    # return InverseRunInput(dummy_input,sq_in,rz_in,lar_r0,0.0,psio)
 end
 
 
@@ -286,7 +287,7 @@ function sol_run(
     sqfs[:, 2] = pfac .* (1 * p0fac .- sq_in.xs)
     sqfs[:, 3] .= 0.0
 
-    sq_in = JPEC.SplinesMod.spline_setup(psis, sqfs; bctype=3)
+    sq_in = Spl.spline_setup(psis, sqfs; bctype=3)
     #-----------------------------------------------------------------------
     # compute 2D data
     #-----------------------------------------------------------------------
@@ -306,7 +307,7 @@ function sol_run(
         end
     end
 
-    psi_in = JPEC.SplinesMod.bicube_setup(rs, zs, psifs; bctypex=3, bctypey=3)
+    psi_in = Spl.bicube_setup(rs, zs, psifs; bctypex=3, bctypey=3)
     #-----------------------------------------------------------------------
     # process equilibrium
     #-----------------------------------------------------------------------
