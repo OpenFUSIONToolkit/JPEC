@@ -97,9 +97,16 @@ A container struct for inputs to the `inverse_run` function.
 - `equil_input`: The original `EquilInput` object.
 """
 mutable struct InverseRunInput
-    # Fields for inverse equilibrium solver would be defined here
     equil_input::EquilInput
+
+    sq_in::Any           # 1D spline input profile (e.g. F*Bt, Pressure, q)
+    rz_in::Any           # 2D bicubic spline input for (R,Z) geometry
+
+    ro::Float64          # R axis location
+    zo::Float64          # Z axis location
+    psio::Float64        # Total flux difference |psi_axis - psi_boundary|
 end
+
 
 """
     PlasmaEquilibrium(...)

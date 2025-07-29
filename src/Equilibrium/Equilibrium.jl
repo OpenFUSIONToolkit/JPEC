@@ -10,12 +10,13 @@ using Printf, DifferentialEquations, LinearAlgebra
 include("types.jl")
 include("io.jl")
 include("direct.jl")
-#include("inverse.jl") # Uncomment when inverse.jl is ready
+include("inverse.jl")
 
 # --- Expose types and functions to the user ---
 using .Types: EquilInput, PlasmaEquilibrium, DirectRunInput, InverseRunInput
 using .IO: prepare_solver_input
 using .Direct: direct_run
+using .Inverse: inverse_run
 
 
 export setup_equilibrium, EquilInput, PlasmaEquilibrium
@@ -24,7 +25,7 @@ export setup_equilibrium, EquilInput, PlasmaEquilibrium
 # Uses multiple dispatch to select the correct solver based on input type.
 # Adding a new solver requires adding a new method here.
 _run_solver(input::DirectRunInput) = direct_run(input)
-# _run_solver(input::InverseRunInput) = inverse_run(input) # For future use
+_run_solver(input::InverseRunInput) = inverse_run(input)
 
 """
     setup_equilibrium(equil_input::EquilInput)
