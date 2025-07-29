@@ -311,16 +311,12 @@ function sol_run(
     #-----------------------------------------------------------------------
     # process equilibrium
     #-----------------------------------------------------------------------
-    println("Running Soloviev equilibrium with:")
+    println("Generating Soloviev equilibrium inputs with:")
     println("  mr=$mr, mz=$mz, ma=$ma")
     println("  e=$e, a=$a, r0=$r0")
     println("  q0=$q0, p0fac=$p0fac, b0fac=$b0fac, f0fac=$f0fac")
-
-    plasma_eq = direct_run(
-                           DirectRunInput(equil_in, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
-                          )
     
-    return plasma_eq
+    return DirectRunInput(equil_in, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
 
 end
 

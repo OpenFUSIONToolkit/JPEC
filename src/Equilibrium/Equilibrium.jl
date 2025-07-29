@@ -8,6 +8,11 @@ using Printf, DifferentialEquations, LinearAlgebra
 
 # --- Internal Module Structure ---
 include("EquilibriumTypes.jl")
+include("ReadEquilibrium.jl")
+include("DirectEquilibrium.jl")
+include("InverseEquilibrium.jl")
+include("EquilibriumTypes.jl")
+include("ReadEquilibrium.jl")
 include("DirectEquilibrium.jl")
 include("InverseEquilibrium.jl")
 include("AnalyticEquilibrium.jl")
