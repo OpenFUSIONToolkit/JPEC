@@ -12,13 +12,12 @@ include("io.jl")
 include("direct.jl")
 #include("inverse.jl") # Uncomment when inverse.jl is ready
 
-# --- Expose types and functions to the user ---
-using .Types: EquilInput, PlasmaEquilibrium, DirectRunInput, InverseRunInput
-using .IO: prepare_solver_input
-using .Direct: direct_run
 
 
 export setup_equilibrium, EquilInput, PlasmaEquilibrium
+
+# --- Constants ---
+const mu0 = 4.0 * pi * 1e-7
 
 # --- Internal Solver Dispatch ---
 # Uses multiple dispatch to select the correct solver based on input type.

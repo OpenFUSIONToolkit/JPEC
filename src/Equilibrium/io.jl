@@ -1,23 +1,12 @@
 # src/Equilibrium/io.jl
 
 """
-The `IO` submodule is responsible for reading and parsing raw plasma equilibrium
+The `io.jl` is responsible for reading and parsing raw plasma equilibrium
 data from files. It translates the raw data into the initial data structures and
 fitted splines required by the coordinate solvers.
 """
-module IO
 
-# --- Dependencies ---
-import ..Spl
 
-using Printf
-using ..Types: EquilInput, DirectRunInput
-
-# --- Public API for this submodule ---
-export prepare_solver_input
-
-# --- Constants ---
-const mu0 = 4.0 * pi * 1e-7
 
 """
     prepare_solver_input(equil_in)
@@ -177,4 +166,3 @@ function _read_efit(equil_in::EquilInput)
     return DirectRunInput(equil_in, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
 end
 
-end # module IO
