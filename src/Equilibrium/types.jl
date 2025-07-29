@@ -8,7 +8,7 @@
 """
 module Types
 
-export EquilInput, DirectRunInput, InverseRunInput, PlasmaEquilibrium
+export EquilInput, DirectRunInput, InverseRunInput, LarInput, PlasmaEquilibrium
 
 """
     EquilInput(...)
@@ -142,6 +142,32 @@ mutable struct PlasmaEquilibrium
     ro::Float64
     zo::Float64
     psio::Float64
+end
+
+
+"""
+    LarParams(...)  
+
+A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equilibrium model.
+
+## Fields:
+- `lar_a`: The major radius of the plasma [m].
+- `p00`: The pressure at the magnetic axis [Pa].
+- `p_pres`: The exponent for the pressure profile.
+- `p_sig`: The exponent for the parallel current profile.
+- `sigma0`: The scaling factor for the parallel current profile.
+- `lar_r0`: The reference radius for the q-profile [m].
+- `q0`: The target q-value at the magnetic axis.
+"""
+
+mutable struct LarInput
+    lar_a::Float64
+    p00::Float64
+    p_pres::Float64
+    p_sig::Float64
+    sigma0::Float64
+    lar_r0::Float64
+    q0::Float64
 end
 
 end # module Types
