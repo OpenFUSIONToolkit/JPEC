@@ -1,4 +1,4 @@
-# src/Equilibrium/types.jl
+# src/Equilibrium/EquilibriumTypes.jl
 
 """
 - `EquilInput`:          User-facing input parameters.
@@ -6,7 +6,7 @@
 - `InverseRunInput`:     Internal data structure for the inverse solver.
 - `PlasmaEquilibrium`:   The final, user-facing output object.
 """
-module Types
+module EquilibriumTypes
 
 export EquilInput, DirectRunInput, InverseRunInput, LarInput, PlasmaEquilibrium
 

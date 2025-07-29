@@ -1,17 +1,17 @@
-# src/Equilibrium/direct.jl
+# src/Equilibrium/DirectEquilibrium.jl
 
 """
 The `Direct` submodule contains the logic for the "direct" equilibrium reconstruction method.
 It takes parsed data and splines from the IO module and calculates the final flux-coordinate
 representation of the plasma equilibrium.
 """
-module Direct
+module DirectEquilibrium
 
 # --- Dependencies ---
 import ..Spl
 
 using Printf, LinearAlgebra, DifferentialEquations
-using ..Types: DirectRunInput, PlasmaEquilibrium, EquilInput
+using ..EquilibriumTypes: DirectRunInput, PlasmaEquilibrium, EquilInput
 
 # --- Public API for this submodule ---
 export direct_run

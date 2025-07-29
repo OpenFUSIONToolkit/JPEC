@@ -1,18 +1,18 @@
-# src/Equilibrium/inverse.jl
+# src/Equilibrium/InverseEquilibrium.jl
 
 """
 The `Inverse` submodule contains the logic for transforming an 'inverse' equilibrium
 representation into a straight-fieldline coordinate system and associated quantities.
 It uses bicubic splines for the geometry and supports several surface grid types.
 """
-module Inverse
+module InverseEquilibrium
 
 # --- Dependencies ---
 
 import ..Spl
 
 using LinearAlgebra, Printf
-using ..Types: PlasmaEquilibrium, EquilInput, InverseRunInput
+using ..EquilibriumTypes: PlasmaEquilibrium, EquilInput, InverseRunInput
 
 # --- Public API for this submodule ---
 export inverse_run

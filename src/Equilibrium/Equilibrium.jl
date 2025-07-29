@@ -7,16 +7,15 @@ import ..Spl
 using Printf, DifferentialEquations, LinearAlgebra
 
 # --- Internal Module Structure ---
-include("types.jl")
-include("io.jl")
-include("direct.jl")
-#include("inverse.jl")
+include("EquilibriumTypes.jl")
+include("ReadEquilibrium.jl")
+include("DirectEquilibrium.jl")
 include("InverseEquilibrium.jl")
 
 # --- Expose types and functions to the user ---
-using .Types: EquilInput, PlasmaEquilibrium, DirectRunInput, InverseRunInput
-using .IO: prepare_solver_input
-using .Direct: direct_run
+using .EquilibriumTypes: EquilInput, PlasmaEquilibrium, DirectRunInput, InverseRunInput
+using .ReadEquilibrium: prepare_solver_input
+using .DirectEquilibrium: direct_run
 using .InverseEquilibrium: inverse_run
 
 
