@@ -109,7 +109,7 @@ function sing_find!(ctrl::DconControl, equil::DconEquilibrium, intr::DconInterna
 end
 
 # computes limiter values - function 3 from Fortran DCON
-function sing_lim(intr::DconInternal, cntrl::DconControl, equil::PlasmaEquilibrium)
+function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::PlasmaEquilibrium)
     #declarations 
     itmax = 50
     eps = 1e-10
@@ -255,8 +255,8 @@ function sing_get_ua!(ua::AbstractArray{ComplexF64,3}, intr::DconInternal, ising
     pfac = abs(dpsi)^singp.alpha
 
     # Compute power series via Horner's method
-    ua .= vmat[:,:,:,2*sing_order]   # copy initial term
-    for iorder in (2*sing_order-1):-1:0 #decrement by 1 from 2*sing_order-1 to 0
+    ua .= vmat[:,:,:,2*singp.sing_order]   # copy initial term
+    for iorder in (2*singp.sing_order-1):-1:0 #decrement by 1 from 2*sing_order-1 to 0
         ua .= ua .* sqrtfac .+ vmat[:,:,:,iorder+1]  
         # +1 since Julia arrays are 1-based, Fortran arrays start at 0
     end
@@ -287,13 +287,19 @@ end
 #   u: input array
 # Output:
 #   ca::Array{ComplexF64,3}
-function sing_get_ca!(ca, ising, psifac, u) #TODO: ca is being modified so from Julia conventions, it should be listed first. In Fortran, it is listed last
+function sing_get_ca!(ca::AbstractArray{ComplexF64,3},
+    intr::DconInternal,
+    ising::Int,
+    psifac::Real,
+    u::AbstractArray{ComplexF64,3}) #TODO: ca is being modified so from Julia conventions, it should be listed first. In Fortran, it is listed last
 
     # number of solutions
     msol = size(u,2)
+    mpert = intr.mpert
 
     # call asymptotic solution generator
-    ua = sing_get_ua!(ua, ising, psifac)
+    ua = similar(u)
+    ua = sing_get_ua!(ua,intr, ising, psifac)
 
     # build system matrix temp1 (2*mpert × 2*mpert)
     temp1 = Array{ComplexF64}(undef, 2*mpert, 2*mpert)
@@ -310,7 +316,7 @@ function sing_get_ca!(ca, ising, psifac, u) #TODO: ca is being modified so from 
     temp2 .= F \ temp2
 
     # output coefficients ca (mpert × msol × 2)
-    ca = Array{ComplexF64}(undef, mpert, msol, 2)
+    #ca = Array{ComplexF64}(undef, mpert, msol, 2) #don't think we need this
     ca[:, 1:msol, 1] .= temp2[1:mpert, :]
     ca[:, 1:msol, 2] .= temp2[mpert+1:2*mpert, :]
 
