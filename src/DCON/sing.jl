@@ -91,14 +91,127 @@ function sing_lim()
     q1lim  = sq.fs1[mpsi, 4] #TODO: does sq have a field fs1?
     psilim = psihigh
 
+    #normalize dmlim to interval [0,1)
+    if sas_flag
+        while dmlim > 1.0
+            dmlim -= 1.0
+        end
+        while dmlim < 0.0
+            dmlim += 1.0
+        end
+        #compute qlim
+        qlim = (Int(nn * qlim) + dmlim) / nn
+        while qlim > qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
+            qlim -= 1.0 / nn
+        end
+    end
 
-    
+    #use newton iteration to find psilim
+    if qlim < qmax
+        # Find index jpsi that minimizes |sq.fs[:,4] - qlim|
+        diffs = abs.(sq.fs[:,4] .- qlim) #broadcaasting, subtracts qlim from each element in sq.fs[:,4]
+        jpsi = argmin(diffs)
+
+        # Ensure jpsi is within bounds
+        if jpsi >= mpsi
+            jpsi = mpsi - 1
+        end
+
+        psilim = sq.xs[jpsi]
+        it = 0
+
+        while true
+            it += 1
+
+            # Equivalent to CALL spline_eval(sq, psilim, 1)
+            spline_eval!(sq, psilim, 1) #TODO: I don't think this is the correct call
+
+            q  = sq.f[4]
+            q1 = sq.f1[4]
+
+            dpsi = (qlim - q) / q1
+            psilim += dpsi
+
+            if abs(dpsi) < eps * abs(psilim) || it > itmax
+                break
+            end
+        end
+
+        q1lim = q1
+
+        # abort if not found
+        if it > itmax
+            error("Can't find psilim.")
+        end
+
+    else
+        qlim   = qmax
+        q1lim  = sq.fs1[mpsi,4]
+        psilim = psihigh
+    end
+
+    #= More Julia version of the Newton iteration
+    #use Newton iteration to find psilim
+    if qlim < qmax
+        # Find closest index
+        _, jpsi = findmin(abs.(sq.fs[:,4] .- qlim))
+        jpsi = min(jpsi, mpsi - 1)
+
+        psilim = sq.xs[jpsi]
+        dpsi   = Inf
+        q1     = NaN
+
+        for it in 1:itmax
+            spline_eval!(sq, psilim, 1)
+
+            q  = sq.f[4]
+            q1 = sq.f1[4]
+
+            dpsi    = (qlim - q) / q1
+            psilim += dpsi
+
+            if abs(dpsi) < eps * abs(psilim)
+                return qlim, q1, psilim
+            end
+        end
+
+        error("Can't find psilim within $itmax iterations.")
+
+    else
+        qlim   = qmax
+        q1     = sq.fs1[mpsi,4]
+        psilim = psihigh
+        return qlim, q1, psilim
+    end
+    =#
+
+    #set up record for determining the peak in dW near the boundary.
+    if psiedge < psilim
+        spline_eval!(sq, psiedge, 0) #TODO: I don't think this is the right function call
+
+        qedgestart = Int(sq.f[4])
+
+        size_edge = ceil(Int, (qlim - qedgestart) * nn * nperq_edge)
+
+        dw_edge  = fill(-typemax(Float64) * (1 + ifac), size_edge)
+        q_edge   = [qedgestart + i / (nperq_edge * nn) for i in 0:size_edge-1]
+        psi_edge = zeros(size_edge)
+
+        # monitor some deeper points for an informative profile
+        pre_edge = 1
+        for i in 1:size_edge
+            if q_edge[i] < sq.f[4]
+                pre_edge += 1
+            end
+        end
+    end
 end
 
-
+#computes asymptotic series solutions
 function sing_get_ua() #replace with a single vector 
 end
 
+#computes asymptotic coefficients
 function sing_get_ca() #replace with a single vector - optional with diagnose
 end
 
