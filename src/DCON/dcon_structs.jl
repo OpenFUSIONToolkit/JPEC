@@ -55,6 +55,15 @@ end
 end
 
 @kwdef struct DconInternal
+    mlow::Int = 0 #Copy of delta_mlow, but with limits enforced
+    mhigh::Int = 0 #Copy of delta_mhigh, but with limits enforced
+    mpert::Int = 0 #mpert = mhigh-mlow+1
+    mband::Int = 0 #mband = mpert-1-delta_mband
+    vac_memory::Bool = false
+    keq_out::Bool = false
+    theta_out::Bool = false
+    xlmda_out::Bool = false
+    fkg_kmats_flag::Bool = false
     sol_base::Int = 50
     locstab::Any = nothing # Replace Any with actual type if available
     msing::Int = 0
@@ -135,6 +144,7 @@ end
     bin_bal2::Bool = false
     out_metric::Bool = false
     bin_metric::Bool = false
+    feval_flag::Bool = false
     out_fmat::Bool = false
     bin_fmat::Bool = false
     out_gmat::Bool = false
@@ -159,4 +169,47 @@ end
     msol_ahb::Int = 0
     netcdf_out::Bool = true
     out_fund::Bool = false
-    out_ahg2msc::Bool =
+    out_ahg2msc::Bool = true
+end
+
+@kwdef struct FourFit
+
+    # Spline matrices
+    dmats::CsplineType
+    emats::CsplineType
+    hmats::CsplineType
+    dbats::CsplineType
+    ebats::CsplineType
+    fbats::CsplineType
+    fmats::CsplineType
+    kmats::CsplineType
+    gmats::CsplineType
+    kaats::CsplineType
+    gaats::CsplineType
+    f0mats::CsplineType
+    pmats::CsplineType
+    paats::CsplineType
+    kkmats::CsplineType
+    kkaats::CsplineType
+    r1mats::CsplineType
+    r2mats::CsplineType
+    r3mats::CsplineType
+    akmats::CsplineType
+    bkmats::CsplineType
+    ckmats::CsplineType
+
+    k0s::SplineType
+
+    ipiva::Vector{Int}
+    asmat::Array{ComplexF64,2}
+    bsmat::Array{ComplexF64,2}
+    csmat::Array{ComplexF64,2}
+    jmat::Vector{ComplexF64}
+
+    parallel_threads::Int = 0
+    dcon_kin_threads::Int = 0
+
+    # kinetic ABCDEH mats for sing_mod
+    kwmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
+    ktmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
+end

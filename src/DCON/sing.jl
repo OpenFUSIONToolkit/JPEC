@@ -1,6 +1,8 @@
 # Computations relating to singualar surfaces
+#TODO: Assign types to things? 
 
 using LinearAlgebra #standard Julia library for linear algebra operations
+using LinearAlgebra.LAPACK #required for banded matrix operations
 
 #keep 1-3, 11 is CRUCIAL
 #13-16 are for kinetic DCON so skip for now
@@ -332,23 +334,24 @@ function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{C
     gaatb = zeros(ComplexF64, 2*mband+1, mpert)
     amatlu = zeros(ComplexF64, 3*mband+1, mpert)
     fmatlu = zeros(ComplexF64, 3*mband+1, mpert)
-    # ... and all the other matrices as needed ...
+    temp1 = zeros(ComplexF64, mpert, mpert)
+    #TODO: preallocate the rest of the matrices
 
     # Spline evaluation
-    spline_eval!(sq, psifac, 0)
+    spline_eval(sq, psifac, 0)
     q = sq.f[4]
-    singfac .= mlow .- nn*q .+ collect(0:mpert-1)
+    singfac .= mlow .- nn*q .+ collect(0:mpert-1) #TODO: does this have to be broadcast or is it all just numbers
     singfac .= 1.0 ./ singfac
-    chi1 = twopi * psio
+    chi1 = twopi * psio #TODO: 2*π or 2*pi instead of twopi? -> both defined in Julia
 
     #= kinetic stuff - skip for now
     if kin_flag
-        cspline_eval!(amats, psifac, 0)
-        cspline_eval!(bmats, psifac, 0)
-        cspline_eval!(cmats, psifac, 0)
+        cspline_eval(amats, psifac, 0)
+        cspline_eval(bmats, psifac, 0)
+        cspline_eval(cmats, psifac, 0)
         cspline_eval!(dmats, psifac, 0)
-        cspline_eval!(emats, psifac, 0)
-        cspline_eval!(hmats, psifac, 0)
+        cspline_eval(emats, psifac, 0)
+        cspline_eval(hmats, psifac, 0)
         cspline_eval!(dbats, psifac, 0)
         cspline_eval!(ebats, psifac, 0)
         cspline_eval!(fbats, psifac, 0)
@@ -366,14 +369,39 @@ function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{C
         kwmat = zeros(ComplexF64, mpert, mpert, 6)
         ktmat = zeros(ComplexF64, mpert, mpert, 6)
         for i in 1:6
-            cspline_eval!(kwmats[i], psifac, 0)
-            cspline_eval!(ktmats[i], psifac, 0)
+            cspline_eval(kwmats[i], psifac, 0)
+            cspline_eval(ktmats[i], psifac, 0)
             kwmat[:,:,i] = reshape(kwmats[i].f, mpert, mpert)
             ktmat[:,:,i] = reshape(ktmats[i].f, mpert, mpert)
         end
 
         if fkg_kmats_flag
-            # ... (see Fortran for details, similar translation as above) ...
+            cspline_eval(akmats, psifac, 0)
+            cspline_eval(bkmats, psifac, 0)
+            cspline_eval(ckmats, psifac, 0)
+            cspline_eval(f0mats, psifac, 0)
+            cspline_eval(pmats, psifac, 0)
+            cspline_eval(paats, psifac, 0)
+            cspline_eval(kkmats, psifac, 0)
+            cspline_eval(kkaats, psifac, 0)
+            cspline_eval(r1mats, psifac, 0)
+            cspline_eval(r2mats, psifac, 0)
+            cspline_eval(r3mats, psifac, 0)
+            cspline_eval(gaats, psifac, 0)
+
+            amat = reshape(akmats.f, mpert, mpert)
+            bmat = reshape(bkmats.f, mpert, mpert)
+            cmat = reshape(ckmats.f, mpert, mpert)
+            f0mat = reshape(f0mats.f, mpert, mpert)
+            pmat = reshape(pmats.f, mpert, mpert)
+            paat = reshape(paats.f, mpert, mpert)
+            kkmat = reshape(kkmats.f, mpert, mpert)
+            kkaat = reshape(kkaats.f, mpert, mpert)
+            r1mat = reshape(r1mats.f, mpert, mpert)
+            r2mat = reshape(r2mats.f, mpert, mpert)
+            r3mat = reshape(r3mats.f, mpert, mpert)
+
+            #TODO: reproduce lines 943-956
             # Factor banded matrix, fill in amatlu, call LAPACK, etc.
             # Use LinearAlgebra.LAPACK.gbtrf! and gbtrs! for banded solves
             # Fill in fmat, kmat, kaat, etc.
@@ -389,6 +417,7 @@ function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{C
             eaat = emat .- 2 .* ktmat[:,:,5]
             b1mat = ifac * dbat
             # ... (rest of the kinetic matrix setup, as above) ...
+            #TODO: reproduc lines 977-1157
         end
         # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else =#
@@ -405,7 +434,34 @@ function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{C
         # Factor Hermitian matrix amat, solve for bmat and cmat
         # Use LinearAlgebra.LAPACK.hetrf! and hetrs!
         # Fill in fmatb, gmatb, kmatb as above
-    #end
+
+        #TODO: is this right? ChatGPT says it is equivalent so that is probably true
+        F = cholesky(Hermitian(amat, :L))  # factorization using the lower triangle
+        bmat_sol = F \ bmat
+        cmat_sol = F \ cmat
+
+        # copy ideal Hermitian matrices F and G
+        fill!(fmatb, 0.0 + 0.0im)
+        fill!(gmatb, 0.0 + 0.0im)
+        iqty = 1
+        @inbounds for jpert in 1:mpert
+            for ipert in jpert:min(mpert, jpert + mband)
+                fmatb[1 + ipert - jpert, jpert] = fmats.f[iqty]
+                gmatb[1 + ipert - jpert, jpert] = gmats.f[iqty]
+                iqty += 1
+            end
+        end
+
+        #copy ideal non-Hermitian banded matrix K
+        fill!(kmatb, 0.0 + 0.0im)
+        iqty = 1
+        @inbounds for jpert in 1:mpert
+            for ipert in max(1, jpert - mband):min(mpert, jpert + mband)
+                kmatb[1 + mband + ipert - jpert, jpert] = kmats.f[iqty]
+                iqty += 1
+            end
+        end
+    #end #this is the end of the IFElse for when we re-implement kinetic stuff
 
     # Compute du1 and du2
     du .= 0
@@ -433,12 +489,48 @@ function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{C
         # end
     #end
 
+    # assuming all arrays are appropriately defined and typed,
+# and that zgbmv, zgbtrf, zgbtrs are available wrappers for LAPACK
+
+    du .= 0  # du = 0
+    #=
+    if kin_flag
+        for isol in 1:msol
+            du[:, isol, 1] .= u[:, isol, 2]
+            zgbmv('N', mpert, mpert, mband, mband, -one, kmatb,
+                  2*mband + 1, u[:, isol, 1], 1, one, du[:, isol, 1], 1)
+        end
+
+        info = Ref{Int32}()
+        ipiv = zeros(Int32, mpert)  # assuming pivot array
+        fmatlu .= 0
+
+        zgbtrf(mpert, mpert, mband, mband, fmatlu, 3*mband + 1, ipiv, info)
+        if info[] != 0
+            message = "zgbtrf: fmat singular at psifac = $psifac, ipert = $(info[]), reduce delta_mband"
+            error(message)
+        end
+
+        zgbtrs("N", mpert, mband, mband, msol, fmatlu, 3*mband + 1, ipiv, du, mpert, info)
+    
+        for isol in 1:msol
+            zgbmv('N', mpert, mpert, mband, mband, one, gaatb,
+                  2*mband + 1, du[:, isol, 1], 1, zero(one), du[:, isol, 2], 1)
+        end
+        =#
+    #else #else for if kin_flag -> we are ignore kinetic rn
+        for isol in 1:msol
+            du[:, isol, 1] .= u[:, isol, 2]
+            du[:, isol, 2] .= -amat \ u[:, isol, 1]  # solve Hermitian system
+        end
+    #end #end for if kin_flag -> we are ignore kinetic rn
+
+
     # Store u-derivative and xss
-    global ud
+    global ud #TODO: UH OH why is this a global?!?
     ud[:,:,1] = du[:,:,1]
     ud[:,:,2] = -bmat * du[:,:,1] - cmat * u[:,:,1]
 
-    return nothing
 end
 
 #= Matrix stuff- ignore for now
