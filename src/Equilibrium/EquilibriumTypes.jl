@@ -6,6 +6,9 @@
 - `InverseRunInput`:     Internal data structure for the inverse solver.
 - `PlasmaEquilibrium`:   The final, user-facing output object.
 """
+module EquilibriumTypes
+
+export EquilInput, DirectRunInput, InverseRunInput, LarInput, SolInput, PlasmaEquilibrium
 
 """
     EquilInput(...)
@@ -191,3 +194,39 @@ mutable struct LarInput
 
     zeroth ::Bool      #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
 end
+
+"""
+    SolInput(...)  
+
+A mutable struct holding parameters for the Soloviev analytical equilibrium.
+
+## Fields:
+
+- `mr`: Number of radial grid zones
+- `mz`: Number of axial grid zones
+- `ma`: Number of flux grid zones
+- `e`: Elongation
+- `a`: Minor radius
+- `r0`: Major radius
+- `q0`: Safety factor at the o-point
+- `p0fac`: Scales on axis pressure (s*P. beta changes. Phi,q constant)
+- `b0fac`: Scales on toroidal field (s*Phi,s*f,s^2*P. bt changes. Shape,beta constant)
+- `f0fac`: Scales on toroidal field (s*f. bt,q changes. Phi,p,bp constant)
+"""
+
+mutable struct SolInput
+    mr::Int
+    mz::Int
+    ma::Int
+
+    e::Float64
+    a::Float64
+    r0::Float64
+    q0::Float64
+
+    p0fac::Float64
+    b0fac::Float64
+    f0fac::Float64
+end
+
+end # module Types
