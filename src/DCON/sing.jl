@@ -306,8 +306,55 @@ function sing_der(neq::Int, psifac::Float64, u::Array{ComplexF64,3}, du::Array{C
     gaatb = zeros(ComplexF64, 2*mband+1, mpert)
     amatlu = zeros(ComplexF64, 3*mband+1, mpert)
     fmatlu = zeros(ComplexF64, 3*mband+1, mpert)
+#= The fully written out version 30+ lines but slightly faster
+    # 2D arrays (mpert x mpert)
     temp1 = zeros(ComplexF64, mpert, mpert)
-    #TODO: preallocate the rest of the matrices
+    temp2 = zeros(ComplexF64, mpert, mpert)
+    amat  = zeros(ComplexF64, mpert, mpert)
+    bmat  = zeros(ComplexF64, mpert, mpert)
+    cmat  = zeros(ComplexF64, mpert, mpert)
+    dmat  = zeros(ComplexF64, mpert, mpert)
+    emat  = zeros(ComplexF64, mpert, mpert)
+    hmat  = zeros(ComplexF64, mpert, mpert)
+    baat  = zeros(ComplexF64, mpert, mpert)
+    caat  = zeros(ComplexF64, mpert, mpert)
+    eaat  = zeros(ComplexF64, mpert, mpert)
+    dbat  = zeros(ComplexF64, mpert, mpert)
+    ebat  = zeros(ComplexF64, mpert, mpert)
+    fmat  = zeros(ComplexF64, mpert, mpert)
+    kmat  = zeros(ComplexF64, mpert, mpert)
+    gmat  = zeros(ComplexF64, mpert, mpert)
+    kaat  = zeros(ComplexF64, mpert, mpert)
+    gaat  = zeros(ComplexF64, mpert, mpert)
+    pmat  = zeros(ComplexF64, mpert, mpert)
+    paat  = zeros(ComplexF64, mpert, mpert)
+    umat  = zeros(ComplexF64, mpert, mpert)
+    aamat = zeros(ComplexF64, mpert, mpert)
+    b1mat = zeros(ComplexF64, mpert, mpert)
+    bkmat = zeros(ComplexF64, mpert, mpert)
+    bkaat = zeros(ComplexF64, mpert, mpert)
+    kkmat = zeros(ComplexF64, mpert, mpert)
+    kkaat = zeros(ComplexF64, mpert, mpert)
+    r1mat = zeros(ComplexF64, mpert, mpert)
+    r2mat = zeros(ComplexF64, mpert, mpert)
+    r3mat = zeros(ComplexF64, mpert, mpert)
+    f0mat = zeros(ComplexF64, mpert, mpert)
+
+    # 3D arrays (mpert x mpert x 6)
+    kwmat = zeros(ComplexF64, mpert, mpert, 6)
+    ktmat = zeros(ComplexF64, mpert, mpert, 6)
+=#
+
+    #TODO: This seems to work (and ChatGPT claims it will). Could be bad though
+    names_2d = [:temp1, :temp2, :amat, :bmat, :cmat, :dmat, :emat, :hmat, :baat, :caat, :eaat,
+            :dbat, :ebat, :fmat, :kmat, :gmat, :kaat, :gaat, :pmat, :paat, :umat, :aamat,
+            :b1mat, :bkmat, :bkaat, :kkmat, :kkaat, :r1mat, :r2mat, :r3mat, :f0mat]
+
+    for name in names_2d
+        @eval $name = zeros(ComplexF64, mpert, mpert)
+    end
+    kwmat = zeros(ComplexF64, mpert, mpert, 6)
+    ktmat = zeros(ComplexF64, mpert, mpert, 6)
 
     # Spline evaluation
     spline_eval(sq, psifac, 0)
