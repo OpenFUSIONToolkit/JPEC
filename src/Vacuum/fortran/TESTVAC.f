@@ -31,6 +31,7 @@ c-----------------------------------------------------------------------
       
       ! REAL(r8) :: xs, zs, xt, zt, xtp, ztp
       ! INTEGER :: n
+      CALL defglo(mthvac)
 
       xs = 2.1629189218489446_r8
       zs = 0.49099087247571593_r8
@@ -40,7 +41,6 @@ c-----------------------------------------------------------------------
       ztp = -0.13298631469337879_r8
       n = 1
 
-      CALL defglo(mthvac)
       CALL green
 !       CALL mscvac(wv,mpert,mtheta,mthvac,complex_flag,kernelsignin,
 !      $                   walflag, farwalflag, grriio, xzptso)
