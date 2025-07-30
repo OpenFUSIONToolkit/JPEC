@@ -1,10 +1,8 @@
-# src/Equilibrium/InverseEquilibrium.jl
-
-"""
-The `Inverse` submodule contains the logic for transforming an 'inverse' equilibrium
+#=
+This contains the logic for transforming an 'inverse' equilibrium
 representation into a straight-fieldline coordinate system and associated quantities.
 It uses bicubic splines for the geometry and supports several surface grid types.
-"""
+=#
 
 
 # --- Lagrange Polynomial Extrapolation ---
@@ -128,17 +126,18 @@ end
 
 
 
-"""
-    inverse_run(input::InverseRunInput)
+# """
+#     equilibrium_solver(input::InverseRunInput)
 
-Main routine for inverse equilibrium analysis.
+# Main routine for inverse equilibrium analysis.
 
-Arguments:
-    - input: InverseRunInput struct containing all splines and parameters.
+# Arguments:
+#     - input: InverseRunInput struct containing all splines and parameters.
 
-Returns:
-    - PlasmaEquilibrium object (as in direct_run).
-"""
+# Returns:
+#     - PlasmaEquilibrium object (as in direct_run).
+# """
+
 # function inverse_run(input::InverseRunInput)
 #     equil_params = deepcopy(input.equil_input)
 #     sq_in = deepcopy(input.sq_in)
@@ -367,8 +366,9 @@ Returns:
 #     return PlasmaEquilibrium(equil_params, sq, rzphi, eqfun, ro, zo, psio)
 # end
 
+
 """
-    inverse_run(raw_profile::InverseRunInput) -> PlasmaEquilibrium
+    equilibrium_solver(raw_profile::InverseRunInput) -> PlasmaEquilibrium
 
 Reconstructs a magnetic equilibrium from a CHEASE2 inverse input profile.
 This routine fits input data to splines, performs transformation to
@@ -381,7 +381,7 @@ on the prescribed flux grid.
 # Returns
 - `PlasmaEquilibrium`: A fully processed equilibrium structure for simulation.
 """
-function inverse_run(raw_profile::InverseRunInput)::PlasmaEquilibrium
+function equilibrium_solver(raw_profile::InverseRunInput)::PlasmaEquilibrium
     println("--- Starting Inverse Equilibrium Processing ---")
 
     # --- Unpack input

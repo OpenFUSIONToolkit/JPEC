@@ -1,10 +1,7 @@
-# src/Equilibrium/AnalyticEquilibrium.jl
-
-"""
-The `Analytic` submodule builds analytic equilibria from numerical inputs (e.g. `lar.in`, `sol.in`),
-bypassing the need for file-based equilibrium data.
-"""
-
+#=
+Analytic equilibrium functions that prepare all the necessary equilibrium
+input information for a direct or inverse equilibrium construction
+=#
 
 """
     lar_init_conditions(rmin, sigma_type, params)
@@ -20,7 +17,6 @@ Also evaluates the initial derivative using the analytic model.
 - `r`: Physical radius corresponding to `rmin * lar_a`.
 - `y`: Initial state vector of length 5.
 """
-
 function lar_init_conditions(rmin::Float64, lar_input::LarInput)
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
@@ -60,7 +56,7 @@ at a given radius `r`, using the current state vector `y` and equilibrium parame
 - 0. The result is stored in-place in `dy`.
 """
 
-function lar_der(dy::Vector{Float64}, r::Float64, y::Vector{Float64}, lar_input::LarInput)
+function lar_der(dy::Vector{Float64}, r::Float64, y::Vector{Float64}, lar_input::LargeAspectRatioConfig)
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
 
@@ -108,7 +104,7 @@ defined by `lar_input`, and returns the full solution table including derived qu
  - working on it not yet implemented
 """
 
-function lar_run(lar_input::LarInput)
+function lar_run(lar_input::LargeAspectRatioConfig)
     rmin = 1e-4
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0

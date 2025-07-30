@@ -1,10 +1,9 @@
-# src/Equilibrium/DirectEquilibrium.jl
-
-"""
-The `Direct` submodule contains the logic for the "direct" equilibrium reconstruction method.
+#=
+This file contains the logic for the "direct" equilibrium reconstruction method.
 It takes parsed data and splines from the IO module and calculates the final flux-coordinate
 representation of the plasma equilibrium.
-"""
+=#
+
 
 # --- Internal Helper Structs ---
 """
@@ -296,8 +295,10 @@ function direct_fl_int(
     u0[2] = sqrt((r_start - ro)^2 + (z_start - zo)^2) # Initial rfac
     tspan = (0.0, 2.0 * pi)
 
+    equil_input = raw_profile.config.control
+
     params = FieldLineDerivParams(ro, zo, raw_profile.psi_in, raw_profile.sq_in, raw_profile.psio,
-        raw_profile.equil_input.power_bp, raw_profile.equil_input.power_b, raw_profile.equil_input.power_r)
+    equil_input.power_bp, equil_input.power_b, equil_input.power_r)
 
     # Use a callback to refine the solution at each step to stay on the flux surface
     saved_values = Vector{Vector{Float64}}()
@@ -415,7 +416,7 @@ end
 
 
 """
-    direct_run(raw_profile)
+    equilibrium_solver(raw_profile)
 
 The main driver for the direct equilibrium reconstruction. It orchestrates the entire
 process from finding the magnetic axis to integrating along field lines and
@@ -430,11 +431,11 @@ constructing the final coordinate and physics quantity splines.
   including the profile spline (`sq`), the coordinate mapping spline (`rzphi`), and
   the physics quantity spline (`eqfun`).
 """
-function direct_run(raw_profile::DirectRunInput)
+function equilibrium_solver(raw_profile::DirectRunInput)
     println("--- Starting Direct Equilibrium Processing ---")
 
     # 1. Unpack initial data
-    equil_params = raw_profile.equil_input
+    equil_params = raw_profile.config.control
     sq_in = raw_profile.sq_in
     psi_in = raw_profile.psi_in
     psio = raw_profile.psio
@@ -472,7 +473,7 @@ function direct_run(raw_profile::DirectRunInput)
 
 
     normalized_profile = DirectRunInput(
-        raw_profile.equil_input,
+        raw_profile.config,
         raw_profile.sq_in,
         psi_in_norm, 
         raw_profile.rmin,
@@ -623,6 +624,6 @@ function direct_run(raw_profile::DirectRunInput)
 
     println("--- Direct Equilibrium Processing Finished ---")
 
-    return PlasmaEquilibrium(equil_params, sq, rzphi, eqfun, ro, zo, psio)
+    return PlasmaEquilibrium(raw_profile.config, sq, rzphi, eqfun, ro, zo, psio)
 end
 
