@@ -23,16 +23,16 @@ OBJS = \
 	spline_c_api.o
 
 # 4.  Targets
-all: $(OUTLIB)
+
+all : $(OUTLIB) 
 
 $(OUTLIB): $(OBJS)
 	$(FC) $(LDFLAGS) -o $@ $^ $(LIBS)
-	@mkdir -p $(DEPSDIR)
-	mv -f $(OUTLIB)  $(DEPSDIR)
+	mv $(OUTLIB) ../../../deps/
 
 clean:
-	rm -f *.o *.mod *.original *.dylib *.dll *.so
-
+	rm -f *.o *.mod *.original *.dylib
+	
 # 5. dependencies
 spline.o: defs.o
 cspline.o: defs.o spline.o
