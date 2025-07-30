@@ -38,7 +38,7 @@ returning the final processed `PlasmaEquilibrium` object.
 function setup_equilibrium(path::String = "equil.toml")
     return setup_equilibrium( EquilConfig(path))
 end
-function setup_equilibrium(eq_config::EquilConfig)
+function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
 
     @printf "Equilibrium file: %s\n" eq_config.control.eq_filename
 
@@ -49,11 +49,19 @@ function setup_equilibrium(eq_config::EquilConfig)
     elseif eq_type == "chease2"
         eq_input = read_chease2(eq_config)
     elseif eq_type == "lar"
-        lar_config = LargeAspectRatioConfig(eq_config.control.eq_filename)
-        eq_input = lar_run(lar_config)
+
+        if additional_input === nothing
+            additional_input = LargeAspectRatioConfig(eq_config.control.eq_filename)
+        end
+
+        eq_input = lar_run(eq_config, additional_input)
     elseif eq_type == "sol"
-        sol_config = SolevevConfig(eq_config.control.eq_filename)
-        eq_input = sol_run(sol_config)
+
+        if additonal_input === nothing
+            additional_input = SolevevConfig(eq_config.control.eq_filename) 
+        end
+
+        eq_input = sol_run(eq_config, additional_input)
     else
         error("Equilibrium type $(equil_in.eq_type) is not implemented")
     end

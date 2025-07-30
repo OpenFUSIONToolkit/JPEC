@@ -11,13 +11,13 @@ Also evaluates the initial derivative using the analytic model.
 
 ## Arguments:
 - `rmin`: Normalized starting radius (as a fraction of `lar_a`).
-- `lar_input`: A `LarInput` object containing equilibrium parameters.
+- `lar_input`: A `LargeAspectRatioConfig` object containing equilibrium parameters.
 
 ## Returns:
 - `r`: Physical radius corresponding to `rmin * lar_a`.
 - `y`: Initial state vector of length 5.
 """
-function lar_init_conditions(rmin::Float64, lar_input::LarInput)
+function lar_init_conditions(rmin::Float64, lar_input::LargeAspectRatioConfig)
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
     q0 = lar_input.q0
@@ -50,7 +50,7 @@ at a given radius `r`, using the current state vector `y` and equilibrium parame
 - `dy`: A preallocated vector where the computed derivatives will be stored (in-place).
 - `r`: The radial position at which the derivative is evaluated.
 - `y`: The current state vector.
-- `lar_input`: A `LarInput` object containing equilibrium shaping parameters.
+- `lar_input`: A `LargeAspectRatioConfig` object containing equilibrium shaping parameters.
 
 ## Returns:
 - 0. The result is stored in-place in `dy`.
@@ -98,13 +98,13 @@ Solves the LAR (Large Aspect Ratio) plasma equilibrium ODE system using analytic
 defined by `lar_input`, and returns the full solution table including derived quantities.
 
 ## Arguments:
-- `lar_input`: A `LarInput` object containing profile and geometric parameters.
+- `lar_input`: A `LargeAspectRatioConfig` object containing profile and geometric parameters.
 
 ## Returns:
  - working on it not yet implemented
 """
 
-function lar_run(lar_input::LargeAspectRatioConfig)
+function lar_run(equil_input::EquilConfig, lar_input::LargeAspectRatioConfig)
     rmin = 1e-4
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
@@ -204,11 +204,9 @@ function lar_run(lar_input::LargeAspectRatioConfig)
     end
 
     rz_in = Spl.bicube_setup(r_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
-    # plasma_eq = inverse_run(
-    #     InverseRunInput(nothing,sq_in,rz_in,lar_r0,0.0,psio)
-    # )
 
-    return sq_in,rz_in
+    return InverseRunInput(equil_input, sq_in, rz_in, lar_r0, 0.0, psio)
+    
 end
 
 
@@ -231,8 +229,8 @@ This is a Julia version of the Fortran code in sol.f, implementing Soloviev's an
 - `plasma_eq`: PlasmaEquilibrium object
 """
 function sol_run(
-                 equil_in::EquilInput,
-                 sol_inputs::SolInput
+                 equil_inputs::EquilConfig,
+                 sol_inputs::SolevevConfig
                 )
 
     mr = sol_inputs.mr
@@ -322,6 +320,6 @@ function sol_run(
     println("  e=$e, a=$a, r0=$r0")
     println("  q0=$q0, p0fac=$p0fac, b0fac=$b0fac, f0fac=$f0fac")
     
-    return DirectRunInput(equil_in, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
+    return DirectRunInput(equil_inputs, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
 
 end
