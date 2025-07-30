@@ -392,15 +392,15 @@ function sing_der(neq::Int,
 
     #= kinetic stuff - skip for now
     if ctrl.kin_flag
-        cspline_eval!(ffit.amats, psifac, 0)
-        cspline_eval!(ffit.bmats, psifac, 0)
-        cspline_eval!(ffit.cmats, psifac, 0)
-        cspline_eval!(ffit.dmats, psifac, 0)
-        cspline_eval!(ffit.emats, psifac, 0)
-        cspline_eval!(ffit.hmats, psifac, 0)
-        cspline_eval!(ffit.dbats, psifac, 0)
-        cspline_eval!(ffit.ebats, psifac, 0)
-        cspline_eval!(ffit.fbats, psifac, 0)
+        cspline_eval(ffit.amats, psifac, 0)
+        cspline_eval(ffit.bmats, psifac, 0)
+        cspline_eval(ffit.cmats, psifac, 0)
+        cspline_eval(ffit.dmats, psifac, 0)
+        cspline_eval(ffit.emats, psifac, 0)
+        cspline_eval(ffit.hmats, psifac, 0)
+        cspline_eval(ffit.dbats, psifac, 0)
+        cspline_eval(ffit.ebats, psifac, 0)
+        cspline_eval(ffit.fbats, psifac, 0)
 
         amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
         bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
@@ -415,8 +415,8 @@ function sing_der(neq::Int,
         kwmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
         ktmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
         for i in 1:6
-            cspline_eval!(ffit.kwmats[i], psifac, 0)
-            cspline_eval!(ffit.ktmats[i], psifac, 0)
+            cspline_eval(ffit.kwmats[i], psifac, 0)
+            cspline_eval(ffit.ktmats[i], psifac, 0)
             kwmat[:,:,i] = reshape(ffit.kwmats[i].f, intr.mpert, intr.mpert)
             ktmat[:,:,i] = reshape(ffit.ktmats[i].f, intr.mpert, intr.mpert)
         end
@@ -468,12 +468,12 @@ function sing_der(neq::Int,
         # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else =#
         #TODO: find out what this function is actually called now and what to pass in
-        cspline_eval!(ffit.amats, psifac, 0)
-        cspline_eval!(ffit.bmats, psifac, 0)
-        cspline_eval!(ffit.cmats, psifac, 0)
-        cspline_eval!(ffit.fmats, psifac, 0)
-        cspline_eval!(ffit.kmats, psifac, 0)
-        cspline_eval!(ffit.gmats, psifac, 0)
+        cspline_eval(ffit.amats, psifac, 0)
+        cspline_eval(ffit.bmats, psifac, 0)
+        cspline_eval(ffit.cmats, psifac, 0)
+        cspline_eval(ffit.fmats, psifac, 0)
+        cspline_eval(ffit.kmats, psifac, 0)
+        cspline_eval(ffit.gmats, psifac, 0)
         amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
         bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
         cmat = reshape(ffit.cmats.f, intr.mpert, intr.mpert)
