@@ -295,7 +295,7 @@ end
 
 
 
-Base.@kwdef mutable struct EquilibriumParameters
+@kwdef mutable struct EquilibriumParameters
     ro::Union{Nothing, Float64} = nothing # R-coordinate of the magnetic axis [m]
     zo::Union{Nothing, Float64} = nothing # Z-coordinate of the magnetic axis [m]
     psio::Union{Nothing, Float64} = nothing # Total flux difference |Ψ_axis - Ψ_boundary| [Weber / radian]
