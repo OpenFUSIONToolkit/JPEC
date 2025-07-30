@@ -5,6 +5,7 @@ include("dcon.jl")
 include("Ode.jl")
 include("sing.jl")
 include("fourfit.jl")
+include("utils.jl")
 
 const Version = "JULIA-PORT-1.0"
 

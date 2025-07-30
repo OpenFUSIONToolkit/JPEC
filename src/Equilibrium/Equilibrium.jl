@@ -1,4 +1,3 @@
-# src/Equilibrium/Equilibrium.jl
 module Equilibrium
 
 # --- Module-level Dependencies ---
@@ -182,7 +181,7 @@ function equilibrium_global_parameters!(pe::PlasmaEquilibrium)
     mu0 = 4π * 1e-7
 
     # Use separatrix geometry
-    rsep, zsep, rext, _ = equil_out_sep_find!(pe)
+    rsep, zsep, rext, _ = equilibrium_separatrix_find!(pe)
 
     rmean = (rsep[2] + rsep[1]) / 2
     amean = (rsep[2] - rsep[1]) / 2

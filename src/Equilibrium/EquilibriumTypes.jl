@@ -334,8 +334,7 @@ end
     verbose::Bool = false # Whether to print verbose output
     diagnose_src::Bool = false # Whether to diagnose source data
     diagnose_maxima::Bool = false # Whether to diagnose maxima in the equilibrium
-    
-    voluSme::Union{Nothing,Float64} = nothing # Plasma volume [m³]
+    volume::Union{Nothing,Float64} = nothing # Plasma volume [m³]
     betat::Union{Nothing,Float64} = nothing # Toroidal beta (normalized pressure) at the axis
     betan::Union{Nothing,Float64} = nothing # Normalized beta at the axis
     betaj::Union{Nothing,Float64} = nothing # Total beta at the axis
