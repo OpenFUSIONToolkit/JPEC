@@ -34,7 +34,7 @@ function MainProgram(in_path::String)
 #  -----------------------------------------------------------------------
 #  TODO:     optionally reform the eq splines to concentrate at true truncation (EQUIL TEAM)
 #  -----------------------------------------------------------------------
-    sing_lim!(intr, ctrl, equil)  # determine if qhigh is truncating before psihigh
+    #sing_lim!(intr, ctrl, equil)  # determine if qhigh is truncating before psihigh
 #. This needs to be handled
 #    IF(psilim /= psihigh .AND. reform_eq_with_psilim)THEN
 #      CALL equil_read(out_unit, psilim) # this needs to be like plasma_eq = LoadEquilibrium(psilim) 
@@ -70,13 +70,13 @@ function MainProgram(in_path::String)
 # -----------------------------------------------------------------------
 #      define poloidal mode numbers.
 # -----------------------------------------------------------------------
-    sing_find!(ctrl, intr, equil)
+    sing_find!(ctrl, equil, intr)
     if ctrl.cyl_flag
       intr.mlow = ctrl.delta_mlow
       intr.mhigh = ctrl.delta_mhigh
     elseif ctrl.sing_start == 0
-      intr.mlow = min(ctrl.nn * equil.qmin, zero) - 4 - ctrl.delta_mlow
-      intr.mhigh = ctrl.nn * equil.qmax + ctrl.delta_mhigh
+      intr.mlow = -4 - ctrl.delta_mlow # TODO: remove this once equil.qmin is added min(ctrl.nn * equil.qmin, zero) - 4 - ctrl.delta_mlow
+      intr.mhigh = 20 # TODO: same as above # ctrl.nn * equil.qmax + ctrl.delta_mhigh
     else
       intr.mmin = typemax(typeof(sing[1].m))  # HUGE in Fortran
       for ising in Int(ctrl.sing_start):intr.msing
@@ -95,19 +95,19 @@ function MainProgram(in_path::String)
 # TODO: need to tie in the equilibrium quantities.
 # -----------------------------------------------------------------------
     if ctrl.mat_flag || ctrl.ode_flag
-      if ctrl.verbose
-        println("   q0 = $(equil.q0), qmin = $(equil.qmin), qmax = $(equil.qmax), q95 = $(equil.q95)")
-        println("   sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
-        println("   betat = $(equil.betat), betan = $(equil.betan), betap1 = $(equil.betap1)")
-        println("   nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
-        println(" Fourier analysis of metric tensor components")
-      end
+      # if ctrl.verbose # TODO: add back in once equil params are here
+      #   println("   q0 = $(equil.q0), qmin = $(equil.qmin), qmax = $(equil.qmax), q95 = $(equil.q95)")
+      #   println("   sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
+      #   println("   betat = $(equil.betat), betan = $(equil.betan), betap1 = $(equil.betap1)")
+      #   println("   nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
+      #   println(" Fourier analysis of metric tensor components")
+      # end
 
-      fourfit_make_metric()
+      fourfit_make_metric(equil.rzphi, equil.sq) #TODO: replace this with structures once fourfit.jl fucntion is reworked
       if ctrl.verbose
         println("Computing F, G, and K Matrices")
       end
-      fourfit_make_matrix(out_fund)
+      fourfit_make_matrix(out_fund) #TODO: what is out_fund? 
       println("mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband), nn = $(ctrl.nn), sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
 
  #     if kin_flag

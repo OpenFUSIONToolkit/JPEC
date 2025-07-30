@@ -50,7 +50,7 @@ For each rational surface found, a `NamedTuple` with:
 
 is pushed to `sing_surf_data`.
 """
-function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
+function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
 
     # Define functions to evaluate q and its first derivative
     # TODO: confirm that this is the correct way to get spline data
@@ -76,14 +76,14 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
             it = 0
             psi0 = psiex[iex-1]
             psi1 = psiex[iex]
-            psifac = equil.psilow
+            psifac =  0.01 # TODO: JMH - replace with equil.psilow
 
             # Bisection method to find singular surface
             while it < itmax
                 it += 1
                 psifac = (psi0 + psi1)/2
-                singfac = (m - nn * qval(psifac)) * dm
-                if abs(singfac) <= 1e-12
+                singfac = (m - ctrl.nn * qval(psifac)) * dm
+                if abs(singfac) <= 1e-8
                     break
                 elseif singfac > 0
                     psi0 = psifac
@@ -95,12 +95,12 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
             if it == itmax
                 @warn "Bisection did not converge for m = $m"
             else
-                push!(intr.sing, (
-                    m = m,
-                    psifac = psifac,
-                    rho = sqrt(psifac),
-                    q = m / nn,
-                    q1 = q1val(psifac),
+                push!(intr.sing, SingType(
+                        m = m,
+                        psifac = psifac,
+                        rho = sqrt(psifac),
+                        q = m / ctrl.nn,
+                        q1 = q1val(psifac),
                 ))
             end
             m += dm

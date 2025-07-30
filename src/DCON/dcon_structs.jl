@@ -68,7 +68,7 @@ end
     locstab::Any = nothing # Replace Any with actual type if available
     msing::Int = 0
     kmsing::Int = 0
-    sing::Union{Nothing, Vector{SingType}} = nothing
+    sing::Union{Nothing, Vector{SingType}} = SingType[]
     kinsing::Union{Nothing, Vector{SingType}} = nothing
     psilim::Float64 = 0.0
     qlim::Float64 = 0.0
