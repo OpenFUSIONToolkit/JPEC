@@ -551,13 +551,9 @@ function ode_unorm(sing_flag::Bool)
     return
 end
 
-<<<<<<< Updated upstream
 function ode_fixup(intr::DconInternal, odet::OdeState, dout::DconOutput, sing_flag::Bool, test::Bool)
     # ...existing code... --> diagnose stuff would go here
-=======
-function ode_fixup(sing_flag::Bool, test::Bool)
->>>>>>> Stashed changes
-
+    
     secondary = false
     mask = trues(2, odet.msol)
     jmax = zeros(Int, 1)
