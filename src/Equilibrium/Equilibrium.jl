@@ -14,11 +14,7 @@ include("InverseEquilibrium.jl")
 include("AnalyticEquilibrium.jl")
 
 # --- Expose types and functions to the user ---
-using .EquilibriumTypes: EquilInput, PlasmaEquilibrium, DirectRunInput, InverseRunInput, LarInput, SolInput
-using .ReadEquilibrium: prepare_solver_input
-using .DirectEquilibrium: direct_run
-using .InverseEquilibrium: inverse_run
-using .AnalyticEquilibrium: lar_run, sol_run
+
 
 export setup_equilibrium #, EquilInput, PlasmaEquilibrium
 

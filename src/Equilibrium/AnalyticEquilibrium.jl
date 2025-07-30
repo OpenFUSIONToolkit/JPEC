@@ -5,15 +5,6 @@ The `Analytic` submodule builds analytic equilibria from numerical inputs (e.g. 
 bypassing the need for file-based equilibrium data.
 """
 
-module AnalyticEquilibrium
-
-# --- Dependencies ---
-import ..Spl
-
-using Printf, DifferentialEquations, LinearAlgebra
-using ..EquilibriumTypes: InverseRunInput, LarInput, SolInput, DirectRunInput, EquilInput
-
-export lar_run, sol_run
 
 """
     lar_init_conditions(rmin, sigma_type, params)
@@ -337,5 +328,4 @@ function sol_run(
     
     return DirectRunInput(equil_in, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
 
-end
 end
