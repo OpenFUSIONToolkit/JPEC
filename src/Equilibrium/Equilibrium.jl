@@ -17,7 +17,7 @@ include("AnalyticEquilibrium.jl")
 
 # --- Expose types and functions to the user ---
 
-export setup_equilibrium, EquilConfig,EquilControl, EquilOutput, PlasmaEquilibrium
+export setup_equilibrium, EquilConfig,EquilControl, EquilOutput, PlasmaEquilibrium, EquilibriumParameters
 
 # --- Constants ---
 const mu0 = 4.0 * pi * 1e-7
@@ -226,7 +226,7 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
 
     equil.params.qextrema_psi = psiexl
     equil.params.qextrema_q = qexl
-    equil.params.mextrama = length(psiexl)
+    equil.params.mextrema = length(psiexl)
     # Compute derived q-values
     q0 = sq.fs[1, 4] - sq.fs1[1, 4] * sq.xs[1]
     qmax_edge = sq.fs[end, 4]

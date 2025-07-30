@@ -132,7 +132,7 @@ Compute and set limiter values for the DCON analysis.
 Modifies fields in `intr` and `ctrl` to set limiter locations and related quantities.
 """
 # computes limiter values - function 3 from Fortran DCON
-function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, eqCtrl::JPEC.Equilibrium.EquilibriumControl, eqPrm::JPEC.Equilibrium.EquilibriumParameters)
+function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, eqCtrl::JPEC.Equilibrium.EquilControl, eqPrm::JPEC.Equilibrium.EquilibriumParameters)
     #declarations 
     itmax = 50
     eps = 1e-10
