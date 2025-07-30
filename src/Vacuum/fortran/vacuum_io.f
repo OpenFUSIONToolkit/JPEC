@@ -217,31 +217,31 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     gato inputs.
 c-----------------------------------------------------------------------
-      if ( lrgato .eq. 1 ) then
-         lzio = 0
-         dx0 = 0.5
-         call readvacin ( mfel,rgato,ndum2,ngato,qa1,xinf,zinf,
-     $        delta, vecin, xigr_,xigi_, mth,mth1,mth2, ndfel,dx0,
-     $        ieig, outmod, iotty )
-         call wrtout ( mfel, xigr_, "xigr", 1, mfel )
-         l11 = lmin(1)
-         l22 = lmax(1)
-         call fanal ( xigr_, mfel, xirc, xirs, l11,l22, pye,-0.5_8 )
-         call fanal ( xigi_, mfel, xiic, xiis, l11,l22, pye,-0.5_8 )
-         llnn = l22 - l11 + 1
-         call vecwrt ( llnn, xirc, "xirc(l)", 1, llnn, outmod,0 )
-         call vecwrt ( llnn, xirs, "xirs(l)", 1, llnn, outmod,0 )
-         call vecwrt ( llnn, xiic, "xiic(l)", 1, llnn, outmod,0 )
-         call vecwrt ( llnn, xiis, "xiis(l)", 1, llnn, outmod,0 )
-         dth = twopi / mth
-         n = ngato
-         do ii = 1, mth+1
-            delta(ii) = 0.0
-         enddo
-         write ( outmod, '(/,"******* DELTA set to 0.0 ******" )' )
-         write ( iotty, 701 ) mfel,rgato,ndum2,ngato, ga1,fa1,qa1
-         write ( outmod,701 ) mfel,rgato,ndum2,ngato, ga1,fa1,qa1
-      endif
+!       if ( lrgato .eq. 1 ) then
+!          lzio = 0
+!          dx0 = 0.5
+!          call readvacin ( mfel,rgato,ndum2,ngato,qa1,xinf,zinf,
+!      $        delta, vecin, xigr_,xigi_, mth,mth1,mth2, ndfel,dx0,
+!      $        ieig, outmod, iotty )
+!          call wrtout ( mfel, xigr_, "xigr", 1, mfel )
+!          l11 = lmin(1)
+!          l22 = lmax(1)
+!          call fanal ( xigr_, mfel, xirc, xirs, l11,l22, pye,-0.5_8 )
+!          call fanal ( xigi_, mfel, xiic, xiis, l11,l22, pye,-0.5_8 )
+!          llnn = l22 - l11 + 1
+!          call vecwrt ( llnn, xirc, "xirc(l)", 1, llnn, outmod,0 )
+!          call vecwrt ( llnn, xirs, "xirs(l)", 1, llnn, outmod,0 )
+!          call vecwrt ( llnn, xiic, "xiic(l)", 1, llnn, outmod,0 )
+!          call vecwrt ( llnn, xiis, "xiis(l)", 1, llnn, outmod,0 )
+!          dth = twopi / mth
+!          n = ngato
+!          do ii = 1, mth+1
+!             delta(ii) = 0.0
+!          enddo
+!          write ( outmod, '(/,"******* DELTA set to 0.0 ******" )' )
+!          write ( iotty, 701 ) mfel,rgato,ndum2,ngato, ga1,fa1,qa1
+!          write ( outmod,701 ) mfel,rgato,ndum2,ngato, ga1,fa1,qa1
+!       endif
 c-----------------------------------------------------------------------
 c     more gato computations.
 c-----------------------------------------------------------------------
