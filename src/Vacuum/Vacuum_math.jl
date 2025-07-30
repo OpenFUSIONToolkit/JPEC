@@ -402,7 +402,8 @@ function green(xs, zs, xt, zt, xtp, ztp, n, usechancebugs=false)
     # Chance eq.(44)
     # coefficient
     grad_gg = gg / R4
-    begin
+
+    if usechancebugs == false
         # ∂Gⁿ/∂X' = dG_dX
         aval1 = (n * (xs2 + xt2 + ζ2)*(xs2 - xt2 + ζ2) - xt2*(xt2-xs2+ζ2)) * pn
         aval2 = (2.0 * xt * xs * (xs2-xt2+ζ2)) * pp 
@@ -420,12 +421,24 @@ function green(xs, zs, xt, zt, xtp, ztp, n, usechancebugs=false)
 
         # bval
         bval = G
-    end
 
-    # for 𝓃⩵0,  aval0 = 𝒥 ∇'𝒢⁰∇'ℒ 
-    dG_dX0 = grad_gg * (2.0 * xt * xs * (xs2-xt2+ζ2)) * p1 - xt2*(xt2-xs2+ζ2) * p0 / xt
-    dG_dZ0 = grad_gg * ((xs2 + xt2 + ζ2) * p0 + 4.0 * x_multiple * p1) * ζ
-    aval0 = -xt * (ztp * dG_dX0 - xtp * dG_dZ0)
+        # for 𝓃⩵0,  aval0 = 𝒥 ∇'𝒢⁰∇'ℒ 
+        dG_dX0 = grad_gg * (2.0 * xt * xs * (xs2-xt2+ζ2)) * p1 - xt2*(xt2-xs2+ζ2) * p0 / xt
+        dG_dZ0 = grad_gg * ((xs2 + xt2 + ζ2) * p0 + 4.0 * x_multiple * p1) * ζ
+        aval0 = -xt * (ztp * dG_dX0 - xtp * dG_dZ0)
+    else
+        bval  = -gg*pn
+        aval1 = ( n*(xs2+xt2+ζ2)*(xt2-xs2-ζ2)+xt2*(xm2+ζ2))*pn
+        aval2 = 2.0*xt*xs*(xs2-xt2-ζ2)*pp
+        aval3 = ztp*(aval1+aval2) / xt
+        aval4 = (2.0*n+1.0)*(xp2+ζ2)*pn+4.0*xt*xs*pp
+        aval5 = xtp*(zt-zs)*aval4
+        aval6 =(aval3-aval5) / ( xt*R4)
+        aval = - xt2*aval6 * gg / (2*π)
+        aval0 = ztp*(two*xs*(zm2-ζ2)*aleg1 - xt*(xm2+ζ2)*p0)
+        aval0 = aval0 + xtp*(zt-zs)*(4.0*xt*xs*p1+(xp2+zm2)*p0)
+        aval0 = -aval0*xt / (R4*rR)
+    end
 
     return G, aval, aval0, bval
 end
