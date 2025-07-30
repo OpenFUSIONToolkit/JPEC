@@ -51,7 +51,7 @@ function setup_equilibrium(eq_config::EquilConfig)
     elseif eq_type == "chease2"
         eq_input = read_chease2(eq_config)
     elseif eq_type == "lar"
-        lar_config = LargeAspectRationConfig(eq_config.control.eq_filename)
+        lar_config = LargeAspectRatioConfig(eq_config.control.eq_filename)
         eq_input = lar_run(lar_config)
     elseif eq_type == "sol"
         sol_config = SolevevConfig(eq_config.control.eq_filename)

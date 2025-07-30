@@ -147,7 +147,7 @@ end
 
 
 """
-    LargeAspectRationConfig(...)  
+    LargeAspectRatioConfig(...)  
 
 A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equilibrium model.
 
@@ -165,7 +165,7 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
 - `zeroth`: If set to true, it neglects the Shafranov shift
 """
 
-@kwdef mutable struct LargeAspectRationConfig
+@kwdef mutable struct LargeAspectRatioConfig
     lar_r0::Float64 = 10.0    # Major radius of the plasma
     lar_a::Float64 = 1.0      # Minor radius of the plasma
 
@@ -184,13 +184,13 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
 end
 
 """
-Outer constructor for LargeAspectRationConfig that enables a toml file 
+Outer constructor for LargeAspectRatioConfig that enables a toml file 
     interface for specifying the configuration settings
 """
-function LargeAspectRationConfig(path::String)
+function LargeAspectRatioConfig(path::String)
     raw = TOML.parsefile(path)
     input_data = get(raw, "LAR_INPUT", Dict())
-    return LargeAspectRationConfig(; symbolize_keys(input_data)...)
+    return LargeAspectRatioConfig(; symbolize_keys(input_data)...)
 end
 
 

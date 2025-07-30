@@ -19,7 +19,7 @@ Also evaluates the initial derivative using the analytic model.
 """
 
 # I'm not sure we can change this directly.
-function lar_init_conditions(rmin::Float64, lar_input::LargeAspectRationConfig)
+function lar_init_conditions(rmin::Float64, lar_input::LargeAspectRatioConfig)
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
     q0 = lar_input.q0
@@ -58,7 +58,7 @@ at a given radius `r`, using the current state vector `y` and equilibrium parame
 - 0. The result is stored in-place in `dy`.
 """
 
-function lar_der(dy::Vector{Float64}, r::Float64, y::Vector{Float64}, lar_input::LargeAspectRationConfig)
+function lar_der(dy::Vector{Float64}, r::Float64, y::Vector{Float64}, lar_input::LargeAspectRatioConfig)
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
 
@@ -106,7 +106,7 @@ defined by `lar_input`, and returns the full solution table including derived qu
  - working on it not yet implemented
 """
 
-function lar_run(lar_input::LargeAspectRationConfig)
+function lar_run(lar_input::LargeAspectRatioConfig)
     rmin = 1e-4
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
