@@ -332,6 +332,10 @@ end
     bt0::Union{Nothing, Float64} = nothing # Toroidal magnetic field at the axis [T]
     crnt::Union{Nothing, Float64} = nothing # Plasma current at the axis [A]
     bwall::Union{Nothing, Float64} = nothing # Toroidal magnetic field at the wall [T] 
+    verbose::Bool = false # Whether to print verbose output
+    diagnose_src::Bool = false # Whether to diagnose source data
+    diagnose_maxima::Bool = false # Whether to diagnose maxima in the equilibrium
+    
 end
 
 
