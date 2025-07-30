@@ -164,7 +164,6 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
 - `ma`: The number of grid points in the radial direction.
 - `zeroth`: If set to true, it neglects the Shafranov shift
 """
-
 @kwdef mutable struct LargeAspectRatioConfig
     lar_r0::Float64 = 10.0    # Major radius of the plasma
     lar_a::Float64 = 1.0      # Minor radius of the plasma

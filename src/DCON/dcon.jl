@@ -1,6 +1,7 @@
 
 using LinearAlgebra
 using TOML
+using ..Equilibrium
 
 # --- Placeholder for global variables, modules and utilities --- #
 # using Equil, ODE, Ball, Mercier, FreeBoundary, Resist, Pentrc
@@ -8,30 +9,35 @@ using TOML
 
 #= Core Control Flow =#
 
-function MainProgram()
+function MainProgram(in_path::String)
     println("DCON START -> v$(Version)")
     timer_start()   # Timer stub
 
 # -----------------------------------------------------------------------
 #      read input data.
 # -----------------------------------------------------------------------
-    inputs = TOML.parsefile("dcon.toml")
+    inputs = TOML.parsefile(in_path*"/dcon.toml")
     ctrl = DconControl(; (Symbol(k)=>v for (k,v) in inputs["DCON_CONTROL"])...)
     outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
     intr = DconInternal() 
 
 # -----------------------------------------------------------------------
-#     set variables. (EQUIL TEAM)
+#     set up variables
 # -----------------------------------------------------------------------
-    #delta_mhigh=delta_mhigh*2 # do we need this?
-    equil = LoadEquilibrium()
+    ctrl.delta_mhigh *= 2   # for consistency with Fortran DCON
+
+# -----------------------------------------------------------------------
+#     set up equilibrium structures
+# -----------------------------------------------------------------------
+    equil = setup_equilibrium(in_path*"/equil.toml")
+
 #    CALL equil_out_global # these need to be addressed
 #    CALL equil_out_qfind
 
 #  -----------------------------------------------------------------------
 #  TODO:     optionally reform the eq splines to concentrate at true truncation (EQUIL TEAM)
 #  -----------------------------------------------------------------------
-    sing_lim()  # determine if qhigh is truncating before psihigh
+    sing_lim!(intr, ctrl, equil)  # determine if qhigh is truncating before psihigh
 #. This needs to be handled
 #    IF(psilim /= psihigh .AND. reform_eq_with_psilim)THEN
 #      CALL equil_read(out_unit, psilim) # this needs to be like plasma_eq = LoadEquilibrium(psilim) 
@@ -227,24 +233,6 @@ function MainProgram()
     println("Normal termination.")
 end
 
-function LoadEquilibrium() # EQUIL TEAM
-    equil_input = JPEC.Equilibrium.EquilInput(
-      "beta_1.00",        # eq_filename
-      "efit",          # eq_type
-      "boozer",        # jac_type
-      0.01,             # psilow
-      1.0,             # psihigh
-      100,             # mpsi (number of radial grid points)
-      128              # mtheta (number of poloidal grid points)
-    )
-
-    # 2. Run the main equilibrium setup function.
-    #    This will read the file, solve the direct problem, and return the final object.
-    println("Starting equilibrium reconstruction...")
-    plasma_eq = JPEC.Equilibrium.setup_equilibrium(equil_input)
-    println("Equilibrium reconstruction complete.")
-    return plasma_eq
-end
 
 function AnalyzeMode(n, ctrl, outp)
     # Mode workflow for a given n
