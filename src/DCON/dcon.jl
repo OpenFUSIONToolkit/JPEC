@@ -172,8 +172,9 @@ function MainProgram()
 # -----------------------------------------------------------------------
 #      compute free boundary energies.
 # -----------------------------------------------------------------------
-# TODO: The initial set up in Julia will only handle psiedge = psilim and no free 
-# boundary modes. This will need to be expanded to handle free boundary conditions.
+# TODO: The initial set up in Julia will only handle psiedge = psilim and vac_flag=false
+# and no free boundary modes. This will need to be expanded to handle free boundary 
+# conditions.
     if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
       if ctrl.verbose
         println("Computing free boundary energies")
@@ -204,18 +205,18 @@ function MainProgram()
 # -----------------------------------------------------------------------
     if nzero != 0
       if ctrl.verbose
-        println("Fixed-boundary mode unstable for nn = $nn.")
+        println("Fixed-boundary mode unstable for nn = $(ctrl.nn).")
       end
     end
 
     if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
       if real(total1) < 0
         if ctrl.verbose
-            println("Free-boundary mode unstable for nn = $ctrl.nn.")
+            println("Free-boundary mode unstable for nn = $(ctrl.nn).")
         end
       else
         if ctrl.verbose
-            println("All free-boundary modes stable for nn = $ctrl.nn.")
+            println("All free-boundary modes stable for nn = $(ctrl.nn).")
         end
       end
     end
