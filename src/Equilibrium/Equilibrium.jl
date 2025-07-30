@@ -19,7 +19,7 @@ include("ReadEquilibrium.jl")
 
 
 
-export setup_equilibrium, EquilInput, PlasmaEquilibrium
+export setup_equilibrium, EquilConfig,EquilControl, EquilOutput, PlasmaEquilibrium
 
 # --- Constants ---
 const mu0 = 4.0 * pi * 1e-7
@@ -38,19 +38,22 @@ returning the final processed `PlasmaEquilibrium` object.
 - A `PlasmaEquilibrium` object containing the final result.
 """
 function setup_equilibrium(path::String = "equil.toml")
-    eq_config = EquilConfig(path)
+    return setup_equilibrium( EquilConfig(path))
+end
+function setup_equilibrium(eq_config::EquilConfig)
 
     @printf "Equilibrium file: %s\n" eq_config.control.eq_filename
 
+    eq_type = eq_config.control.eq_type
     # Parse file and prepare initial data structures and splines
-    if eq_config.control..eq_type == "efit"
+    if  eq_type == "efit"
         eq_input = read_efit(eq_config)
-    elseif equil_in.eq_type == "chease2"
+    elseif eq_type == "chease2"
         eq_input = read_chease2(eq_config)
-    elseif equil_in.eq_type == "lar"
+    elseif eq_type == "lar"
         lar_config = LargeAspectRationConfig(eq_config.control.eq_filename)
         eq_input = lar_run(lar_config)
-    elseif equil_in.eq_type == "sol"
+    elseif eq_type == "sol"
         sol_config = SolevevConfig(eq_config.control.eq_filename)
         eq_input = sol_run(sol_config)
     else

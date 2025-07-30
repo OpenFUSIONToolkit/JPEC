@@ -102,7 +102,7 @@ A container struct that bundles all necessary configuration settings originally 
     control::EquilControl = EquilControl()
     output::EquilOutput = EquilOutput()
 end
-
+#
 
 """
 Constructor that allows users to form a EquilConfig struct from dictionaries
@@ -112,13 +112,14 @@ function EquilConfig(control::Dict, output::Dict)
     construct = EquilControl(;control...)
     outstruct = EquilOutput(;output...)
     return EquilConfig(control=construct, output=outstruct)
-
+end
 
 """
 Outer constructor for EquilConfig that enables a toml file 
     interface for specifying the configuration settings
 """
-function EquilConfig(path::String = "equil.toml")
+# if this also have default, then conflicts with @kwdef mutable struct EquilConfig.
+function EquilConfig(path::String)
     raw = TOML.parsefile(path)
 
     # Extract EQUIL_CONTROL with default fallback
@@ -171,7 +172,7 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
     p_pres::Float64 = 2.0     # p00 * (1-(r/a)**2)**p_pres
     p_sig::Float64 = 1.0      # The exponent that determines the shape of the current-related function profile
 
-    sigma_type::String = 'default' # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
+    sigma_type::String = "default" # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
 
     mtau::Float64 = 128       # the number of grid points in the poloidal direction
     ma::Float64 = 128         # the number of grid points in the radial direction
@@ -183,7 +184,7 @@ end
 Outer constructor for LargeAspectRationConfig that enables a toml file 
     interface for specifying the configuration settings
 """
-function LargeAspectRationConfig(path::String = "lar.toml")
+function LargeAspectRationConfig(path::String)
     raw = TOML.parsefile(path)
     input_data = get(raw, "LAR_INPUT", Dict())
     return LargeAspectRationConfig(; symbolize_keys(input_data)...)
@@ -227,7 +228,7 @@ end
 Outer constructor for LarConfig that enables a toml file 
     interface for specifying the configuration settings
 """
-function SolevevConfig(path::String = "sol.toml")
+function SolevevConfig(path::String) # if we use @kwdef, it generates SolevevConfig() so it conflicts with this line.
     raw = TOML.parsefile(path)
     input_data = get(raw, "SOL_INPUT", Dict())
     return SolevevConfig(; symbolize_keys(input_data)...)
