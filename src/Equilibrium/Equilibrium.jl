@@ -5,6 +5,8 @@ module Equilibrium
 import ..Spl
 
 using Printf, DifferentialEquations, LinearAlgebra
+using TOML
+
 
 # --- Internal Module Structure ---
 include("EquilibriumTypes.jl")
@@ -15,17 +17,11 @@ include("AnalyticEquilibrium.jl")
 
 # --- Expose types and functions to the user ---
 
-
-export setup_equilibrium #, EquilInput, PlasmaEquilibrium
+export setup_equilibrium, EquilConfig,EquilControl, EquilOutput, PlasmaEquilibrium
 
 # --- Constants ---
 const mu0 = 4.0 * pi * 1e-7
 
-# --- Internal Solver Dispatch ---
-# Uses multiple dispatch to select the correct solver based on input type.
-# Adding a new solver requires adding a new method here.
-_run_solver(input::DirectRunInput) = direct_run(input)
-_run_solver(input::InverseRunInput) = inverse_run(input)
 
 """
     setup_equilibrium(equil_input::EquilInput)
@@ -39,21 +35,34 @@ returning the final processed `PlasmaEquilibrium` object.
 ## Returns:
 - A `PlasmaEquilibrium` object containing the final result.
 """
-function setup_equilibrium(equil_input::EquilInput)
-    println("--- Julia Equilibrium Setup ---")
-    @printf "Equilibrium file: %s\n" equil_input.eq_filename
-    @printf "Type = %s, Jac_type = %s\n" equil_input.eq_type equil_input.jac_type
-    println("-"^40)
+function setup_equilibrium(path::String = "equil.toml")
+    return setup_equilibrium( EquilConfig(path))
+end
+function setup_equilibrium(eq_config::EquilConfig)
 
+    @printf "Equilibrium file: %s\n" eq_config.control.eq_filename
 
-    # 1. Parse file and prepare initial data structures and splines
-    solver_input = prepare_solver_input(equil_input)
+    eq_type = eq_config.control.eq_type
+    # Parse file and prepare initial data structures and splines
+    if  eq_type == "efit"
+        eq_input = read_efit(eq_config)
+    elseif eq_type == "chease2"
+        eq_input = read_chease2(eq_config)
+    elseif eq_type == "lar"
+        lar_config = LargeAspectRatioConfig(eq_config.control.eq_filename)
+        eq_input = lar_run(lar_config)
+    elseif eq_type == "sol"
+        sol_config = SolevevConfig(eq_config.control.eq_filename)
+        eq_input = sol_run(sol_config)
+    else
+        error("Equilibrium type $(equil_in.eq_type) is not implemented")
+    end
 
-    # 2. Run the appropriate solver (direct or inverse)
-    final_equilibrium = _run_solver(solver_input)
+    # Run the appropriate solver (direct or inverse) to get a PlasmaEquilibrium struct
+    plasma_equilibrium = equilibrium_solver(eq_input)
 
     println("--- Equilibrium Setup Complete ---")
-    return final_equilibrium
+    return plasma_equilibrium
 end
 
 end # module Equilibrium
