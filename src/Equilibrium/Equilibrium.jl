@@ -1,4 +1,3 @@
-# src/Equilibrium/Equilibrium.jl
 module Equilibrium
 
 # --- Module-level Dependencies ---
