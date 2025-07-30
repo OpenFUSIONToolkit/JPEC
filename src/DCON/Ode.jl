@@ -212,7 +212,7 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
     else
         while true
             ising += 1
-            if ising > intr.msing || psilim < intr.sing[min(ising, msing)].psifac
+            if ising > intr.msing || intr.psilim < intr.sing[min(ising, msing)].psifac
                 break
             end
             q = intr.sing[ising].q
@@ -220,17 +220,17 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
                 break
             end
         end
-        if ising > intr.msing || psilim < intr.sing[min(ising, intr.msing)].psifac || ctrl.singfac_min == 0
+        if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac || ctrl.singfac_min == 0
             psimax = psilim * (1 - eps)
-            next = "finish"
+            odet.next = "finish"
         else
             psimax = intr.sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
-            next = "cross"
+            odet.next = "cross"
         end
     end
 
     # Allocate and sort solutions by increasing value of |m-ms1|
-    m = intr.mlow - 1 .+ index
+    m = intr.mlow - 1 .+ odet.index
     if ctrl.sort_type == "absm"
         key = abs.(m)
     elseif ctrl.sort_type == "sing"
@@ -242,7 +242,7 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
     else
         error("Cannot recognize sort_type = $ctrl.sort_type")
     end
-    bubble!(key, index, 1, intr.mpert) # in original Fortran: bubble(key, index, 1, mpert)
+    bubble!(key, odet.index, 1, intr.mpert) # in original Fortran: bubble(key, index, 1, mpert)
 
     # Initialize solutions
     for ipert = 1:mpert
@@ -263,9 +263,9 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
         # end
     else
         if intr.msing > 0
-            m1 = round(Int, ctrl.nn * intr.sing[ising].q)
+            odet.m1 = round(Int, ctrl.nn * intr.sing[ising].q)
         else
-            m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * q1val[end])
+            odet.m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * q1val[end])
         end
     end
     odet.singfac = abs(m1 - ctrl.nn * q)
