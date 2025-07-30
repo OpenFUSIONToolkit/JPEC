@@ -70,14 +70,13 @@ function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
     plasma_equilibrium = equilibrium_solver(eq_input)
 
     # add global parameters to the PlasmaEquilibrium struct
-    #equilibrium_global_parameters!(plasma_equilibrium)
+    equilibrium_global_parameters!(plasma_equilibrium)
 
     # Find q information
     equilibrium_qfind!(plasma_equilibrium)
 
     # Diagnoses grad-shafranov solution.
     equilibrium_gse!(plasma_equilibrium)
-
 
     println("--- Equilibrium Setup Complete ---")
     return plasma_equilibrium
@@ -142,18 +141,21 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
 end
 
 
-# function equilibrium_global_parameters!(equil::PlasmaEquilibrium)
-#     # Set global parameters based on the equilibrium data
-#     equil.global_params.rmean = mean(equil.r)
-#     equil.global_params..zmean = mean(equil.z)
-#     equil.b0 = mean(equil.b)
-#     equil.q0 = mean(equil.q)
-#     equil.psi0 = mean(equil.psi)
+function equilibrium_global_parameters!(equil::PlasmaEquilibrium)
+    # Set global parameters based on the equilibrium data
+    equil.global_params.rmean = mean(equil.r)
+    equil.global_params..zmean = mean(equil.z)
+    equil.b0 = mean(equil.b)
+    equil.q0 = mean(equil.q)
+    equil.psi0 = mean(equil.psi)
 
-#     # Add any other global parameters as needed
-#     return equil
+    # Add any other global parameters as needed
+    return equil
     
-# end
+end
+
+
+
 
 
 function equilibrium_qfind!(equil::PlasmaEquilibrium)
