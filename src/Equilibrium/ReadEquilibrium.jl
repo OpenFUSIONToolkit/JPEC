@@ -55,7 +55,7 @@ them into a `DirectRunInput` object.
 ## Returns:
 - A `DirectRunInput` object ready for the direct solver.
 """
-function read_efit(config::EquilConfig)
+function read_efit(config::EquilibriumConfig)
     println("--> Processing EFIT g-file: $(config.control.eq_filename)")
     lines = readlines(config.control.eq_filename)
 
@@ -131,7 +131,7 @@ end
 
 Debug version: Reads ASCII CHEASE file and prints checking info at each read.
 """
-function read_chease2(config::EquilConfig)
+function read_chease2(config::EquilibriumConfig)
     println("--> Reading CHEASE file: $(config.control.eq_filename)")
 
     # Robust splitting, also for glued numbers

@@ -80,7 +80,7 @@ end
     end
 end
 
-@kwdef mutable struct EquilOutput
+@kwdef mutable struct EquilibriumOutput
     gse_flag::Bool = false
     out_eq_1d::Bool = false
     bin_eq_1d::Bool = false
@@ -93,33 +93,33 @@ end
 
 
 """
-    EquilConfig(...)
+    EquilibriumConfig(...)
 
 A container struct that bundles all necessary configuration settings originally specified in the equil
     fortran namelsits.
 """
-@kwdef mutable struct EquilConfig
+@kwdef mutable struct EquilibriumConfig
     control::EquilControl = EquilControl()
-    output::EquilOutput = EquilOutput()
+    output::EquilibriumOutput = EquilibriumOutput()
 end
 #
 
 """
-Constructor that allows users to form a EquilConfig struct from dictionaries
+Constructor that allows users to form a EquilibriumConfig struct from dictionaries
     for convinience when most of the defaults are fine.
 """
-function EquilConfig(control::Dict, output::Dict)
+function EquilibriumConfig(control::Dict, output::Dict)
     construct = EquilControl(;control...)
-    outstruct = EquilOutput(;output...)
-    return EquilConfig(control=construct, output=outstruct)
+    outstruct = EquilibriumOutput(;output...)
+    return EquilibriumConfig(control=construct, output=outstruct)
 end
 
 """
-Outer constructor for EquilConfig that enables a toml file 
+Outer constructor for EquilibriumConfig that enables a toml file 
     interface for specifying the configuration settings
 """
-# if this also have default, then conflicts with @kwdef mutable struct EquilConfig.
-function EquilConfig(path::String)
+# if this also have default, then conflicts with @kwdef mutable struct EquilibriumConfig.
+function EquilibriumConfig(path::String)
     raw = TOML.parsefile(path)
 
     # Extract EQUIL_CONTROL with default fallback
@@ -139,9 +139,9 @@ function EquilConfig(path::String)
     if !isabspath(control.eq_filename)
         control.eq_filename = normpath(joinpath(dirname(path), control.eq_filename))
     end
-    output  = EquilOutput(; symbolize_keys(output_data)...)
+    output  = EquilibriumOutput(; symbolize_keys(output_data)...)
 
-    return EquilConfig(control=control, output=output)
+    return EquilibriumConfig(control=control, output=output)
 end
 
 
@@ -264,7 +264,7 @@ and preparing the initial splines.
 - `psio`: The total flux difference `abs(ψ_axis - ψ_boundary)` [Weber / radian].
 """
 mutable struct DirectRunInput
-    config::EquilConfig
+    config::EquilibriumConfig
     sq_in::Any       # 1D profile spline (CubicSplineType)
     psi_in::Any      # 2D flux spline (BicubicSplineType)
     rmin::Float64
@@ -283,7 +283,7 @@ A container struct for inputs to the `inverse_run` function.
 - `equil_input`: The original `EquilInput` object.
 """
 mutable struct InverseRunInput
-    config::EquilConfig
+    config::EquilibriumConfig
 
     sq_in::Any           # 1D spline input profile (e.g. F*Bt, Pressure, q)
     rz_in::Any           # 2D bicubic spline input for (R,Z) geometry
@@ -312,7 +312,7 @@ end
     q95::Union{Nothing, Float64} = nothing # Safety factor at 95% flux surface
     qextrema_psi::Union{Nothing, Vector{Float64}} = nothing # Normalized poloidal flux values where q has extrema
     qextrema_q::Union{Nothing, Vector{Float64}} = nothing # Safety factor values at the extrema points
-    mextrama::Union{Nothing, Int} = nothing # Number of extrema points in the q-profile
+    mextrema::Union{Nothing, Int} = nothing # Number of extrema points in the q-profile
     psi_norm::Union{Nothing, Float64} = nothing # Normalized poloidal flux at the axis
     b_norm::Union{Nothing, Float64} = nothing # Normalized total magnetic field strength at the axis
     psi_axis::Union{Nothing, Float64} = nothing # Normalized poloidal flux at the axis
@@ -377,7 +377,7 @@ provides a complete representation of the processed plasma equilibrium in flux c
 - `psio`: Total flux difference `|Ψ_axis - Ψ_boundary|` [Weber / radian].
 """
 mutable struct PlasmaEquilibrium
-    config::EquilConfig
+    config::EquilibriumConfig
     params::EquilibriumParameters  # Parameters for the equilibrium
     sq::Spl.CubicSplineType                     # Final 1D profile spline
     rzphi::Spl.BicubicSplineType                # Final 2D coordinate mapping spline

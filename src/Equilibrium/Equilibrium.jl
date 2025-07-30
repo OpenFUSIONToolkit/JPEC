@@ -17,7 +17,7 @@ include("AnalyticEquilibrium.jl")
 
 # --- Expose types and functions to the user ---
 
-export setup_equilibrium, EquilConfig,EquilControl, EquilOutput, PlasmaEquilibrium, EquilibriumParameters
+export setup_equilibrium, EquilibriumConfig, EquilControl, EquilibriumOutput, PlasmaEquilibrium, EquilibriumParameters
 
 # --- Constants ---
 const mu0 = 4.0 * pi * 1e-7
@@ -36,9 +36,9 @@ returning the final processed `PlasmaEquilibrium` object.
 - A `PlasmaEquilibrium` object containing the final result.
 """
 function setup_equilibrium(path::String = "equil.toml")
-    return setup_equilibrium( EquilConfig(path))
+    return setup_equilibrium( EquilibriumConfig(path))
 end
-function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
+function setup_equilibrium(eq_config::EquilibriumConfig, additional_input=nothing)
 
     @printf "Equilibrium file: %s\n" eq_config.control.eq_filename
 
