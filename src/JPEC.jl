@@ -10,4 +10,7 @@ export SplinesMod, Spl
 include("Equilibrium/Equilibrium.jl")
 export Equilibrium
 
+include("DCON/dcon_mod.jl")
+export DconMod
+
 end # module JPEC

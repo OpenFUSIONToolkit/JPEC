@@ -9,39 +9,61 @@ using JPEC
 # using OdeOutput
 # using Debug
 # using Free
+# using DifferentialEquations
 
 # For now, we set up the equilibrium spline locally, but this should be replaced with a proper import
-plasma_eq = JPEC.Equilibrium.setup_equilibrium(equil_input)
-sq = plasma_eq.sq
+# JMH - removed this because it through an error due to undefined equil_input at precompilation
+# plasma_eq = JPEC.Equilibrium.setup_equilibrium(equil_input)
+# sq = plasma_eq.sq
 
 const diagnose_ca = false
 const eps = 1e-10
 
-@kwdef struct OdeState(mpert::Int, msol::Int)
-    istep::Int=0
-    ix::Int=0
-    atol::Float64 = 1e-10
-    singfac::Float64 = 0.0
-    neq::Int = 0
-    msol::Int = mpert # This is initialized as mpert within the fortran ode_axis_init
-    next::String = ""
-    flag_count::Int = 0
-    new::Bool = true
-    u::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)
-    du::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)
-    u_save::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)  
-    index::Vector{Int}=collect(1:mpert)
-    unorm::Vector{Float64}=zeros(Float64, 2*mpert)
-    unorm0::Vector{Float64}=zeros(Float64, 2*mpert)
-    fixfac::Array{ComplexF64,2}=zeros(ComplexF64, msol, msol)
+mutable struct OdeState
+    mpert::Int
+    msol::Int
+    istep::Int
+    ix::Int
+    atol::Float64
+    singfac::Float64
+    neq::Int
+    next::String
+    flag_count::Int
+    new::Bool
+    u::Array{ComplexF64, 3}
+    du::Array{ComplexF64, 3}
+    u_save::Array{ComplexF64, 3}
+    index::Vector{Int}
+    unorm::Vector{Float64}
+    unorm0::Vector{Float64}
+    fixfac::Array{ComplexF64,2}
+
+    # Defines an inner constructor that allows for initialization using mpert/msol
+    function OdeState(mpert::Int, msol::Int)
+        new(
+            mpert,                                     # mpert
+            msol,                                      # msol
+            0,                                         # istep
+            0,                                         # ix
+            1e-10,                                     # atol
+            0.0,                                       # singfac
+            0,                                         # neq
+            "",                                        # next
+            0,                                         # flag_count
+            true,                                      # new
+            zeros(ComplexF64, mpert, mpert, 2),        # u
+            zeros(ComplexF64, mpert, mpert, 2),        # du
+            zeros(ComplexF64, mpert, mpert, 2),        # u_save
+            collect(1:mpert),                          # index
+            zeros(Float64, 2*mpert),                   # unorm
+            zeros(Float64, 2*mpert),                   # unorm0
+            zeros(ComplexF64, msol, msol)              # fixfac
+        )
+    end
 end
 
-function init_ode_state(mpert, msol)
-    return OdeState(mpert, msol)
-end
 
-
-function ode_run(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal)
+function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal)
     # Initialization
     odet = init_ode_state(intr.mpert, intr.mpert)
 
@@ -141,7 +163,7 @@ Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are
 """
 
 #function ode_axis_init(sing_surf_data, plasma_eq; nn = 1, ψlim=0.9936, ψlow = 0.01, mlow = -12, mhigh = 20, singfac_min = 1e-5, qlow = 0.0, sort_type = "absm")
-function ode_axis_init(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal, odet::OdeState)
+function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState)
 
     # This might be wrong - double check once equil is more defined. 
     qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
@@ -499,7 +521,7 @@ function ode_step()
     odet.istep += 1
 
     # Use DifferentialEquations.jl for general ODE solving in Julia
-    using DifferentialEquations
+    # 
 
     # Define the ODE function in the DifferentialEquations.jl format
     function ode_func!(du, u, p, t)
