@@ -144,8 +144,7 @@ Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are
 
 """
 
-#function ode_axis_init(sing_surf_data, plasma_eq; nn = 1, ψlim=0.9936, ψlow = 0.01, mlow = -12, mhigh = 20, singfac_min = 1e-5, qlow = 0.0, sort_type = "absm")
-function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState)
+function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState)
 
     # This might be wrong - double check once equil is more defined. 
     qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
