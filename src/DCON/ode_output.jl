@@ -33,7 +33,7 @@ function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconC
 end
 
 
-function ode_output_get_evals(intr::DconInternal, ctrl::DconControl)
+function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium)
     # Assumed global variables:
     # u, mpert, out_evals, bin_evals, istep, psifac, q, m1, nn, sq
     # evals_out_unit, evals_bin_unit
@@ -47,8 +47,11 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl)
     nn = intr.nn
     evals_out_unit = ctrl.evals_out_unit
     evals_bin_unit = ctrl.evals_bin_unit
+    sq = equil.sq 
+    psifac = intr.sing.psifac
+    q = equil.sq.f[4]
 
-    #TODO: where do psifac, m1 and q come from? Also istep and sq
+    #TODO: where do m1 and istep come from?
 
     # Compute plasma response matrix
     temp = conj.(transpose(u[:, 1:mpert, 1]))
