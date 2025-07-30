@@ -1,20 +1,10 @@
-# src/Equilibrium/direct.jl
+# src/Equilibrium/DirectEquilibrium.jl
 
 """
 The `Direct` submodule contains the logic for the "direct" equilibrium reconstruction method.
 It takes parsed data and splines from the IO module and calculates the final flux-coordinate
 representation of the plasma equilibrium.
 """
-module Direct
-
-# --- Dependencies ---
-import ..Spl
-
-using Printf, LinearAlgebra, DifferentialEquations
-using ..Types: DirectRunInput, PlasmaEquilibrium, EquilInput
-
-# --- Public API for this submodule ---
-export direct_run
 
 # --- Internal Helper Structs ---
 """
@@ -127,16 +117,16 @@ function direct_get_bfield!(
     (derivs < 1) && return
 
     # 3. Evaluate magnetic field components (derivs >= 1)
-    bf_out.br =  bf_out.psiz / r
-    bf_out.bz = -bf_out.psir / r
+    bf_out.br =  bf_out.psiz / r # Br = (1/R) * ∂ψ/∂Z
+    bf_out.bz = -bf_out.psir / r # Bz = -(1/R) * ∂ψ/∂R
 
     (derivs < 2) && return
 
     # 4. Evaluate derivatives of B-field components (derivs >= 2)
-    bf_out.brr = (bf_out.psirz - bf_out.br) / r
-    bf_out.brz =  bf_out.psizz / r
-    bf_out.bzr = -(bf_out.psirr + bf_out.bz) / r
-    bf_out.bzz = -bf_out.psirz / r
+    bf_out.brr = (bf_out.psirz - bf_out.br) / r #d(Br)/dr
+    bf_out.brz =  bf_out.psizz / r #d(Br)/dz
+    bf_out.bzr = -(bf_out.psirr + bf_out.bz) / r #d(Bz)/dr
+    bf_out.bzz = -bf_out.psirz / r # d(Bz)/dz
 
     return
 end
@@ -160,7 +150,7 @@ and the inboard/outboard separatrix crossings on the midplane.
 - `zo`: Z-coordinate of the magnetic axis [m].
 - `rs1`: R-coordinate of the inboard separatrix crossing [m].
 - `rs2`: R-coordinate of the outboard separatrix crossing [m].
-- 
+- `psi_in_new` : returns psi_in renormalized by * psio/psi(ro,zo)
 """
 function direct_position(
     psi_in::Spl.BicubicSplineType,
@@ -178,6 +168,7 @@ function direct_position(
     # 1. Find the magnetic axis (O-point) using Newton-Raphson
     println("Finding magnetic axis...")
     # (Initial coarse search for r if guess is 0.0)
+    # find o point coarse guess by finding point psi extrema by Bz.
     if r ≈ 0.0
         r_mid, z_mid = (rmax + rmin) / 2.0, zo_guess
         dr_scan = (rmax - rmin) / 20.0
@@ -194,6 +185,7 @@ function direct_position(
         direct_get_bfield!(bf_temp, r, z, psi_in, sq_in, psio, derivs=2)
         det = bf_temp.brr * bf_temp.bzz - bf_temp.brz * bf_temp.bzr
         if abs(det) < 1e-20; error("Jacobian matrix is singular near ($r, $z)."); end
+        # Δx = -J^-1 F
         dr = (bf_temp.brz * bf_temp.bz - bf_temp.bzz * bf_temp.br) / det
         dz = (bf_temp.bzr * bf_temp.br - bf_temp.brr * bf_temp.bz) / det
         r += dr; z += dz
@@ -207,17 +199,14 @@ function direct_position(
     ro, zo = r, z
 
     # 2. Psi Renormalization
-    # NOTE: The old code modified and re-fitted the spline here. With the new opaque
-    # spline types, this is not possible. The normalization performed in the IO
-    # module based on header values (simag, sibry) is assumed to be sufficient.
-    # This step is preserved conceptually but does not modify the spline.
+    # renormalize psi_in by psi_in * psio/psi(ro,zo)
+    # Redefined to avoid direct modification of the psi_rz structure.
+    # However, if it is determined that redefining psi_rz will not cause major problems,
+    # modification may be permitted.
     direct_get_bfield!(bf_temp, ro, zo, psi_in, sq_in, psio, derivs=0)
     psi_at_axis = bf_temp.psi
     fac = psio/psi_at_axis
     new_psi_fs = psi_in.fs * fac
-    print(typeof(psi_in.xs))
-    print(typeof(psi_in.ys))
-    print(typeof(new_psi_fs))
     x_coords = Vector(psi_in.xs)
     y_coords = Vector(psi_in.ys)
     psi_in_new = Spl.bicube_setup(x_coords, y_coords, new_psi_fs, bctypex=4, bctypey=4)
@@ -237,7 +226,7 @@ function direct_position(
             r_sep = (start_r * (3.0 - 0.5 * ird) + end_r) / (4.0 - 0.5 * ird)
             @printf "  Restart attempt %d/6 with initial R = %.6f\n" (ird + 1) r_sep
             for _ in 1:max_newton_iter
-                # Use psi_in_new for all subsequent physics calculations
+                
                 direct_get_bfield!(bf_temp, r_sep, zo, psi_in_new, sq_in, psio, derivs=1)
                 if abs(bf_temp.psir) < 1e-14; @warn "d(psi)/dr is near zero."; break; end
                 dr = -bf_temp.psi / bf_temp.psir
@@ -300,6 +289,10 @@ function direct_fl_int(
 
     # 2. Set up and solve the ODE for field line following
     u0 = zeros(Float64, 4)
+    #[1]:∫(dl/Bp)
+    #[2]: rfac (radial distance from magnetic axis)
+    #[3]: ∫(dl/(R²Bp)) 
+    #[4]: ∫(jac*dl/Bp) 
     u0[2] = sqrt((r_start - ro)^2 + (z_start - zo)^2) # Initial rfac
     tspan = (0.0, 2.0 * pi)
 
@@ -358,7 +351,7 @@ function direct_fl_der!(dy, y, params::FieldLineDerivParams, eta)
     b = sqrt(b_sq)
     jacfac = (bp^params.power_bp) * (b^params.power_b) / (r^params.power_r)
 
-    # Denominator for d(l_pol)/d(eta)
+    # Denominator for d(l_pol)/d(eta) = rfac |B_pol|/denominator
     denominator = bf_temp.bz * cos_eta - bf_temp.br * sin_eta
     if abs(denominator) < 1e-14
         fill!(dy, 1e20) # Return large derivatives for solver to handle stiffness
@@ -367,8 +360,9 @@ function direct_fl_der!(dy, y, params::FieldLineDerivParams, eta)
     end
 
     # dy/d(eta)
-    dy[1] = y[2] / denominator  # d/dη [∫(dl/Bp)]
-    dy[2] = dy[1] * (bf_temp.br * cos_eta + bf_temp.bz * sin_eta) # d(rfac)/dη
+    dy[1] = y[2] / denominator  # d/dη [∫(dl/Bp)] = 1/|B_P| dl/d(eta) = rfac/denominator
+    dy[2] = dy[1] * (bf_temp.br * cos_eta + bf_temp.bz * sin_eta)
+    # d(rfac)/d(eta) = rfac/denom *( Br cos(eta) + Bz sin(eta) ) 
     dy[3] = dy[1] / (r^2)       # d/dη [∫(dl/(R²Bp))]
     dy[4] = dy[1] * jacfac      # d/dη [∫(jac*dl/Bp)]
     return
@@ -434,7 +428,7 @@ constructing the final coordinate and physics quantity splines.
 ## Returns:
 - A `PlasmaEquilibrium` object containing the final, processed equilibrium data,
   including the profile spline (`sq`), the coordinate mapping spline (`rzphi`), and
-  the physics quantity spline (`eq_quantities`).
+  the physics quantity spline (`eqfun`).
 """
 function direct_run(raw_profile::DirectRunInput)
     println("--- Starting Direct Equilibrium Processing ---")
@@ -444,6 +438,7 @@ function direct_run(raw_profile::DirectRunInput)
     sq_in = raw_profile.sq_in
     psi_in = raw_profile.psi_in
     psio = raw_profile.psio
+    mtheta = equil_params.mtheta
 
     # 2. Setup the new output radial grid (`ψ_norm`)
     mpsi = equil_params.mpsi
@@ -459,6 +454,9 @@ function direct_run(raw_profile::DirectRunInput)
     else
         error("Unsupported grid_type: $(equil_params.grid_type)")
     end
+    # need to add more grid type
+
+    #2pi*F, mu0P, dvdpsi, q
     sq_fs_nodes = zeros(Float64, mpsi + 1, 4)
 
     ro_guess = (raw_profile.rmin + raw_profile.rmax) / 2.0
@@ -476,7 +474,7 @@ function direct_run(raw_profile::DirectRunInput)
     normalized_profile = DirectRunInput(
         raw_profile.equil_input,
         raw_profile.sq_in,
-        psi_in_norm, # <-- Using the new, normalized spline here
+        psi_in_norm, 
         raw_profile.rmin,
         raw_profile.rmax,
         raw_profile.zmin,
@@ -486,9 +484,8 @@ function direct_run(raw_profile::DirectRunInput)
 
     # 4. Main integration loop over flux surfaces
     local rzphi::Spl.BicubicSplineType
-    local eq_quantities::Spl.BicubicSplineType
-    mtheta = equil_params.mtheta
-    local rzphi_fs_nodes # Will be initialized on first loop
+    local eqfun::Spl.BicubicSplineType
+    local rzphi_fs_nodes 
 
     println("Starting loop over flux surfaces...")
     # Loop from edge inwards (index mpsi+1 down to 1)
@@ -498,13 +495,19 @@ function direct_run(raw_profile::DirectRunInput)
 
         # a. Integrate along the field line for this surface
         y_out, bf_start = direct_fl_int(ipsi, psi_norm_surf, normalized_profile, ro, zo, rs2)
+        #y_out
+        #[1]: eta
+        #[2]:∫(dl/Bp)
+        #[3]: rfac (radial distance from magnetic axis)
+        #[4]: ∫(dl/(R²Bp)) 
+        #[5]: ∫(jac*dl/Bp) 
 
         # b. Process integration results into a temporary periodic spline `ff(θ_new)`
-        theta_new_nodes = y_out[:, 2] ./ y_out[end, 2]
+        theta_new_nodes = y_out[:, 2] ./ y_out[end, 2] #SFL angle θ_new
         ff_fs_nodes = hcat(
             y_out[:, 3].^2,                                            # 1: rfac²
             y_out[:, 1] / (2*pi) .- theta_new_nodes,                   # 2: η/(2π) - θ_new
-            bf_start.f * (y_out[:, 4] .- theta_new_nodes .* y_out[end, 4]), # 3: Toroidal stream function term
+            bf_start.f * (y_out[:, 4] .- theta_new_nodes .* y_out[end, 4]), # 3: Toroidal stream function term (term for calculate q)
             y_out[:, 5] ./ y_out[end, 5] .- theta_new_nodes            # 4: Jacobian-related term
         )
         ff = Spl.spline_setup(theta_new_nodes, ff_fs_nodes, bctype="periodic")
@@ -526,9 +529,9 @@ function direct_run(raw_profile::DirectRunInput)
         end
 
         # e. Store surface-averaged quantities for the `sq` spline
-        sq_fs_nodes[ipsi, 1] = bf_start.f
+        sq_fs_nodes[ipsi, 1] = bf_start.f * (2pi) # 2pi*F
         sq_fs_nodes[ipsi, 2] = bf_start.p
-        sq_fs_nodes[ipsi, 3] = y_out[end, 5] * psio / (2pi)  # Toroidal Flux / (2pi)^2
+        sq_fs_nodes[ipsi, 3] = y_out[end, 5] * (2pi) *psio # dV/d(psi)
         sq_fs_nodes[ipsi, 4] = y_out[end, 4] * bf_start.f / (2pi) # q-profile
     end
     println("...Loop over flux surfaces finished.")
@@ -565,7 +568,7 @@ function direct_run(raw_profile::DirectRunInput)
 
     # 6. Calculate final physics quantities (B-field, metric components, etc.)
     println("Calculating final physics quantities (B, g_ij)...")
-    eq_quantities_fs_nodes = zeros(Float64, mpsi + 1, mtheta + 1, 3)
+    eqfun_fs_nodes = zeros(Float64, mpsi + 1, mtheta + 1, 3)
     v = zeros(Float64, 2, 3)
 
     for ipsi in 1:(mpsi+1), itheta in 1:(mtheta+1)
@@ -574,7 +577,7 @@ function direct_run(raw_profile::DirectRunInput)
 
         f = Spl.spline_eval(sq, psi_norm, 0)
         q = f[4]
-        f_val = f[1] # This is F = R*Bt
+        f_val = f[1] 
 
         f, fx, fy = Spl.bicube_eval(rzphi, psi_norm, theta_new, 1)
         rfac_sq = max(0.0, f[1])
@@ -583,38 +586,43 @@ function direct_run(raw_profile::DirectRunInput)
         r_coord = ro + rfac * cos(eta)
         jacfac = f[4]
 
-        # (R, Z, phi_stream)의  (psi_norm, theta_new)에 대한 미분
-        v[1,1] = (rfac > 0) ? fx[1] / (2.0 * rfac) : 0.0       # d(rfac)/d(psi_norm)
-        v[1,2] = fx[2] * 2.0 * pi * rfac                       # d(eta)/d(psi_norm) * rfac
-        v[1,3] = fx[3] * r_coord                               # d(phi_s)/d(psi_norm) * r_coord
-        v[2,1] = (rfac > 0) ? fy[1] / (2.0 * rfac) : 0.0       # d(rfac)/d(theta_new)
-        v[2,2] = (1.0 + fy[2]) * 2.0 * pi * rfac               # d(eta)/d(theta_new) * rfac
-        v[2,3] = fy[3] * r_coord                               # d(phi_s)/d(theta_new) * r_coord
+ 
+        v[1,1] = (rfac > 0) ? fx[1] / (2.0 * rfac) : 0.0       # 1/(2rfac) * d(rfac)/d(psi_norm)
+        v[1,2] = fx[2] * 2.0 * pi * rfac                       # 2pi*rfac * d(eta)/d(psi_norm)
+        v[1,3] = fx[3] * r_coord                               # r_coord * d(phi_s)/d(psi_norm) 
+        v[2,1] = (rfac > 0) ? fy[1] / (2.0 * rfac) : 0.0       # 1/(2rfac) d(rfac)/d(theta_new)
+        v[2,2] = (1.0 + fy[2]) * 2.0 * pi * rfac               # 2pi*rfac * d(eta)/d(theta_new) 
+        v[2,3] = fy[3] * r_coord                               # r_coord * d(phi_s)/d(theta_new)
+        v33 = 2.0 * pi * r_coord                               # 2pi * r_coord 
 
-        w11 = (jacfac != 0) ?  v[2,2] * (2.0*pi*r_coord) / jacfac : 0.0
-        w12 = (jacfac*rfac != 0) ? -v[2,1] * pi * r_coord / (rfac * jacfac) : 0.0
-        delpsi_norm_sq = w11^2 + w12^2
 
-        b_sq = ((psio * sqrt(delpsi_norm_sq))^2 + f_val^2) / r_coord^2
-        eq_quantities_fs_nodes[ipsi, itheta, 1] = sqrt(max(0.0, b_sq)) # B_total
+        w11 = (1.0 + fy[2]) * (2.0*pi)^2 * rfac * r_coord / jacfac
+        w12 = (jacfac*rfac != 0) ? -fy[1] * pi * r_coord / (rfac * jacfac) : 0.0
+        delpsi_norm = sqrt(w11^2 + w12^2)
+
+        b_sq = ((psio *2pi *delpsi_norm)^2 + (f_val/(2pi*r_coord))^2)
+        eqfun_fs_nodes[ipsi, itheta, 1] = b_sq # B_total
 
         denom = jacfac * b_sq
         if abs(denom) > 1e-20
-            g12 = dot(v[1,:], v[2,:]) / denom
-            g13 = (v[2,3] * (2pi*r_coord) + q*dot(v[2,:],v[2,:])) / denom
+            # 2. Gyrokinetic coefficient C1 
+            numerator_2 = dot(v[1,:], v[2,:]) + q * v33 * v[1,3] 
+            eqfun_fs_nodes[ipsi, itheta, 2] = numerator_2 / denom
+    
+            # 3. Gyrokinetic coefficient C2 
+            numerator_3 = v[2,3] * v33 + q * v33^2 
+            eqfun_fs_nodes[ipsi, itheta, 3] = numerator_3 / denom
         else
-            g12, g13 = 0.0, 0.0
+            eqfun_fs_nodes[ipsi, itheta, 2] = 0.0
+            eqfun_fs_nodes[ipsi, itheta, 3] = 0.0
         end
-        eq_quantities_fs_nodes[ipsi, itheta, 2] = g12
-        eq_quantities_fs_nodes[ipsi, itheta, 3] = g13
     end
     println("...done.")
 
-    eq_quantities = Spl.bicube_setup(sq_x_nodes, collect(rzphi_y_nodes), eq_quantities_fs_nodes, bctypex=4, bctypey=2)
+    eqfun = Spl.bicube_setup(sq_x_nodes, collect(rzphi_y_nodes), eqfun_fs_nodes, bctypex=4, bctypey=2)
 
     println("--- Direct Equilibrium Processing Finished ---")
 
-    return PlasmaEquilibrium(equil_params, sq, rzphi, eq_quantities, ro, zo, psio)
+    return PlasmaEquilibrium(equil_params, sq, rzphi, eqfun, ro, zo, psio)
 end
 
-end # module Direct

@@ -17,26 +17,19 @@ sq = plasma_eq.sq
 const diagnose_ca = false
 const eps = 1e-10
 
-# Global variables (should be refactored into structs for safety)
-new = true
-next = ""
-flag_count = 0
-
-# Example types for variables (adjust as needed)
-# These should be replaced with proper structs and types
 @kwdef struct OdeState(mpert::Int, msol::Int)
-    istate::Int=1
     istep::Int=0
-    liw::Int=20
-    lrw::Int=22+64*mpert*msol
-    iopt::Int=1
-    itask::Int=5
-    itol::Int=2
-    mf::Int=10
     ix::Int=0
-    iwork::Vector{Int}=zeros(Int, 20)
-    rwork::Vector{Float64}=zeros(Float64, 22+64*mpert*msol)
-    atol::Array{ComplexF64,3}=zeros(ComplexF64, mpert, msol, 2)
+    atol::Float64 = 1e-10
+    singfac::Float64 = 0.0
+    neq::Int = 0
+    msol::Int = mpert # This is initialized as mpert within the fortran ode_axis_init
+    next::String = ""
+    flag_count::Int = 0
+    new::Bool = true
+    u::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)
+    du::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)
+    u_save::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)  
     index::Vector{Int}=collect(1:mpert)
     unorm::Vector{Float64}=zeros(Float64, 2*mpert)
     unorm0::Vector{Float64}=zeros(Float64, 2*mpert)
@@ -50,18 +43,16 @@ end
 
 function ode_run(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal)
     # Initialization
-    odet = init_ode_state(intr.mpert, intr.msol)
+    odet = init_ode_state(intr.mpert, intr.mpert)
 
     if ctrl.sing_start <= 0
-        ode_axis_init(ctrl, equil, intr)
+        ode_axis_init(ctrl, equil, intr, odet)
     elseif ctrl.sing_start <= intr.msing
-        @warn "sing_start = 0 not implemented yet!"
-        ode_sing_init()
+        error("sing_start > 0 not implemented yet!")
+        # ode_sing_init()
     else
-        message = "sing_start = $(ctrl.sing_start) > msing = $(intr.msing)"
-        program_stop(message)
+        error("Invalid value for sing_start: $(ctrl.sing_start) > msing = $(intr.msing)")
     end
-    flag_count = 0
     #ode_output_open() # TODO: have to handle io
     if diagnose_ca
         ascii_open(ca_unit, "ca.out", "UNKNOWN")
@@ -101,18 +92,10 @@ function ode_run(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal)
         else
             break
         end
-        flag_count = 0
     end
 
     # Finalize
     ode_output_close()
-    # Deallocate arrays (in Julia, set to nothing or let GC handle)
-    rwork = nothing
-    atol = nothing
-    unorm0 = nothing
-    unorm = nothing
-    index = nothing
-    fixfac = nothing
     if diagnose_ca
         ascii_close(ca_unit)
     end
@@ -158,11 +141,7 @@ Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are
 """
 
 #function ode_axis_init(sing_surf_data, plasma_eq; nn = 1, ψlim=0.9936, ψlow = 0.01, mlow = -12, mhigh = 20, singfac_min = 1e-5, qlow = 0.0, sort_type = "absm")
-function ode_axis_init(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal)
-
-    # JMH - I think all default values here will be supplied by inputs
-    # Right now, there are a lot of globals - not sure how we want to handle these
-    # But at least the major outputs here match fortran dcon
+function ode_axis_init(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal, odet::OdeState)
 
     # This might be wrong - double check once equil is more defined. 
     qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
@@ -240,13 +219,6 @@ function ode_axis_init(ctrl::DconControl, equil::DconEquilibrium, intr::DconInte
     end
 
     # Allocate and sort solutions by increasing value of |m-ms1|
-    # TODO: THESE PROBABLY SHOULDN'T BE GLOBAL - WHERE DO THEY GO? 
-    global u = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
-    global du = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
-    global u_save = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
-    global unorm0 = zeros(Float64, 2 * intr.mpert)
-    global unorm = zeros(Float64, 2 * intr.mpert)
-    global index = collect(1:intr.mpert)
     m = intr.mlow - 1 .+ index
     if ctrl.sort_type == "absm"
         key = abs.(m)
@@ -263,22 +235,12 @@ function ode_axis_init(ctrl::DconControl, equil::DconEquilibrium, intr::DconInte
 
     # Initialize solutions
     for ipert = 1:mpert
-        u[index[ipert], ipert, 2] = 1
+        odet.u[index[ipert], ipert, 2] = 1
     end
-
-    # TODO: I THINK THESE ARE IN THE SINGVARS STRUCT - NEED TO ADD AT SOME POINT
-    global msol = intr.mpert
-    global neq = 4 * intr.mpert * msol
-    u_save .= u
-    global psi_save = psifac
-
-    # Initialize integrator parameters (JMH - not sure if these are needed in Julia)
-    # global istep = 0
-    # global iopt = 1
-    # global itask = 5
-    # global itol = 2
-    # global mf = 10
-    # global istate = 1
+    odet.msol = intr.mpert
+    odet.neq = 4 * intr.mpert * msol
+    odet.u_save .= u
+    odet.psi_save = psifac
 
     # Compute conditions at next singular surface
     q = qval(equil.psilow) # Fortran: q=sq%fs(0,4) # IS THIS RIGHT? 
@@ -295,130 +257,95 @@ function ode_axis_init(ctrl::DconControl, equil::DconEquilibrium, intr::DconInte
             m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * q1val[end])
         end
     end
-    # TODO: not sure where this is used
-    global singfac = abs(m1 - ctrl.nn * q)
-
-    # Set up work arrays (JMH - not sure if these are needed in Julia)
-    # global liw = length(iwork)
-    # global lrw = 22 + 64 * mpert * msol
-    # global rwork = zeros(Float64, lrw)
-    # global atol = zeros(ComplexF64, mpert, msol, 2)
-    # global fixfac = zeros(ComplexF64, msol, msol)
-    # iwork = 0
-    # rwork = 0
-    # rwork[1] = psimax
-    # rwork[5] = psifac * 1e-3
-    # rwork[11] = rwork[5]
+    odet.singfac = abs(m1 - ctrl.nn * q)
 end
 
+# TODO: NOT IMPLEMENTED YET!
 function ode_sing_init()
-    # Declare and initialize local variables
-    star = fill(' ', mpert)
-    # local variables
-    ua = Array{Complex{r8}}(undef, mpert, 2*mpert, 2)
-    dpsi = 0.0
-    new = true
-
-    ising = sing_start
-    dpsi = singfac_min/abs(nn*sing[ising].q1)*10
-    psifac = sing[ising].psifac + dpsi
-    q = sing[ising].q + dpsi*sing[ising].q1
-
-    # Allocate and initialize solution arrays
-    u      = zeros(Complex{r8}, mpert, mpert, 2)
-    du     = zeros(Complex{r8}, mpert, mpert, 2)
-    u_save = zeros(Complex{r8}, mpert, mpert, 2)
-    unorm0 = zeros(r8, 2*mpert)
-    unorm  = zeros(r8, 2*mpert)
-    index  = zeros(Int, 2*mpert)
-
-    if old_init
-        u .= 0.0
-        for ipert ∈ 1:mpert
-            u[ipert, ipert, 2] = 1.0
-        end
-    else
-        sing_get_ua(ising, psifac, ua)
-        # Big slice: u = ua[:, mpert+1:2*mpert,:]
-        for i = 1:mpert, j = 1:mpert, k = 1:2
-            u[i, j, k] = ua[i, mpert+j, k]
-        end
-    end
-    u_save .= u
-    psi_save = psifac
-    msol = mpert
-    neq = 4 * mpert * msol
-
-    # Diagnose output: for demonstration, I'll use console prints only
-    if diagnose
-        sing_der(neq, psifac, u, du)
-        file = ascii_open("init.out", "w")
-        println(file, "Output from ode_sing_init")
-        println(file, "mlow mhigh mpert q psifac dpsi order")
-        println(file, mlow, " ", mhigh, " ", mpert, " ", q, " ", psifac, " ", dpsi, " ", sing_order)
-        ipert0 = sing[ising].m - mlow + 1
-        star = fill(' ', mpert)
-        star[ipert0] = '*'
-        m = mlow
-        for isol in 1:msol
-            println(file, "isol = $isol, m = $m", star[isol])
-            # The original Fortran code prints a header and then u and du for each ipert.
-            for ipert in 1:mpert
-                println(file, "$ipert ", u[ipert, isol, 1], " ", u[ipert, isol, 2],
-                        " ", du[ipert, isol, 1], " ", du[ipert, isol, 2], " ",
-                        star[ipert])
-            end
-            m += 1
-        end
-        ascii_close(file)
-        program_stop("Termination by ode_sing_init.")
-    end
-
-    # Compute conditions at next singular surface
-    while true
-        ising += 1
-        if ising > msing || psilim < sing[ising ≤ msing ? ising : msing].psifac
-            break
-        end
-        q = sing[ising].q
-        if mlow ≤ nn*q && mhigh ≥ nn*q
-            break
-        end
-    end
-
-    if ising > msing || psilim < sing[ising ≤ msing ? ising : msing].psifac
-        m1 = round(Int, nn*qlim) + round(Int, sign(one, nn*sq.fs1[mpsi, 4]))
-        psimax = psilim * (1-eps)
-        next_ = "finish"
-    else
-        m1 = round(Int, nn*sing[ising].q)
-        psimax = sing[ising].psifac - singfac_min/abs(nn*sing[ising].q1)
-        next_ = "cross"
-    end
-
-    # Set up integrator parameters
-    istep = 0
-    istate = 1
-    iopt = 1
-    itask = 5
-    itol = 2
-    mf = 10
-    istate = 1
-
-    # Set up work arrays
-    liw = length(iwork)    # iwork must exist!
-    lrw = 22 + 64*mpert*msol
-    rwork = zeros(r8, lrw)
-    atol  = zeros(r8, mpert, msol, 2)
-    fixfac = zeros(r8, msol, msol)
-    iwork = zeros(Int, liw)  # or readjust as needed
-    rwork[1] = psimax
-    rwork[5] = dpsi
-    rwork[11] = rwork[5]
-
-    # Terminate, or in Julia just return (no need for RETURN)
-    return nothing  # or could return a struct with all these values, for a more Julian approach
+    return
 end
+#     # Declare and initialize local variables
+#     star = fill(' ', mpert)
+#     # local variables
+#     ua = Array{Complex{r8}}(undef, mpert, 2*mpert, 2)
+#     dpsi = 0.0
+#     new = true
+
+#     ising = sing_start
+#     dpsi = singfac_min/abs(nn*sing[ising].q1)*10
+#     psifac = sing[ising].psifac + dpsi
+#     q = sing[ising].q + dpsi*sing[ising].q1
+
+#     # Allocate and initialize solution arrays
+#     u      = zeros(Complex{r8}, mpert, mpert, 2)
+#     du     = zeros(Complex{r8}, mpert, mpert, 2)
+#     u_save = zeros(Complex{r8}, mpert, mpert, 2)
+#     unorm0 = zeros(r8, 2*mpert)
+#     unorm  = zeros(r8, 2*mpert)
+#     index  = zeros(Int, 2*mpert)
+
+#     if old_init
+#         u .= 0.0
+#         for ipert ∈ 1:mpert
+#             u[ipert, ipert, 2] = 1.0
+#         end
+#     else
+#         sing_get_ua(ising, psifac, ua)
+#         # Big slice: u = ua[:, mpert+1:2*mpert,:]
+#         for i = 1:mpert, j = 1:mpert, k = 1:2
+#             u[i, j, k] = ua[i, mpert+j, k]
+#         end
+#     end
+#     u_save .= u
+#     psi_save = psifac
+#     msol = mpert
+#     neq = 4 * mpert * msol
+
+#     # Compute conditions at next singular surface
+#     while true
+#         ising += 1
+#         if ising > msing || psilim < sing[ising ≤ msing ? ising : msing].psifac
+#             break
+#         end
+#         q = sing[ising].q
+#         if mlow ≤ nn*q && mhigh ≥ nn*q
+#             break
+#         end
+#     end
+
+#     if ising > msing || psilim < sing[ising ≤ msing ? ising : msing].psifac
+#         m1 = round(Int, nn*qlim) + round(Int, sign(one, nn*sq.fs1[mpsi, 4]))
+#         psimax = psilim * (1-eps)
+#         next_ = "finish"
+#     else
+#         m1 = round(Int, nn*sing[ising].q)
+#         psimax = sing[ising].psifac - singfac_min/abs(nn*sing[ising].q1)
+#         next_ = "cross"
+#     end
+
+#     # Set up integrator parameters
+#     istep = 0
+#     istate = 1
+#     iopt = 1
+#     itask = 5
+#     itol = 2
+#     mf = 10
+#     istate = 1
+
+#     # Set up work arrays
+#     liw = length(iwork)    # iwork must exist!
+#     lrw = 22 + 64*mpert*msol
+#     rwork = zeros(r8, lrw)
+#     atol  = zeros(r8, mpert, msol, 2)
+#     fixfac = zeros(r8, msol, msol)
+#     iwork = zeros(Int, liw)  # or readjust as needed
+#     rwork[1] = psimax
+#     rwork[5] = dpsi
+#     rwork[11] = rwork[5]
+
+#     # Terminate, or in Julia just return (no need for RETURN)
+#     return nothing  # or could return a struct with all these values, for a more Julian approach
+# end
 
 function ode_ideal_cross()
     # ...existing code...
@@ -427,23 +354,7 @@ function ode_ideal_cross()
     if verbose
         println("psi = $(sing[ising].psifac), q = $(sing[ising].q)")
     end
-    ode_unorm(true)
-
-    # Diagnose solution before reinitialization
-    if diagnose
-        sing_get_ca(ising, psifac, u, ca)
-        init_out_unit = ascii_open("reinit.out", "UNKNOWN")
-        println(init_out_unit, "Output from ode_ideal_cross, singfac = $singfac")
-        println(init_out_unit, "Asymptotic coefficients matrix before reinit:")
-        for jsol in 1:msol
-            println(init_out_unit, "jsol = $jsol, m = $(mlow + jsol - 1)")
-            # Print ca values for each ipert
-            for ipert in 1:mpert
-                println(init_out_unit, ca[ipert, jsol, 1], abs(ca[ipert, jsol, 1]),
-                        ca[ipert, jsol, 2], abs(ca[ipert, jsol, 2]))
-            end
-        end
-    end
+    ode_unorm(true)    
 
     # Write asymptotic coefficients before reinit
     if bin_euler
@@ -469,21 +380,6 @@ function ode_ideal_cross()
     if !con_flag
         u[ipert0, :, :] .= 0
         u[:, index[1], :] .= ua[:, ipert0 + mpert, :]
-    end
-
-    # Diagnose solution after reinitialization
-    if diagnose
-        sing_get_ca(ising, psifac, u, ca)
-        println(init_out_unit, "Asymptotic coefficients matrix after reinit:")
-        for jsol in 1:msol
-            println(init_out_unit, "jsol = $jsol, m = $(mlow + jsol - 1)")
-            for ipert in 1:mpert
-                println(init_out_unit, ca[ipert, jsol, 1], abs(ca[ipert, jsol, 1]),
-                        ca[ipert, jsol, 2], abs(ca[ipert, jsol, 2]))
-            end
-        end
-        ascii_close(init_out_unit)
-        program_stop("Termination by ode_ideal_cross.")
     end
 
     # Write asymptotic coefficients after reinit
@@ -600,8 +496,7 @@ function ode_step()
     end
 
     # Advance differential equations
-    global istep
-    istep += 1
+    odet.istep += 1
 
     # Use DifferentialEquations.jl for general ODE solving in Julia
     using DifferentialEquations
@@ -627,25 +522,6 @@ function ode_step()
     u .= sol.u[end]
     psifac = sol.t[end]
 
-    # Diagnose error
-    if rwork[11] < 1e-14 && diagnose
-        dt = rwork[11]
-        sing_der(neq, psifac, u, du)
-        dewset(neq, itol, rtol, atol, u, ewt)
-        err = du .* dt ./ ewt
-        errabs = abs.(err)
-        errmax = maximum(errabs)
-        errloc = ind2sub(size(errabs), argmax(errabs))
-        ipert, isol, ieq = errloc
-        ewtmax = ewt[ipert, isol, ieq]
-        msg = """
-        Termination by ode_step
-        ipert = $ipert, ieq = $ieq, isol = $isol, msol = $msol
-        errmax = $(errmax), ewt = $(ewtmax), atol = $(abs(atol[ipert, isol, ieq]))
-        """
-        program_stop(msg)
-    end
-
 end
 
 function ode_unorm(sing_flag::Bool)
@@ -654,8 +530,7 @@ function ode_unorm(sing_flag::Bool)
     unorm[mpert+1:msol] .= sqrt.(sum(abs.(u[:, mpert+1:msol, 2]).^2, dims=1)[:])
     if minimum(unorm[1:msol]) == 0
         jmax = argmin(unorm[1:msol])
-        message = "_unorm: unorm(1,$jmax) = 0"
-        program_stop(message)
+        error("One of the first solution vector norms unorm(1,$jmax) = 0")
     end
 
     # Normalize unorm and perform Gaussian reduction if required
@@ -667,9 +542,6 @@ function ode_unorm(sing_flag::Bool)
         uratio = maximum(unorm[1:msol]) / minimum(unorm[1:msol])
         if uratio > ucrit || sing_flag
             ode_fixup(sing_flag, false)
-            if diagnose
-                ode_test_fixup()
-            end
             new = true
         end
     end
@@ -680,37 +552,9 @@ end
 function ode_fixup(sing_flag::Bool, test::Bool)
     # ...existing code...
 
-    diagnose = false
     secondary = false
-    # new is a persistent variable in Fortran; use a global or Ref in Julia if needed
-    global new
     mask = trues(2, msol)
     jmax = zeros(Int, 1)
-
-    # Open output file and write initial values
-    if diagnose
-        if new
-            ascii_open(init_out_unit, "fixup.out", "UNKNOWN")
-            new = false
-        end
-        println(init_out_unit, "mlow = $mlow, mhigh = $mhigh, mpert = $mpert, msol = $msol, psifac = $psifac, q = $q")
-        println(init_out_unit, "input values:")
-        for isol in 1:msol
-            println(init_out_unit, "isol = $isol, m = $(mlow + isol - 1)")
-            # Print first two components
-            for ipert in 1:2
-                println(init_out_unit, "re u($ipert), im u($ipert)")
-            end
-            # Normalize and print
-            norm_val = maximum(abs.(u[:, isol, 1]))
-            for ipert in 1:mpert
-                println(init_out_unit, ipert, u[ipert, isol, :] / norm_val)
-            end
-            for ipert in 1:2
-                println(init_out_unit, "re u($ipert), im u($ipert)")
-            end
-        end
-    end
 
     # Initial output
     println(crit_out_unit, "Gaussian Reduction at istep = $istep, psi = $psifac, q = $q")
@@ -790,23 +634,6 @@ function ode_fixup(sing_flag::Bool, test::Bool)
         write(euler_bin_unit, fixfac, index[1:msol])
     end
 
-    # Write output values and close output file
-    if diagnose
-        println(init_out_unit, "output values:")
-        for isol in 1:msol
-            println(init_out_unit, "isol = $isol, m = $(mlow + isol - 1)")
-            for ipert in 1:2
-                println(init_out_unit, "re u($ipert), im u($ipert)")
-            end
-            for ipert in 1:mpert
-                println(init_out_unit, ipert, u[ipert, isol, :])
-            end
-            for ipert in 1:2
-                println(init_out_unit, "re u($ipert), im u($ipert)")
-            end
-        end
-    end
-
     # ...existing code...
     return
 end
@@ -868,8 +695,8 @@ function ode_test()
 end
 
 # Example stub for test fixup
+# JMH - I think this function is only called with diagnose logic
 function ode_test_fixup()
-    # Implement test fixup logic here
     return
 end
 

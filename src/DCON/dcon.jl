@@ -22,7 +22,7 @@ function MainProgram()
     intr=DconInternal() 
 
 # -----------------------------------------------------------------------
-#     set variables
+#     set variables. (EQUIL TEAM)
 # -----------------------------------------------------------------------
     #delta_mhigh=delta_mhigh*2 # do we need this?
     equil = LoadEquilibrium()
@@ -30,7 +30,7 @@ function MainProgram()
 #    CALL equil_out_qfind
 
 #  -----------------------------------------------------------------------
-#  TODO:     optionally reform the eq splines to concentrate at true truncation
+#  TODO:     optionally reform the eq splines to concentrate at true truncation (EQUIL TEAM)
 #  -----------------------------------------------------------------------
     sing_lim()  # determine if qhigh is truncating before psihigh
 #. This needs to be handled
@@ -41,7 +41,7 @@ function MainProgram()
 #    ENDIF
 
 # -----------------------------------------------------------------------
-# TODO:    record the equilibrium properties
+# TODO:    record the equilibrium properties (EQUIL TEAM)
 # -----------------------------------------------------------------------
 #      CALL equil_out_diagnose(.FALSE.,out_unit)
 #      CALL equil_out_write_2d
@@ -209,6 +209,7 @@ function MainProgram()
       end
     end
 
+    # TODO: Handle vacuum/free boundary results
     if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
       if real(total1) < 0
         if ctrl.verbose

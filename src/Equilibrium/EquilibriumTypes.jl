@@ -1,4 +1,4 @@
-# src/Equilibrium/types.jl
+# src/Equilibrium/EquilibriumTypes.jl
 
 """
 - `EquilInput`:          User-facing input parameters.
@@ -6,9 +6,9 @@
 - `InverseRunInput`:     Internal data structure for the inverse solver.
 - `PlasmaEquilibrium`:   The final, user-facing output object.
 """
-module Types
+module EquilibriumTypes
 
-export EquilInput, DirectRunInput, InverseRunInput, PlasmaEquilibrium
+export EquilInput, DirectRunInput, InverseRunInput, LarInput, SolInput, PlasmaEquilibrium
 
 """
     EquilInput(...)
@@ -28,6 +28,8 @@ reconstruction process. These parameters are typically set by the user.
 ## Keyword Arguments:
 - `newq0`: Target q-value on axis. If non-zero, triggers q-profile revision (Default: 0.0).
 """
+# it is mutable because power_bp _r _b is defined and then modified by jac_type in input.
+# Maybe if we organize the order a bit more, we can change it to a struct.
 mutable struct EquilInput
     eq_filename::String
     eq_type::String
@@ -63,7 +65,7 @@ and preparing the initial splines.
 - `sq_in`
         # x value: psin
         # Quantity 1: F = R*Bt  [m T]
-        # Quantity 2: Pressure (non-negative) [nt^2 / m^2 * mu0 = T^2]
+        # Quantity 2: mu0 * Pressure (non-negative) [nt^2 / m^2 * mu0 = T^2]
         # Quantity 3: q-profile 
         # Quantity 4: sqrt(psi_norm)
 - `psi_in`:
@@ -97,9 +99,16 @@ A container struct for inputs to the `inverse_run` function.
 - `equil_input`: The original `EquilInput` object.
 """
 mutable struct InverseRunInput
-    # Fields for inverse equilibrium solver would be defined here
     equil_input::EquilInput
+
+    sq_in::Any           # 1D spline input profile (e.g. F*Bt, Pressure, q)
+    rz_in::Any           # 2D bicubic spline input for (R,Z) geometry
+
+    ro::Float64          # R axis location
+    zo::Float64          # Z axis location
+    psio::Float64        # Total flux difference |psi_axis - psi_boundary|
 end
+
 
 """
     PlasmaEquilibrium(...)
@@ -113,16 +122,23 @@ provides a complete representation of the processed plasma equilibrium in flux c
         # x value: normalized psi
         # Quantity 1: Toroidal Field Function * 2π, `F * 2π` (where `F = R * B_toroidal`)
         # Quantity 2: Pressure * μ₀, `P * μ₀`.
-        # Quantity 3: q-profile 
-        # Quantity 4: sqrt(psi_norm)
+        # Quantity 3: dVdpsi
+        # Quantity 4: q
 - `rzphi`: The final 2D flux-coordinate mapping spline (`BicubicSplineType`).
         # x value: normlized psi
         # y value: SFL poloidal angle [0,1]
         # Quantity 1: r_coord² = (R - ro)² + (Z - zo)²
         # Quantity 2: Offset between the geometric poloidal angle (η) and the new angle (θ_new)
                      `η / (2π) - θ_new
-        # Quantity 3:
-        # Quantity 4: The scaled physics Jacobian
+        # Quantity 3: ν in ϕ=2πζ+ν(ψ,θ)
+        # Quantity 4: Jacobian.
+-   `eqfun`: A 2D spline storing local physics and geometric quantities that vary across the flux surfaces.
+        # These are pre-calculated for efficient use in subsequent stability and transport codes.
+        # x value: Normalized poloidal flux, ψ_norm ∈ [0, 1].
+        # y value: SFL poloidal angle, θ_new ∈ [0, 1].
+        # Quantity 1: Total magnetic field strength, B [T]
+        # Quantity 2: (e₁⋅e₂ + q⋅e₃⋅e₁) / (J⋅B²).
+        # Quantity 3: (e₂⋅e₃ + q⋅e₃⋅e₃) / (J⋅B²).
 - `ro`: R-coordinate of the magnetic axis [m].
 - `zo`: Z-coordinate of the magnetic axis [m].
 - `psio`: Total flux difference `|Ψ_axis - Ψ_boundary|` [Weber / radian].
@@ -131,10 +147,86 @@ mutable struct PlasmaEquilibrium
     equil_input::EquilInput
     sq::Any             # Final 1D profile spline
     rzphi::Any          # Final 2D coordinate mapping spline
-    eq_quantities::Any
+    eqfun::Any
     ro::Float64
     zo::Float64
     psio::Float64
+end
+
+
+"""
+    LarInput(...)  
+
+A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equilibrium model.
+
+## Fields:
+
+- `lar_r0`: The major radius of the plasma [m].
+- `lar_a`: The minor radius of the plasma [m].
+
+- `beta0`: The beta value on axis (normalized pressure).
+- `q0`: The safety factor on axis.
+
+- `p_pres`: The exponent for the pressure profile, defined as `p00 * (1 - (r / a)^2)^p_pres`.
+- `p_sig`: The exponent that determines the shape of the current-related function profile.
+
+- `sigma_type`: The type of sigma profile, can be "default" or "wesson". If "wesson", the sigma profile is defined as `sigma0 * (1 - (r / a)^2)^p_sig`.
+
+- `mtau`: The number of grid points in the poloidal direction.
+- `ma`: The number of grid points in the radial direction.
+- `zeroth`: If set to true, it neglects the Shafranov shift
+"""
+
+mutable struct LarInput
+    lar_r0::Float64     # Major radius of the plasma
+    lar_a::Float64      # Minor radius of the plasma
+
+    beta0::Float64      # beta on axis
+    q0::Float64         # q (safety factor) on axis
+
+    p_pres::Float64     # p00 * (1-(r/a)**2)**p_pres
+    p_sig::Float64      # The exponent that determines the shape of the current-related function profile
+
+    sigma_type::String  # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
+
+    mtau::Int      # the number of grid points in the poloidal direction
+    ma::Int        # the number of grid points in the radial direction
+
+    zeroth ::Bool      #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
+end
+
+"""
+    SolInput(...)  
+
+A mutable struct holding parameters for the Soloviev analytical equilibrium.
+
+## Fields:
+
+- `mr`: Number of radial grid zones
+- `mz`: Number of axial grid zones
+- `ma`: Number of flux grid zones
+- `e`: Elongation
+- `a`: Minor radius
+- `r0`: Major radius
+- `q0`: Safety factor at the o-point
+- `p0fac`: Scales on axis pressure (s*P. beta changes. Phi,q constant)
+- `b0fac`: Scales on toroidal field (s*Phi,s*f,s^2*P. bt changes. Shape,beta constant)
+- `f0fac`: Scales on toroidal field (s*f. bt,q changes. Phi,p,bp constant)
+"""
+
+mutable struct SolInput
+    mr::Int
+    mz::Int
+    ma::Int
+
+    e::Float64
+    a::Float64
+    r0::Float64
+    q0::Float64
+
+    p0fac::Float64
+    b0fac::Float64
+    f0fac::Float64
 end
 
 end # module Types

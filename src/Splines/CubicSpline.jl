@@ -1,12 +1,3 @@
-module CubicSpline
-
-const libdir = joinpath(@__DIR__, "..", "..", "deps")
-const libspline = joinpath(libdir, "libspline")
-
-using ..Helper: parse_bctype, ReadOnlyArray, @expose_fields
-
-export spline_setup, spline_eval, spline_eval!, spline_integrate!
-
 abstract type CubicSplineType end
 
 mutable struct RealSplineType <: CubicSplineType
@@ -58,11 +49,11 @@ function _MakeSpline(mx::Int64, nqty::Int64, bctype::Int32)
 	h = Ref{Ptr{Cvoid}}()
 	ccall((:spline_c_create, libspline), Cvoid,
 		(Int64, Int64, Ref{Ptr{Cvoid}}), mx, nqty, h)
-	
+
 
 	fsi = Matrix{Float64}(undef, 0, 0)
 	fs1 = Matrix{Float64}(undef, 0, 0)
-	
+
 	return RealSplineType(h[], Vector{Float64}(undef, 0), Matrix{Float64}(undef, 0, 0)
 	, mx, nqty, bctype, fsi, fs1)
 end
@@ -102,7 +93,7 @@ function _spline_setup(xs::Vector{Float64}, fs::Vector{Float64}, bctype::Int32)
 		(Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}),
 		spline.handle, xs, fs_matrix)
 
-	ccall((:spline_c_fit, libspline), Cvoid, 
+	ccall((:spline_c_fit, libspline), Cvoid,
         (Ptr{Cvoid}, Int32, Ptr{Float64}), spline.handle, spline.bctype, spline._fs1)
 
 
@@ -126,7 +117,7 @@ function _spline_setup(xs::Vector{Float64}, fs::Matrix{Float64}, bctype::Int32)
 		(Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}),
 		spline.handle, xs, fs)
 
-	ccall((:spline_c_fit, libspline), Cvoid, 
+	ccall((:spline_c_fit, libspline), Cvoid,
         (Ptr{Cvoid}, Int32, Ptr{Float64}), spline.handle, spline.bctype, spline._fs1)
 	return spline
 end
@@ -207,9 +198,9 @@ function spline_setup(xs, fs; bctype::Union{String, Int}="not-a-knot")
 	end
 
     spline = _spline_setup(xs, fs, Int32(bctype_code))
-	
+
 	finalizer(_destroy_spline, spline)
-    
+
 	return spline
 end
 
@@ -443,7 +434,7 @@ function _spline_integrate!(spline::ComplexSplineType)
 
 
     ccall((:cspline_c_int, libspline), Cvoid,
-          (Ptr{Cvoid}, Ptr{ComplexF64}), 
+          (Ptr{Cvoid}, Ptr{ComplexF64}),
           spline.handle, spline._fsi)
 
     return
@@ -457,11 +448,9 @@ function spline_integrate!(spline::CubicSplineType)
 	- `spline`: A mutable `Spline` object".
 
 	## Returns:
-	- Nothing. Updates `spline._fsi` in place so that  
+	- Nothing. Updates `spline._fsi` in place so that
 	`spline._fsi[i, :]` equals `∫_{xs[1]}^{xs[i]} f(x) dx` for each component.
 	"""
 
     _spline_integrate!(spline)
-end
-
 end
