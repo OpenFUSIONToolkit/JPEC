@@ -525,24 +525,24 @@ function ode_step(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEqui
 
 end
 
-function ode_unorm(sing_flag::Bool)
+function ode_unorm(intr::DconInternal, odet::OdeState, dout::DconOutput, fNames::DconFileNames, sing_flag::Bool)
     # Compute norms of first solution vectors, abort if any are zero
-    unorm[1:mpert] .= sqrt.(sum(abs.(u[:, 1:mpert, 1]).^2, dims=1)[:])
-    unorm[mpert+1:msol] .= sqrt.(sum(abs.(u[:, mpert+1:msol, 2]).^2, dims=1)[:])
-    if minimum(unorm[1:msol]) == 0
-        jmax = argmin(unorm[1:msol])
+    odet.unorm[1:intr.mpert] .= sqrt.(sum(abs.(u[:, 1:intr.mpert, 1]).^2, dims=1)[:])
+    odet.unorm[intr.mpert+1:odet.msol] .= sqrt.(sum(abs.(u[:, intr.mpert+1:odet.msol, 2]).^2, dims=1)[:])
+    if minimum(odet.unorm[1:odet.msol]) == 0
+        jmax = argmin(odet.unorm[1:odet.msol])
         error("One of the first solution vector norms unorm(1,$jmax) = 0")
     end
 
     # Normalize unorm and perform Gaussian reduction if required
     if new
         new = false
-        unorm0[1:msol] .= unorm[1:msol]
+        odet.unorm0[1:odet.msol] .= odet.unorm[1:odet.msol]
     else
-        unorm[1:msol] .= unorm[1:msol] ./ unorm0[1:msol]
-        uratio = maximum(unorm[1:msol]) / minimum(unorm[1:msol])
-        if uratio > ucrit || sing_flag
-            ode_fixup(sing_flag, false)
+        odet.unorm[1:odet.msol] .= odet.unorm[1:odet.msol] ./ odet.unorm0[1:odet.msol]
+        uratio = maximum(odet.unorm[1:odet.msol]) / minimum(odet.unorm[1:odet.msol])
+        if uratio > ctrl.ucrit || sing_flag
+            ode_fixup(intr, odet, dout, fNames, sing_flag, false)
             new = true
         end
     end
@@ -550,7 +550,7 @@ function ode_unorm(sing_flag::Bool)
     return
 end
 
-function ode_fixup(intr::DconInternal, odet::OdeState, dout::DconOutput, sing_flag::Bool, test::Bool)
+function ode_fixup(intr::DconInternal, odet::OdeState, dout::DconOutput, fNames::DconFileNames, sing_flag::Bool, test::Bool)
     # ...existing code... --> diagnose stuff would go here
 
     secondary = false
@@ -558,9 +558,9 @@ function ode_fixup(intr::DconInternal, odet::OdeState, dout::DconOutput, sing_fl
     jmax = zeros(Int, 1)
 
     # Initial output
-    println(crit_out_unit, "Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $q")
+    println(fNames.crit_out_unit, "Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $q")
     if !sing_flag
-        println(crit_out_unit, "Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $q")
+        println(fNames.crit_out_unit, "Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $q")
     end
     istate = 1
     flag_count = 0
@@ -632,8 +632,8 @@ function ode_fixup(intr::DconInternal, odet::OdeState, dout::DconOutput, sing_fl
     # Save fixfac to file
     if dout.bin_euler && !test
         write(dout.euler_bin_unit, 2)
-        write(euler_bin_unit, sing_flag, msol)
-        write(euler_bin_unit, fixfac, index[1:msol])
+        write(fNames.euler_bin_unit, sing_flag, msol)
+        write(fNames.euler_bin_unit, fixfac, index[1:msol])
     end
 
     # ...existing code... --> diagnose stuff would go here
