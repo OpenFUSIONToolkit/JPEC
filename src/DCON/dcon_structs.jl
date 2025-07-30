@@ -1,5 +1,3 @@
-
-using JPEC
 using TOML
 
 @kwdef mutable struct ResistType
