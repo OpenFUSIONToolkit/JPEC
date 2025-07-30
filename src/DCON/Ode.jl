@@ -45,6 +45,9 @@ including solution vectors, tolerances, and flags for the integration process.
     unorm::Vector{Float64} = zeros(Float64, 2*mpert)                        # norms of solution vectors
     unorm0::Vector{Float64} = zeros(Float64, 2*mpert)                       # initial norms of solution vectors
     fixfac::Array{ComplexF64,2} = zeros(ComplexF64, msol, msol)             # fixup factors for Gaussian reduction
+    crit_save::Float64 = 0.0    # saved critical value for zero crossing detection
+    nzero::Int = 0              # count of zero crossings detected
+    m1::Int = 0                 # poloidal mode number for the first singular surface (?)
 end
 
 OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
@@ -77,7 +80,7 @@ function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, i
             # Always record the first and last point in an inter-rational region
             test = ode_test()
             force_output = first || test
-            ode_output_step(unorm; op_force=force_output)
+            ode_output_step(unorm, intr, ctrl, DconFileNames(), equil; op_force=force_output)
             ode_record_edge()
             if test
                 break

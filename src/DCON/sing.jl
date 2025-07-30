@@ -50,7 +50,7 @@ For each rational surface found, a `NamedTuple` with:
 
 is pushed to `sing_surf_data`.
 """
-function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
+function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
 
     # Define functions to evaluate q and its first derivative
     # TODO: confirm that this is the correct way to get spline data
@@ -76,14 +76,14 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
             it = 0
             psi0 = psiex[iex-1]
             psi1 = psiex[iex]
-            psifac = equil.psilow
+            psifac =  0.01 # TODO: JMH - replace with equil.psilow
 
             # Bisection method to find singular surface
             while it < itmax
                 it += 1
                 psifac = (psi0 + psi1)/2
-                singfac = (m - nn * qval(psifac)) * dm
-                if abs(singfac) <= 1e-12
+                singfac = (m - ctrl.nn * qval(psifac)) * dm
+                if abs(singfac) <= 1e-8
                     break
                 elseif singfac > 0
                     psi0 = psifac
@@ -95,12 +95,12 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
             if it == itmax
                 @warn "Bisection did not converge for m = $m"
             else
-                push!(intr.sing, (
-                    m = m,
-                    psifac = psifac,
-                    rho = sqrt(psifac),
-                    q = m / nn,
-                    q1 = q1val(psifac),
+                push!(intr.sing, SingType(
+                        m = m,
+                        psifac = psifac,
+                        rho = sqrt(psifac),
+                        q = m / ctrl.nn,
+                        q1 = q1val(psifac),
                 ))
             end
             m += dm
@@ -392,15 +392,15 @@ function sing_der(neq::Int,
 
     #= kinetic stuff - skip for now
     if ctrl.kin_flag
-        cspline_eval!(ffit.amats, psifac, 0)
-        cspline_eval!(ffit.bmats, psifac, 0)
-        cspline_eval!(ffit.cmats, psifac, 0)
-        cspline_eval!(ffit.dmats, psifac, 0)
-        cspline_eval!(ffit.emats, psifac, 0)
-        cspline_eval!(ffit.hmats, psifac, 0)
-        cspline_eval!(ffit.dbats, psifac, 0)
-        cspline_eval!(ffit.ebats, psifac, 0)
-        cspline_eval!(ffit.fbats, psifac, 0)
+        cspline_eval(ffit.amats, psifac, 0)
+        cspline_eval(ffit.bmats, psifac, 0)
+        cspline_eval(ffit.cmats, psifac, 0)
+        cspline_eval(ffit.dmats, psifac, 0)
+        cspline_eval(ffit.emats, psifac, 0)
+        cspline_eval(ffit.hmats, psifac, 0)
+        cspline_eval(ffit.dbats, psifac, 0)
+        cspline_eval(ffit.ebats, psifac, 0)
+        cspline_eval(ffit.fbats, psifac, 0)
 
         amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
         bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
@@ -415,8 +415,8 @@ function sing_der(neq::Int,
         kwmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
         ktmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
         for i in 1:6
-            cspline_eval!(ffit.kwmats[i], psifac, 0)
-            cspline_eval!(ffit.ktmats[i], psifac, 0)
+            cspline_eval(ffit.kwmats[i], psifac, 0)
+            cspline_eval(ffit.ktmats[i], psifac, 0)
             kwmat[:,:,i] = reshape(ffit.kwmats[i].f, intr.mpert, intr.mpert)
             ktmat[:,:,i] = reshape(ffit.ktmats[i].f, intr.mpert, intr.mpert)
         end
@@ -468,12 +468,12 @@ function sing_der(neq::Int,
         # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else =#
         #TODO: find out what this function is actually called now and what to pass in
-        cspline_eval!(ffit.amats, psifac, 0)
-        cspline_eval!(ffit.bmats, psifac, 0)
-        cspline_eval!(ffit.cmats, psifac, 0)
-        cspline_eval!(ffit.fmats, psifac, 0)
-        cspline_eval!(ffit.kmats, psifac, 0)
-        cspline_eval!(ffit.gmats, psifac, 0)
+        cspline_eval(ffit.amats, psifac, 0)
+        cspline_eval(ffit.bmats, psifac, 0)
+        cspline_eval(ffit.cmats, psifac, 0)
+        cspline_eval(ffit.fmats, psifac, 0)
+        cspline_eval(ffit.kmats, psifac, 0)
+        cspline_eval(ffit.gmats, psifac, 0)
         amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
         bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
         cmat = reshape(ffit.cmats.f, intr.mpert, intr.mpert)
