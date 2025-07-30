@@ -1,7 +1,7 @@
 using LinearAlgebra
 using Printf
 
-function ode_output_step(unorm::Vector{Float64}; op_force::Union{Bool,Nothing}=nothing)
+function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames; op_force::Union{Bool,Nothing}=nothing)
     # Set optional parameters
     force = false
     if op_force !== nothing
@@ -9,9 +9,9 @@ function ode_output_step(unorm::Vector{Float64}; op_force::Union{Bool,Nothing}=n
     end
 
     # Compute and print critical data for each time step
-    ode_output_monitor()
+    ode_output_monitor(intr, ctrl, fNames)
     if out_evals || bin_evals
-        ode_output_get_evals()
+        ode_output_get_evals(intr, ctrl)
     end
 
     # Write solutions
@@ -40,18 +40,15 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl)
 
     # Access all variables from structs, not globals.
     # Pretty much just giving them all aliases so we don't have to type `intr.` and `ctrl.` every time.
-    u = intr.u
+    u = intr.ud #TODO: is ud the same as u
     mpert = intr.mpert
     out_evals = ctrl.out_evals
     bin_evals = ctrl.bin_evals
-    istep = intr.istep
-    psifac = intr.psifac
-    q = intr.q
-    m1 = intr.m1
     nn = intr.nn
-    sq = intr.sq
     evals_out_unit = ctrl.evals_out_unit
     evals_bin_unit = ctrl.evals_bin_unit
+
+    #TODO: where do psifac, m1 and q come from? Also istep and sq
 
     # Compute plasma response matrix
     temp = conj.(transpose(u[:, 1:mpert, 1]))
@@ -119,19 +116,15 @@ function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconF
     # mpert, msol
 
     mpert = intr.mpert
-    istep = intr.istep
-    psifac = intr.psifac
-    q = intr.q
-    m1 = intr.m1
     nn = intr.nn
-    monitor_unit = ctrl.monitor_unit
     crit_out_unit = fNames.crit_out_unit
     crit_bin_unit = fNames.crit_bin_unit
     termbycross_flag = ctrl.termbycross_flag
     msol = sq.msol # Assuming msol is part of sq or similar structure
 
     #TODO: term_unit and out_unit are not defined in the provided context.
-    #TODO: Also nzero does not seem to be in a struct either and sq and where is u coming from?
+    #TODO: Where is monitor_unit from 
+    #TODO: Also nzero does not seem to be in a struct either and sq and where is u coming from? And istep and m1 and q and psifac
 
     # Static variables (simulate Fortran SAVE)
     global crit_save = get(Globals, :crit_save, 0.0)
@@ -184,7 +177,7 @@ function ode_output_get_crit(psi, u, intr::DconInternal, ctrl::DconControl, sq::
     # Returns: (q, singfac, logpsi1, logpsi2, crit)::Tuple{Float64, Float64, Float64, Float64, Float64}
 
     # Assumed global variables/constants:
-    # mpert, m1, nn, sq (with sq.f), spline_eval
+    # m1, sq (with sq.f), spline_eval
     #TODO: there are still a few global variables here that should be in structs. Or that have not been correctly pulled from structs
 
     # Compute dependent variables
