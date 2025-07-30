@@ -18,7 +18,7 @@ Holds plasma boundary and mode data as provided from DCON or equivalent upstream
 - `delta`: -dphi/qa; 0 for coordinate systems using machine angle (e.g., PEST basis).
 - `mlow`: Lower poloidal mode number for spectral representation.
 - `mhigh`: Upper poloidal mode number for spectral representation.
-- `n`: The toroidal mode number. Paper: $n$.
+- `n`: The toroidal mode number. Paper: n.
 - `qa`: Safety factor at the plasma boundary.
 - `mtheta_in`: Number of poloidal angles in the input boundary arrays.
 """
@@ -128,7 +128,7 @@ Numerical and input control parameters for grid and harmonics.
 - `mth` : Even integer. Number of grid points used for the calculation. The values of 
   the needed quantities on these points are interpolated from those gotten from 
   the plasma information in `mp0`, `mp1`, `vacin`, `invacuum`, or equivalent.
-- `xiin`: Array. Input Fourier modes of $\xi_l(edge)$. See `ieig` in Sec. diags.
+- `xiin`: Array. Input Fourier modes of xi_l(edge). See `ieig` in Sec. diags.
 - `lsymz`: .true. Symmetrizes the vacuum matrix.
 - `leqarcw`: 1 turns on equal arcs distribution of the nodes on the shell. Best results unless
   the wall is very close to the plasma. See `ishape=6` option.
@@ -164,11 +164,11 @@ Parameters for vacuum wall and geometry. (Paper Table: "vacdat")
     * `< 40`: Toroidal conductor with a toroidally symmetric gap, geometry independent of plasma.
     * 31: Shell independent of plasma. Gap on inner side.
     * 34: Shell independent of plasma. Gap on outer side.
-- `aw` ($a_w$): Half-thickness of the shell.
-- `bw` ($b_w$): Elongation of the shell.
-- `cw` ($c_w$): Offset of the center of the shell from the major radius, $X_{maj}$.
-- `dw` ($\delta_w$): Triangularity of shell.
-- `tw` ($\tau_w$): Sharpness of the corners of the shell. Try 0.05 as a good initial value.
+- `aw` (a_w): Half-thickness of the shell.
+- `bw` (b_w): Elongation of the shell.
+- `cw` (c_w): Offset of the center of the shell from the major radius, X_{maj}.
+- `dw` (delta_w): Triangularity of shell.
+- `tw` (tau_w): Sharpness of the corners of the shell. Try 0.05 as a good initial value.
 - `nsing`: Not referenced.
 - `epsq`: Not referenced.
 - `noutv`: Number of grid points for the eddy current plots.
@@ -177,7 +177,7 @@ Parameters for vacuum wall and geometry. (Paper Table: "vacdat")
 - `idsk`: Not referenced.
 - `delg`: Non-integer. Size of arrows for the eddy current plots. Integer part is length of shaft and decimal part is size of the head.
 - `delfac`: Controls grid size to calculate derivatives in `spark` type calculations.
-- `cn0`: Constant added to the $\cal K$ matrix to make it nonsingular for $n=0$ modes.
+- `cn0`: Constant added to the cal K matrix to make it nonsingular for n=0 modes.
 """
 struct Vacdat
     ishape::Int
@@ -202,18 +202,18 @@ end
 
 Plasma and wall geometric parameters. (Paper Table: "shape")
 
-- `ipshp`: 0 gets the plasma boundary and safety factor, $\qedge$, etc. from input files. 1 ignores input data files, sets $\qedge = qain$. Shape of plasma is dee-shaped centered at `xpl`, radius `apl`, elongation `bpl`, and triangularity `dpl`. The straight-line coordinate variable $\delta(\theta)$ is set to zero.
-- `xpl`: Plasma center $R$ coordinate.
+- `ipshp`: 0 gets the plasma boundary and safety factor, qedge, etc. from input files. 1 ignores input data files, sets qedge = qain. Shape of plasma is dee-shaped centered at `xpl`, radius `apl`, elongation `bpl`, and triangularity `dpl`. The straight-line coordinate variable delta(theta) is set to zero.
+- `xpl`: Plasma center R coordinate.
 - `apl`: Plasma minor radius.
 - `bpl`: Plasma elongation.
 - `dpl`: Plasma triangularity.
-- `qain`: Input value for $\qedge$ when `ipshp = 1`.
+- `qain`: Input value for qedge when `ipshp = 1`.
 - `r`: Not referenced.
-- `a` ($a$): Usually the distance of the shell from the plasma in units of the plasma radius $p_{rad}$ at the outer side. If $a \geq 10$, the wall is assumed to be at $\infty$.
-- `b` ($\beta$): Subtending half-angle of the shell in degrees.
-- `abulg` ($a_b$): The size of the bulge along the major radius, normalized to the mean plasma radius.
-- `bbulg` ($\beta_b$): Subtending half-angle of the extent of the bulge.
-- `tbulg` ($\tau_b$): Inverse roundedness of the bulge corners.
+- `a` (a): Usually the distance of the shell from the plasma in units of the plasma radius p_{rad} at the outer side. If a geq 10, the wall is assumed to be at infty.
+- `b` (beta): Subtending half-angle of the shell in degrees.
+- `abulg` (a_b): The size of the bulge along the major radius, normalized to the mean plasma radius.
+- `bbulg` (beta_b): Subtending half-angle of the extent of the bulge.
+- `tbulg` (tau_b): Inverse roundedness of the bulge corners.
 """
 struct Shape
     ipshp::Int
@@ -236,28 +236,28 @@ end
 Diagnostics and output control parameters. (Paper Table: "diags")
 
 - `lkdis`: Logical. Turns on the eddy current calculations. Calls `subroutine kdis`.
-- `ieig`: Integer. Options for getting the surface eigenfunctions $\xi(l)$.
-    * 1: From pest-1. Writes the $\omega^2$ and $\xi(l)$.
+- `ieig`: Integer. Options for getting the surface eigenfunctions xi(l).
+    * 1: From pest-1. Writes the omega^2 and xi(l).
     * 4: Reads from file `outdist`.
-    * 5: Gets $\xi(l)$ from the input `xiin` in namelist `modes`.
-    * 8: $\Re[\xi(k)]$ and $\Im[\xi(k)]$ from input file `vacin` for `gato`'s input.
+    * 5: Gets xi(l) from the input `xiin` in namelist `modes`.
+    * 8: Re[xi(k)] and Im[xi(k)] from input file `vacin` for `gato`'s input.
 - `iloop`: Integer. Turns on Mirnov coils calculation.
     * 1: Coil locations given by dee-shaped geometry set by parameters below.
     * 2: PBX's Mirnov coil positions.
 - `lpsub`: Integer. Uses subroutines for coil positions. Otherwise uses namelist inputs `(xloop, zloop)`.
 - `nloop`: Number of coils around the plasma.
 - `nloopr`: Number of radial loops.
-- `nphil`: Number of $\phi$ positions for the loop calculations.
-- `nphse`: Number of $\phi$ positions for the eddy current plots.
+- `nphil`: Number of phi positions for the loop calculations.
+- `nphse`: Number of phi positions for the eddy current plots.
 - `xofsl`: Offset of the loop positions.
 - `ntloop`: Number of loop positions distributed along the shell.
 - `aloop`: Distance of the loop "dee" from plasma.
 - `bloop`: Elongation of the loop "dee".
 - `dloop`: Triangularity of the loop "dee".
 - `rloop`: Not referenced.
-- `deloop`: Delta fraction of `plrad` to calculate magnetic field from the derivative of $\chi$.
-- `mx`, `mz`: Contour grid for $\chi$.
-- `nph`: Number of such contours in $\phi$.
+- `deloop`: Delta fraction of `plrad` to calculate magnetic field from the derivative of chi.
+- `mx`, `mz`: Contour grid for chi.
+- `nph`: Number of such contours in phi.
 - `nxlpin`, `nzlpin`: Number of X and Z grid points for field evaluation.
 - `epslp`: Grid tolerance for field evaluation.
 - `xlpmin`, `xlpmax`: X grid bounds for field evaluation.
