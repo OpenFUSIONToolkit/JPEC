@@ -10,7 +10,7 @@ This module provides functions to:
 3. Fit the results to Fourier-spline representation
 """
 
-module FourfitMetric
+# module FourfitMetric
 using LinearAlgebra
 using FFTW
 using JPEC
@@ -25,7 +25,7 @@ global kmats_storage = nothing
 
 
 
-export fourfit_make_metric, MetricData, fourfit_make_matrix, MatrixData, compute_eigenvalues
+#export fourfit_make_metric, MetricData, fourfit_make_matrix, MatrixData, compute_eigenvalues
 
 """
     MetricData
@@ -1687,4 +1687,4 @@ end
 
 
 
-end # module FourfitMetric
+# end # module FourfitMetric

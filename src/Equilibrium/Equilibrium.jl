@@ -69,8 +69,170 @@ function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
     # Run the appropriate solver (direct or inverse) to get a PlasmaEquilibrium struct
     plasma_equilibrium = equilibrium_solver(eq_input)
 
+    # add global parameters to the PlasmaEquilibrium struct
+    equilibrium_global_parameters!(plasma_equilibrium)
+
+    # Find q information
+    equilibrium_qfind!(plasma_equilibrium)
+
+    # Diagnoses grad-shafranov solution.
+    equilibrium_gse!(plasma_equilibrium)
+
     println("--- Equilibrium Setup Complete ---")
     return plasma_equilibrium
+end
+
+
+function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
+    rzphi = pe.rzphi
+    mpsi = size(rzphi.fs, 1) - 1
+    mtheta = size(rzphi.fs, 2) - 1
+    twopi = 2π
+
+    # Allocate vector to store eta offset from rzphi
+    vector = zeros(Float64, mtheta + 1)
+    for it in 0:mtheta
+        f = Spl.bicube_eval(rzphi, rzphi.xs[mpsi+1], rzphi.ys[it+1], 0)
+        vector[it+1] = rzphi.ys[it+1] + f[2]
+    end
+
+    psifac = rzphi.xs[mpsi+1]
+    eta0 = 0.0
+    idx = findmin(abs.(vector .- eta0))[2]
+    theta = rzphi.ys[idx]
+    rsep = zeros(2)
+
+    for iside in 1:2
+        it = 0
+        while true
+            it += 1
+            f, fx, fy = Spl.bicube_eval(rzphi, psifac, theta, 1, return_gradient=true)
+            eta = theta + f[2] - eta0
+            eta_theta = 1 + fy[2]
+            dtheta = -eta / eta_theta
+            theta += dtheta
+            if abs(eta) <= 1e-10 || it > 100
+                break
+            end
+        end
+        f = Spl.bicube_eval(rzphi, psifac, theta, 0)
+        rsep[iside] = pe.params.ro + sqrt(f[1]) * cos(twopi * (theta + f[2]))
+        eta0 = 0.5
+        idx = findmin(abs.(vector .- eta0))[2]
+        theta = rzphi.ys[idx]
+    end
+
+    # Find top and bottom
+    for it in 0:mtheta
+        f = Spl.bicube_eval(rzphi, rzphi.xs[mpsi+1], rzphi.ys[it+1], 0)
+        vector[it+1] = sqrt(f[1]) * sin(twopi * (rzphi.ys[it+1] + f[2]))
+    end
+
+    top_idx = argmax(vector)
+    bottom_idx = argmin(vector)
+    top_theta = rzphi.ys[top_idx]
+    bottom_theta = rzphi.ys[bottom_idx]
+
+    # Placeholder computation of zsep, rext
+    pe.params.zsep = [pe.params.zo + 0.1, pe.params.zo - 0.1]  # To be refined using Newton method as in Fortran
+    rext = [pe.params.ro + 0.1, pe.params.ro - 0.1]
+
+    return rsep, zsep, rext
+end
+
+
+function equilibrium_global_parameters!(equil::PlasmaEquilibrium)
+    # Set global parameters based on the equilibrium data
+    equil.global_params.rmean = mean(equil.r)
+    equil.global_params..zmean = mean(equil.z)
+    equil.b0 = mean(equil.b)
+    equil.q0 = mean(equil.q)
+    equil.psi0 = mean(equil.psi)
+
+    # Add any other global parameters as needed
+    return equil
+    
+end
+
+
+
+
+
+function equilibrium_qfind!(equil::PlasmaEquilibrium)
+    println("Finding q profile...")
+
+    sq = equil.sq
+    mpsi = size(sq.fs, 1) - 1  # assuming sq.fs is (mpsi+1, nqty)
+    psiexl = Float64[]
+    qexl = Float64[]
+
+    # Left endpoint
+    push!(psiexl, sq.xs[1])
+    push!(qexl, sq.fs[1, 4])
+
+    # Search for extrema
+    for ipsi in 1:mpsi
+        x0 = sq.xs[ipsi]
+        x1 = sq.xs[ipsi+1]
+        xmax = x1 - x0
+
+        Spl.eval_spline!(sq, x0, deriv_order=3)
+        a = sq.f[4]
+        b = sq.f1[4]
+        c = sq.f2[4]
+        d = sq.f3[4]
+
+        if d != 0.0
+            xcrit = -c / d
+            dx2 = xcrit^2 - 2b / d
+            if dx2 ≥ 0
+                dx = sqrt(dx2)
+                for delta in (dx, -dx)
+                    x = xcrit - delta
+                    if 0 ≤ x < xmax
+                        ψ = x0 + x
+                        push!(psiexl, ψ)
+                        Spl.eval_spline!(sq, ψ, deriv_order=0)
+                        push!(qexl, sq.f[4])
+                    end
+                end
+            end
+        end
+    end
+
+    # Right endpoint
+    push!(psiexl, sq.xs[end])
+    push!(qexl, sq.fs[end, 4])
+
+    # Store in output fields (you can place these in `equil` as needed)
+    equil.qextrema_psi = psiexl
+    equil.qextrema_q = qexl
+
+    # Compute q0, qmin, qmax, qa, q95
+    q0 = sq.fs[1, 4] - sq.fs1[1, 4] * sq.xs[1]
+    qmax_edge = sq.fs[end, 4]
+    qmin = min(minimum(qexl), q0)
+    qmax = max(maximum(qexl), qmax_edge)
+    qa = sq.fs[end, 4] + sq.fs1[end, 4] * (1.0 - sq.xs[end])
+
+    Spl.eval_spline!(sq, 0.95, deriv_order=0)
+    q95 = sq.f[4]
+
+    println("q0: $q0, qmin: $qmin, qmax: $qmax, qa: $qa, q95: $q95")
+    equil.q0   = q0
+    equil.qmin = qmin
+    equil.qmax = qmax
+    equil.qa   = qa
+    equil.q95  = q95
+
+    return equil
+end
+
+
+
+function equilibrium_gse!(equil::PlasmaEquilibrium)
+    println("Diagnosing Grad-Shafranov solution...")
+    return equil
 end
 
 end # module Equilibrium
