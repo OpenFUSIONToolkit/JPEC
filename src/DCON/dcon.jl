@@ -16,10 +16,9 @@ function MainProgram()
 #      read input data.
 # -----------------------------------------------------------------------
     inputs = TOML.parsefile("dcon.toml")
-    ctrl=DconControl(inputs["DCON_CONTROL"])
-    outp=DconOutput(inputs["DCON_OUTPUT"])
-
-    intr=DconInternal() 
+    ctrl = DconControl(; (Symbol(k)=>v for (k,v) in inputs["DCON_CONTROL"])...)
+    outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
+    intr = DconInternal() 
 
 # -----------------------------------------------------------------------
 #     set variables. (EQUIL TEAM)
@@ -228,7 +227,7 @@ function MainProgram()
     println("Normal termination.")
 end
 
-function LoadEquilibrium()
+function LoadEquilibrium() # EQUIL TEAM
     equil_input = JPEC.Equilibrium.EquilInput(
       "beta_1.00",        # eq_filename
       "efit",          # eq_type
@@ -343,4 +342,3 @@ function timer_start()
     return
 end
 
-const Version = "JULIA-PORT-1.0"
