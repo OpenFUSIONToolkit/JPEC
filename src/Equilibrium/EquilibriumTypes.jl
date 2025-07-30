@@ -295,16 +295,37 @@ end
 
 
 
-struct GlobalEquilibriumParameters
-    rmean::Float64
-    amean::Float64
-    aratio::Float64
-    kappa::Float64
-    delta1::Float64
-    delta2::Float64
-    bt0::Float64
-    crnt::Float64
-    bwall::Float64
+mutable struct EquilibriumParameters
+    ro::Float64                 # R-coordinate of the magnetic axis [m]
+    zo::Float64                 # Z-coordinate of the magnetic axis [m]
+    psio::Float64               # Total flux difference |Ψ_axis - Ψ_boundary|
+    rsep::Vector{Float64}       # R-coordinates of the separatrix [m]
+    zsep::Vector{Float64}       # Z-coordinates of the separatrix [m]
+    rext::Vector{Float64}       # R-coordinates of the outermost flux surface [m]
+    zext::Vector{Float64}       # Z-coordinates of the outermost flux surface [m]
+    psi0::Float64               # Reference poloidal flux value [Weber/radian]
+    b0::Float64                 # Toroidal magnetic field strength at the magnetic axis [T]
+    q0::Float64                 # Safety factor at the magnetic axis
+    psi_norm::Float64           # Normalized poloidal flux at the magnetic axis
+    b_norm::Float64             # Normalized toroidal magnetic field strength at the magnetic axis
+    psi_axis::Float64           # Poloidal flux at the magnetic axis [Weber/radian]
+    psi_boundary::Float64       # Poloidal flux at the boundary [Weber/radian]
+    psi_boundary_norm::Float64  # Normalized poloidal flux at the boundary
+    psi_axis_norm::Float64      # Normalized poloidal flux at the magnetic axis
+    psi_boundary_offset::Float64  # Offset for the poloidal flux at the boundary
+    psi_axis_offset::Float64    # Offset for the poloidal flux at the magnetic axis
+    psi_boundary_sign::Int      # Sign of the poloidal flux at the boundary
+    psi_axis_sign::Int          # Sign of the poloidal flux at the magnetic axis
+    psi_boundary_zero::Bool     # Whether the poloidal flux at the boundary is zero    
+    rmean::Float64              # Mean R-coordinate of the plasma [m]
+    amean::Float64              # Mean minor radius of the plasma [m]
+    aratio::Float64             # Aspect ratio of the plasma
+    kappa::Float64              # Elongation of the plasma cross-section
+    delta1::Float64             # Triangularity of the plasma cross-section
+    delta2::Float64             # Second triangularity of the plasma cross-section
+    bt0::Float64                # Toroidal magnetic field strength at the magnetic axis [T]
+    crnt::Float64               # Plasma current at the magnetic axis [A]
+    bwall::Float64              # Toroidal magnetic field strength at the wall [T]
 end
 
 
@@ -344,7 +365,7 @@ provides a complete representation of the processed plasma equilibrium in flux c
 """
 mutable struct PlasmaEquilibrium
     config::EquilConfig
-    global_params::GlobalEquilibriumParameters  # Global parameters for the equilibrium
+    params::EquilibriumParameters  # Global parameters for the equilibrium
     sq::Spl.CubicSplineType                     # Final 1D profile spline
     rzphi::Spl.BicubicSplineType                # Final 2D coordinate mapping spline
     eqfun::Spl.BicubicSplineType

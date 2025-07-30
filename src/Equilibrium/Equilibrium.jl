@@ -84,11 +84,61 @@ function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
 end
 
 
-function equilibrium_sep_find!(equil::PlasmaEquilibrium)
-    # This function is a placeholder for finding the separatrix.
-    # It should be implemented based on the specific requirements of the equilibrium.
-    # For now, we will just return the input equilibrium as is.
-    return equil
+function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
+    rzphi = pe.rzphi
+    mpsi = size(rzphi.fs, 1) - 1
+    mtheta = size(rzphi.fs, 2) - 1
+    twopi = 2π
+
+    # Allocate vector to store eta offset from rzphi
+    vector = zeros(Float64, mtheta + 1)
+    for it in 0:mtheta
+        f = Spl.bicube_eval(rzphi, rzphi.xs[mpsi+1], rzphi.ys[it+1], 0)
+        vector[it+1] = rzphi.ys[it+1] + f[2]
+    end
+
+    psifac = rzphi.xs[mpsi+1]
+    eta0 = 0.0
+    idx = findmin(abs.(vector .- eta0))[2]
+    theta = rzphi.ys[idx]
+    rsep = zeros(2)
+
+    for iside in 1:2
+        it = 0
+        while true
+            it += 1
+            f, fx, fy = Spl.bicube_eval(rzphi, psifac, theta, 1, return_gradient=true)
+            eta = theta + f[2] - eta0
+            eta_theta = 1 + fy[2]
+            dtheta = -eta / eta_theta
+            theta += dtheta
+            if abs(eta) <= 1e-10 || it > 100
+                break
+            end
+        end
+        f = Spl.bicube_eval(rzphi, psifac, theta, 0)
+        rsep[iside] = pe.params.ro + sqrt(f[1]) * cos(twopi * (theta + f[2]))
+        eta0 = 0.5
+        idx = findmin(abs.(vector .- eta0))[2]
+        theta = rzphi.ys[idx]
+    end
+
+    # Find top and bottom
+    for it in 0:mtheta
+        f = Spl.bicube_eval(rzphi, rzphi.xs[mpsi+1], rzphi.ys[it+1], 0)
+        vector[it+1] = sqrt(f[1]) * sin(twopi * (rzphi.ys[it+1] + f[2]))
+    end
+
+    top_idx = argmax(vector)
+    bottom_idx = argmin(vector)
+    top_theta = rzphi.ys[top_idx]
+    bottom_theta = rzphi.ys[bottom_idx]
+
+    # Placeholder computation of zsep, rext
+    pe.params.zsep = [pe.params.zo + 0.1, pe.params.zo - 0.1]  # To be refined using Newton method as in Fortran
+    rext = [pe.params.ro + 0.1, pe.params.ro - 0.1]
+
+    return rsep, zsep, rext
 end
 
 
