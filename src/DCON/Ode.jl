@@ -16,7 +16,6 @@ using JPEC
 # plasma_eq = JPEC.Equilibrium.setup_equilibrium(equil_input)
 # sq = plasma_eq.sq
 
-const diagnose_ca = false
 const eps = 1e-10
 
 """
@@ -65,10 +64,6 @@ function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, i
     else
         error("Invalid value for sing_start: $(ctrl.sing_start) > msing = $(intr.msing)")
     end
-    #ode_output_open() # TODO: have to handle io
-    if diagnose_ca
-        ascii_open(ca_unit, "ca.out", "UNKNOWN")
-    end
 
     # Integration loop
     while true
@@ -106,11 +101,6 @@ function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, i
         end
     end
 
-    # Finalize
-    ode_output_close()
-    if diagnose_ca
-        ascii_close(ca_unit)
-    end
 end
 
 
