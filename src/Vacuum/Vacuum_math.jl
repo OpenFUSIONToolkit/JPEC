@@ -31,6 +31,8 @@
 using Interpolations
 using SpecialFunctions
 
+export spline1d, spline1d_deriv, lagrange1d, search, green
+
 #############################################################
 # Cubic spline and derivatives for line 1d array and return point value, 
 # replacing spl1d1, spl1d2
@@ -46,22 +48,93 @@ function spline1d_deriv(x::Vector, y::Vector, xq::Real)
 end
 
 #############################################################
-# lagrange spline for line 1d array and return point value
+# lagrange spline for line 1d array, return point value and its derivative
 # replacing lagp, lagpe4, lag
 #############################################################
-function lagrange1d(x::Vector, y::Vector, xq::Real)
-    n = length(x)
-    s = 0.0
-    for i in 1:n
-        p = 1.0
-        for j in 1:n
-            if i != j
-                p *= (xq - x[j]) / (x[i] - x[j])
-            end
-        end
-        s += y[i] * p
+"""
+    lagrange1d(ax, af, m, nl, x, iop)
+
+This function performs Lagrange interpolation and optionally computes its derivative.
+
+# Arguments
+- `ax::AbstractVector{Float64}`: Array of x-coordinates for the interpolation points.
+- `af::AbstractVector{Float64}`: Array of y-coordinates (function values) for the interpolation points.
+- `m::Int`: Number of interpolation points.
+- `nl::Int`: Number of points to use for the local interpolation (degree of polynomial + 1).
+- `x::Float64`: The x-value at which to evaluate the interpolated function and/or its derivative.
+
+# Returns
+- `f::Float64`: The interpolated function value at `x`
+- `df::Float64`: The interpolated function derivative at `x` 
+"""
+function lagrange1d!(ax::Vector{Float64}, af::Vector{Float64}, m::Int, nl::Int, x::Float64, f::Float64, df::Float64)
+
+    jn = findfirst(i -> ax[i] >= x, 1:m)
+    jn = (jn === nothing) ? m : jn
+    jn = max(jn - 1, 1)
+    if jn < m && abs(ax[jn + 1] - x) < abs(x - ax[jn])
+        jn += 1
     end
-    return s
+
+    # Determine the range of indices for interpolation
+    jnmm = floor(Int, (nl - 0.1) / 2)
+    jnpp = floor(Int, (nl + 0.1) / 2)
+
+    nll = jn - jnmm
+    nlr = jn + jnpp
+
+    # Adjust for even nl when ax[jn] > x
+    if (nl % 2 == 0) && (ax[jn] > x)
+        nll -= 1
+        nlr += 1
+    end
+
+    # Clamp indices to valid array bounds
+    if nlr > m
+        nlr = m
+        nll = nlr - nl + 1
+    elseif nll < 1
+        nll = 1
+        nlr = nl
+    end
+
+    # Compute function value f
+    for i in nll:nlr
+        alag = 1.0
+        for j in nll:nlr
+            if i == j
+                continue
+            end
+            alag *= (x - ax[j]) / (ax[i] - ax[j])
+        end
+        f += alag * af[i]
+    end
+    if iop == 0
+        return f, df # df is 0.0 as initialized
+    end
+
+    # Compute derivative df
+    for i in nll:nlr
+        slag = 0.0
+        for id in nll:nlr
+            if id == i
+                continue
+            end
+            alag = 1.0
+            for j in nll:nlr
+                if j == i
+                    continue
+                end
+                if j != id
+                    alag *= (x - ax[j]) / (ax[i] - ax[j])
+                else
+                    alag /= (ax[i] - ax[id])
+                end
+            end
+            slag += alag
+        end
+        df += slag * af[i]
+    end
 end
 
 #############################################################
@@ -323,7 +396,7 @@ function green(xs, zs, xt, zt, xtp, ztp, n, usechancebugs=false)
     pn = legendre[end-1]
 
     # Chance eq.(40) 2π⅁ⁿ = G
-    gg = -2 * sqrt(π) * gamma(0.5 - n) / R
+    gg = 2 * sqrt(π) * gamma(0.5 - n) / R
     G = gg * pn
 
     # Chance eq.(44)
@@ -392,13 +465,251 @@ end
 # Utilities
 #############################################################
 
-const architecture = Sys.ARCH
-const cpu_name = Sys.CPU_NAME
-const threads = Sys.CPU_THREADS
-const kernel = Sys.KERNEL
-const username = Sys.username()
+const architecture = Sys.ARCH;
+const cpu_name = Sys.CPU_NAME;
+const threads = Sys.CPU_THREADS;
+const kernel = Sys.KERNEL;
+const username = Sys.username();
 
-function time()
-    now = Dates.now()
-    return Dates.format(now, "HH:MM:SS")
+
+#############################################################
+# Additional spline functions for vacuum structure
+#############################################################
+function spl1d1!(n::Int, x::Vector{Float64}, f::Vector{Float64}, w::Vector{Float64}, 
+                 iop::Vector{Int}, ij::Int, a::Vector{Float64}, b::Vector{Float64}, c::Vector{Float64})
+    
+    zz, oz, tz, sz = 0.0, 1.0, 3.0, 6.0
+    
+    # Check minimum size requirement
+    if n < 4
+        println("spl1d1: Results incorrect because n<4.")
+        return
+    end
+    
+    k = n - 1
+    a[2] = -(x[2] - x[1]) / sz
+    b[2] = (x[3] - x[1]) / tz
+    w[ij+1] = (f[2*ij+1] - f[ij+1]) / (x[3] - x[2]) - (f[ij+1] - f[1]) / (x[2] - x[1])
+    
+    # Main loop for tridiagonal system setup
+    if n > 3
+        for i = 3:k
+            m = (i-1) * ij + 1
+            j1 = m + ij
+            j2 = m - ij
+            con = (x[i+1] - x[i-1]) / tz
+            don = (x[i] - x[i-1]) / sz
+            b[i] = con - (don^2) / b[i-1]
+            e = (f[j1] - f[m]) / (x[i+1] - x[i]) - (f[m] - f[j2]) / (x[i] - x[i-1])
+            w[m] = e - (don * w[j2]) / b[i-1]
+            a[i] = -(don * a[i-1]) / b[i-1]
+        end
+    end
+    
+    k1 = (n-2) * ij + 1
+    c[n-1] = -((x[n] - x[n-1]) / sz) / b[n-1]
+    w[k1] = w[k1] / b[n-1]
+    a[n-1] = a[n-1] / b[n-1]
+    k2 = k - 1
+    
+    # Backward substitution
+    if n > 3
+        for i = 2:k2
+            j = n - i
+            con = (x[j+1] - x[j]) / sz
+            a[j] = (a[j] - con * a[j+1]) / b[j]
+            c[j] = -(con * c[j+1]) / b[j]
+            k3 = (j-1) * ij + 1
+            m = k3 + ij
+            w[k3] = (w[k3] - con * w[m]) / b[j]
+        end
+    end
+    
+    k4 = (n-1) * ij + 1
+    
+    # Boundary condition handling
+    if iop[1] != 5
+        c1 = w[1]
+        if iop[2] != 5
+            c2 = w[k4]
+        else
+            # Right boundary condition processing
+            if n >= 4
+                b1 = x[n] - x[n-3]
+                b2 = x[n] - x[n-2]  
+                b3 = x[n] - x[n-1]
+                b4 = x[n-1] - x[n-3]
+                b5 = x[n-1] - x[n-2]
+                b6 = x[n-2] - x[n-3]
+                l1 = k4 - ij
+                l2 = l1 - ij
+                l3 = l2 - ij
+                w[k4] = -b2*b3*f[l3]/(b6*b4*b1) + b1*b3*f[l2]/(b6*b5*b2) - 
+                        b1*b2*f[l1]/(b4*b5*b3) + f[k4]*(oz/b1+oz/b2+oz/b3)
+            end
+            c2 = w[k4]
+        end
+    else
+        # Left boundary condition processing
+        if n >= 4
+            a1 = x[1] - x[2]
+            a2 = x[1] - x[3]
+            a3 = x[1] - x[4]
+            a4 = x[2] - x[3]
+            a5 = x[2] - x[4]
+            a6 = x[3] - x[4]
+            w[1] = f[1]*(oz/a1+oz/a2+oz/a3) - a2*a3*f[ij+1]/(a1*a4*a5) + 
+                   a1*a3*f[2*ij+1]/(a2*a4*a6) - a1*a2*f[3*ij+1]/(a3*a5*a6)
+        end
+        c1 = w[1]
+        
+        if iop[2] != 5
+            c2 = w[k4]
+        else
+            if n >= 4
+                b1 = x[n] - x[n-3]
+                b2 = x[n] - x[n-2]
+                b3 = x[n] - x[n-1]
+                b4 = x[n-1] - x[n-3]
+                b5 = x[n-1] - x[n-2]
+                b6 = x[n-2] - x[n-3]
+                l1 = k4 - ij
+                l2 = l1 - ij
+                l3 = l2 - ij
+                w[k4] = -b2*b3*f[l3]/(b6*b4*b1) + b1*b3*f[l2]/(b6*b5*b2) - 
+                        b1*b2*f[l1]/(b4*b5*b3) + f[k4]*(oz/b1+oz/b2+oz/b3)
+            end
+            c2 = w[k4]
+        end
+    end
+    
+    # Process boundary conditions
+    for i = 1:k
+        m = (i-1) * ij + 1
+        
+        # Left boundary conditions
+        bob = zz
+        if iop[1] == 1
+            if i == 1
+                a[1] = -oz
+                c[1] = zz
+            end
+        elseif iop[1] == 2
+            if i == 1
+                a[1] = -oz
+                c[1] = zz
+                w[1] = zz
+            elseif i == 2
+                bob = -c1
+            end
+        elseif iop[1] == 3 || iop[1] == 5
+            if i == 1
+                a[1] = -(x[2] - x[1]) / tz
+                c[1] = zz
+                w[1] = -c1 + (f[ij+1] - f[1]) / (x[2] - x[1])
+            elseif i == 2
+                bob = (x[2] - x[1]) / sz
+            end
+        elseif iop[1] == 4
+            if i == 1
+                a[1] = -oz
+                c[1] = oz
+                w[1] = zz
+            end
+        end
+        
+        # Right boundary conditions
+        bill = zz
+        if iop[2] == 1
+            if i == 1
+                a[n] = zz
+                c[n] = -oz
+            end
+        elseif iop[2] == 2
+            if i == 1
+                a[n] = zz
+                c[n] = -oz
+                w[k4] = zz
+            elseif i == k
+                bill = -c2
+            end
+        elseif iop[2] == 3 || iop[2] == 5
+            if i == 1
+                a[n] = zz
+                c[n] = (x[n-1] - x[n]) / tz
+                w[k4] = c2 - (f[k4] - f[k4-ij]) / (x[n] - x[n-1])
+            elseif i == k
+                bill = (x[n] - x[n-1]) / sz
+            end
+        elseif iop[2] == 4
+            if i == 1
+                a[n] = zz
+                c[n] = (x[n-1] + x[1] - x[n] - x[2]) / tz
+                w[k4] = (f[ij+1] - f[1]) / (x[2] - x[1]) - (f[k4] - f[k4-ij]) / (x[n] - x[n-1])
+            elseif i == 2
+                bill = (x[2] - x[1]) / sz
+            elseif i == k
+                bill = (x[n] - x[n-1]) / sz
+            end
+        end
+        
+        # Apply boundary modifications
+        if i > 1
+            w[1] = w[1] - bob * w[m]
+            w[k4] = w[k4] - bill * w[m]
+            a[1] = a[1] - bob * a[i]
+            a[n] = a[n] - bill * a[i]
+            c[1] = c[1] - bob * c[i]
+            c[n] = c[n] - bill * c[i]
+        end
+    end
+    
+    # Solve final system
+    con = a[1] * c[n] - c[1] * a[n]
+    d1 = -w[1]
+    d2 = -w[k4]
+    w[1] = (d1 * c[n] - c[1] * d2) / con
+    w[k4] = (a[1] * d2 - d1 * a[n]) / con
+    
+    for i = 2:k
+        m = (i-1) * ij + 1
+        w[m] = w[m] + a[i] * w[1] + c[i] * w[k4]
+    end
+    
+    return
+end
+
+
+function spl1d2!(n::Int, x::Vector{Float64}, f::Vector{Float64}, w::Vector{Float64}, 
+                 ij::Int, y::Float64, tab::Vector{Float64})
+    
+    wz, sz = 2.0, 6.0
+    mflag = 0
+    
+    # Find interval
+    if y <= x[1]
+        i = 1
+    elseif y >= x[n]
+        i = n - 1
+    else
+        i = search(y, x, n, 1, mflag)
+    end
+    
+    mi = (i-1) * ij + 1
+    k1 = mi + ij
+    flk = x[i+1] - x[i]
+    
+    # Calculate spline value and derivatives
+    a = (w[mi] * (x[i+1] - y)^3 + w[k1] * (y - x[i])^3) / (sz * flk)
+    b = (f[k1]/flk - w[k1]*flk/sz) * (y - x[i])
+    c = (f[mi]/flk - flk*w[mi]/sz) * (x[i+1] - y)
+    tab[1] = a + b + c
+    
+    a = (w[k1] * (y - x[i])^2 - w[mi] * (x[i+1] - y)^2) / (wz * flk)
+    b = (f[k1] - f[mi]) / flk
+    c = flk * (w[mi] - w[k1]) / sz
+    tab[2] = a + b + c
+    tab[3] = (w[mi] * (x[i+1] - y) + w[k1] * (y - x[i])) / flk
+    
+    return
 end
