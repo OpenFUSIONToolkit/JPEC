@@ -143,12 +143,6 @@ end
 
 function equilibrium_global_parameters!(equil::PlasmaEquilibrium)
     # Set global parameters based on the equilibrium data
-    equil.global_params.rmean = mean(equil.r)
-    equil.global_params..zmean = mean(equil.z)
-    equil.b0 = mean(equil.b)
-    equil.q0 = mean(equil.q)
-    equil.psi0 = mean(equil.psi)
-
     # Add any other global parameters as needed
     return equil
     
@@ -162,7 +156,7 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
     println("Finding q profile...")
 
     sq = equil.sq
-    mpsi = size(sq.fs, 1) - 1  # assuming sq.fs is (mpsi+1, nqty)
+    mpsi = length(sq.xs) - 1
     psiexl = Float64[]
     qexl = Float64[]
 
@@ -170,17 +164,14 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
     push!(psiexl, sq.xs[1])
     push!(qexl, sq.fs[1, 4])
 
-    # Search for extrema
+    # Search for extrema in q(ψ)
     for ipsi in 1:mpsi
         x0 = sq.xs[ipsi]
-        x1 = sq.xs[ipsi+1]
+        x1 = sq.xs[ipsi + 1]
         xmax = x1 - x0
 
-        Spl.eval_spline!(sq, x0, deriv_order=3)
-        a = sq.f[4]
-        b = sq.f1[4]
-        c = sq.f2[4]
-        d = sq.f3[4]
+        f, f1, f2, f3 = Spl.spline_eval(sq, x0, 3)
+        a, b, c, d = f[4], f1[4], f2[4], f3[4]
 
         if d != 0.0
             xcrit = -c / d
@@ -191,9 +182,9 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
                     x = xcrit - delta
                     if 0 ≤ x < xmax
                         ψ = x0 + x
+                        fψ, = Spl.spline_eval(sq, ψ, 0)
                         push!(psiexl, ψ)
-                        Spl.eval_spline!(sq, ψ, deriv_order=0)
-                        push!(qexl, sq.f[4])
+                        push!(qexl, fψ[4])
                     end
                 end
             end
@@ -204,29 +195,32 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
     push!(psiexl, sq.xs[end])
     push!(qexl, sq.fs[end, 4])
 
-    # Store in output fields (you can place these in `equil` as needed)
-    equil.qextrema_psi = psiexl
-    equil.qextrema_q = qexl
+    equil.params.qextrema_psi = psiexl
+    equil.params.qextrema_q = qexl
 
-    # Compute q0, qmin, qmax, qa, q95
+    # Compute derived q-values
     q0 = sq.fs[1, 4] - sq.fs1[1, 4] * sq.xs[1]
     qmax_edge = sq.fs[end, 4]
     qmin = min(minimum(qexl), q0)
     qmax = max(maximum(qexl), qmax_edge)
     qa = sq.fs[end, 4] + sq.fs1[end, 4] * (1.0 - sq.xs[end])
 
-    Spl.eval_spline!(sq, 0.95, deriv_order=0)
-    q95 = sq.f[4]
+    f95 = Spl.spline_eval(sq, 0.95, 0)
+    q95 = f95[4]
 
-    println("q0: $q0, qmin: $qmin, qmax: $qmax, qa: $qa, q95: $q95")
-    equil.q0   = q0
-    equil.qmin = qmin
-    equil.qmax = qmax
-    equil.qa   = qa
-    equil.q95  = q95
+
+    # Print and store
+    println("q0: $q0, qmin: $qmin, qmax: $qmax, qa: $qa, q95: $q95, qmax_edge: $qmax_edge")
+
+    equil.params.q0   = q0
+    equil.params.qmin = qmin
+    equil.params.qmax = qmax
+    equil.params.qa   = qa
+    equil.params.q95  = q95
 
     return equil
 end
+
 
 
 
