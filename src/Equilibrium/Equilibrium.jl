@@ -72,6 +72,12 @@ function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
     # add global parameters to the PlasmaEquilibrium struct
     equilibrium_global_parameters!(plasma_equilibrium)
 
+    # Find q information
+    equilibrium_qfind!(plasma_equilibrium)
+
+    # Diagnoses grad-shafranov solution.
+    equilibrium_gse!(plasma_equilibrium)
+
     println("--- Equilibrium Setup Complete ---")
     return plasma_equilibrium
 end
@@ -166,16 +172,90 @@ end
 
 function equilibrium_global_parameters!(equil::PlasmaEquilibrium)
     # Set global parameters based on the equilibrium data
-    # equil.params.rmean = mean(equil.r)
-    # equil.params..zmean = mean(equil.z)
-    # equil.b0 = mean(equil.b)
-    # equil.q0 = mean(equil.q)
-    # equil.psi0 = mean(equil.psi)
-
     # Add any other global parameters as needed
     return equil
     
 end
 
+
+
+
+
+function equilibrium_qfind!(equil::PlasmaEquilibrium)
+    println("Finding q profile...")
+
+    sq = equil.sq
+    mpsi = length(sq.xs) - 1
+    psiexl = Float64[]
+    qexl = Float64[]
+
+    # Left endpoint
+    push!(psiexl, sq.xs[1])
+    push!(qexl, sq.fs[1, 4])
+
+    # Search for extrema in q(ψ)
+    for ipsi in 1:mpsi
+        x0 = sq.xs[ipsi]
+        x1 = sq.xs[ipsi + 1]
+        xmax = x1 - x0
+
+        f, f1, f2, f3 = Spl.spline_eval(sq, x0, 3)
+        a, b, c, d = f[4], f1[4], f2[4], f3[4]
+
+        if d != 0.0
+            xcrit = -c / d
+            dx2 = xcrit^2 - 2b / d
+            if dx2 ≥ 0
+                dx = sqrt(dx2)
+                for delta in (dx, -dx)
+                    x = xcrit - delta
+                    if 0 ≤ x < xmax
+                        ψ = x0 + x
+                        fψ, = Spl.spline_eval(sq, ψ, 0)
+                        push!(psiexl, ψ)
+                        push!(qexl, fψ[4])
+                    end
+                end
+            end
+        end
+    end
+
+    # Right endpoint
+    push!(psiexl, sq.xs[end])
+    push!(qexl, sq.fs[end, 4])
+
+    equil.params.qextrema_psi = psiexl
+    equil.params.qextrema_q = qexl
+
+    # Compute derived q-values
+    q0 = sq.fs[1, 4] - sq.fs1[1, 4] * sq.xs[1]
+    qmax_edge = sq.fs[end, 4]
+    qmin = min(minimum(qexl), q0)
+    qmax = max(maximum(qexl), qmax_edge)
+    qa = sq.fs[end, 4] + sq.fs1[end, 4] * (1.0 - sq.xs[end])
+
+    f95 = Spl.spline_eval(sq, 0.95, 0)
+    q95 = f95[4]
+
+
+    # Print and store
+    println("q0: $q0, qmin: $qmin, qmax: $qmax, qa: $qa, q95: $q95, qmax_edge: $qmax_edge")
+
+    equil.params.q0   = q0
+    equil.params.qmin = qmin
+    equil.params.qmax = qmax
+    equil.params.qa   = qa
+    equil.params.q95  = q95
+
+    return equil
+end
+
+
+
+
+function equilibrium_gse!(equil::PlasmaEquilibrium)
+    println("Diagnosing Grad-Shafranov solution...")
+    return equil
+end
 
 end # module Equilibrium

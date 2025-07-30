@@ -1,7 +1,7 @@
 using LinearAlgebra
 using Printf
 
-function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::JPEC::JPEC.Equilibrium.PlasmaEquilibrium; op_force::Union{Bool,Nothing}=nothing)
+function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, oState::OdeState, equil::JPEC::JPEC.Equilibrium.PlasmaEquilibrium; op_force::Union{Bool,Nothing}=nothing)
     # Set optional parameters
     force = false
     if op_force !== nothing
@@ -12,11 +12,11 @@ function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconC
     ode_output_monitor(intr, ctrl, fNames, equil)
     if out_evals || bin_evals
         dout = DconOutput() #TODO: this probably needs to be passed in instead
-        ode_output_get_evals(intr, ctrl, dout, fNames, equil)
+        ode_output_get_evals(intr, ctrl, dout, fNames, equil, oState)
     end
 
     # Write solutions
-    #if bin_euler && (mod(istep, euler_stride) == 0 || force)
+    #if bin_euler && (mod(oState.istep, euler_stride) == 0 || force)
     #    sing_der(neq, psifac, u, du)
     #    write(euler_bin_unit, 1)
     #    write(euler_bin_unit, psifac, q, msol)
@@ -34,11 +34,7 @@ function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconC
 end
 
 
-function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium)
-    # Assumed global variables:
-    # u, mpert, out_evals, bin_evals, istep, psifac, q, m1, nn, sq
-    # evals_out_unit, evals_bin_unit
-
+function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium, oState::OdeState)
     # Access all variables from structs, not globals.
     # Pretty much just giving them all aliases so we don't have to type `intr.` and `ctrl.` every time.
     u = intr.ud #TODO: is ud the same as u
@@ -52,11 +48,9 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconO
     psifac = intr.sing.psifac
     q = equil.sq.f[4]
 
-    #TODO: where do m1 and istep come from?
-
     # Compute plasma response matrix
     temp = conj.(transpose(u[:, 1:mpert, 1]))
-    wp = u[:, 1:intr.mpert, 2]
+    wp = u[:, 1:mpert, 2]
     wp = conj.(transpose(wp))
 
     ipiv = zeros(Int, mpert)
@@ -80,8 +74,8 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconO
     indexi = sortperm(-abs.(evalsi), rev = true) # TODO: Should this still be rev
 
     # Write ascii eigenvalues
-    if out_evals && istep > 0
-        @printf(evals_out_unit, "\nistep = %d, psifac = %.5e, q = %.5e\n", istep, psifac, q)
+    if out_evals && oState.istep > 0
+        @printf(evals_out_unit, "\nistep = %d, psifac = %.5e, q = %.5e\n", oState.istep, psifac, q)
         @printf(evals_out_unit, "\n     i     eval       evali      err\n")
         for ipert in 1:mpert
             @printf(evals_out_unit, "%6d %11.3e %11.3e %11.3e\n",
@@ -97,7 +91,7 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconO
     if bin_evals && psifac > 0.1
         spline_eval(sq, psifac, 0) #TODO: Where does sq come from?
         q = sq.f[4]
-        singfac = abs(m1 - nn * q)
+        singfac = abs(oState.m1 - nn * q)
         logpsi1 = log10(psifac)
         logpsi2 = log10(singfac)
         for ipert in 2:mpert
@@ -111,14 +105,7 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconO
     return
 end
 
-function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium)#, sVars::SingVars)
-    # Assumed global variables:
-    # psifac, u, u_save, istep, crit_out_unit, crit_bin_unit, term_unit, out_unit
-    # nzero, termbycross_flag
-    # ode_output_get_crit(psi, u) returns (q, singfac, logpsi1, logpsi2, crit)
-    # program_stop(msg)
-    # mpert, msol
-
+function ode_output_monitor!(oState::OdeState, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium)#, sVars::SingVars)
     mpert = intr.mpert
     nn = intr.nn
     crit_out_unit = fNames.crit_out_unit
@@ -126,40 +113,32 @@ function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconF
     termbycross_flag = ctrl.termbycross_flag
     u = intr.ud # Assuming ud is the same as u
     sq = equil.sq
-    psifac = intr.sing.psifac
+    psifac = intr.sing.psifac #TODO: Is this the right thing
     q = equil.sq.f[4]
-    #msol = sVars.msol # Assuming msol is part of sq or similar structure
-
-    #TODO: term_unit and out_unit are not defined in the provided context.
-    #TODO: Where is monitor_unit from 
-    #TODO: Also nzero does not seem to be in a struct and where is istep and m1
-
-    # Static variables (simulate Fortran SAVE)
-    global crit_save = get(Globals, :crit_save, 0.0)
-    global psi_save = get(Globals, :psi_save, 0.0)
+    msol = oState.msol
 
     # Compute new crit
-    dpsi = psifac - psi_save
-    q, singfac, logpsi1, logpsi2, crit = ode_output_get_crit(psifac, u, intr, ctrl, sq)
+    dpsi = psifac - oState.psi_save
+    q, singfac, logpsi1, logpsi2, crit = ode_output_get_crit(psifac, u, intr, ctrl, sq, oState)
 
     # Check for zero crossing
-    if crit * crit_save < 0
-        fac = crit / (crit - crit_save)
-        psi_med = psifac - fac * (psifac - psi_save)
-        dpsi = psi_med - psi_save
-        u_med = u .- fac .* (u .- u_save)
-        q_med, singfac_med, logpsi1_med, logpsi2_med, crit_med = ode_output_get_crit(psi_med, u_med, intr, ctrl, sq)
+    if crit * oState.crit_save < 0
+        fac = crit / (crit - oState.crit_save)
+        psi_med = psifac - fac * (psifac - oState.psi_save)
+        dpsi = psi_med - oState.psi_save
+        u_med = u .- fac .* (u .- oState.u_save)
+        q_med, singfac_med, logpsi1_med, logpsi2_med, crit_med = ode_output_get_crit(psi_med, u_med, intr, ctrl, sq, oState)
 
-        if (crit_med - crit) * (crit_med - crit_save) < 0 &&
-           abs(crit_med) < 0.5 * min(abs(crit), abs(crit_save))
-            println(term_unit, "Zero crossing at psi = $psi_med, q = $q_med")
-            println(out_unit, "Zero crossing at psi = $psi_med, q = $q_med")
+        if (crit_med - crit) * (crit_med - oState.crit_save) < 0 &&
+           abs(crit_med) < 0.5 * min(abs(crit), abs(oState.crit_save))
+            #println(term_unit, "Zero crossing at psi = $psi_med, q = $q_med")
+            #println(out_unit, "Zero crossing at psi = $psi_med, q = $q_med")
             println(crit_out_unit, "Zero crossing at psi = $psi_med, q = $q_med")
             # Write crit values (format as needed)
-            println(crit_out_unit, "$istep $psi_med $dpsi_med $q_med $singfac_med $crit_med")
+            println(crit_out_unit, "$(oState.istep) $psi_med $dpsi_med $q_med $singfac_med $crit_med")
             write(crit_bin_unit, Float32(psi_med), Float32(logpsi1_med),
                   Float32(logpsi2_med), Float32(q_med), Float32(crit_med))
-            global nzero += 1
+            oState.nzero += 1 #TODO: nzero should be in a struct NOT a global
         end
         if termbycross_flag
             error("Terminated by zero crossing.")  #Julia version of program_stop("Terminated by zero crossing.")
@@ -167,25 +146,23 @@ function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconF
     end
 
     # Write new crit
-    println(crit_out_unit, "$istep $psifac $dpsi $q $singfac $crit")
+    println(crit_out_unit, "$(oState.istep) $psifac $dpsi $q $singfac $crit")
     write(crit_bin_unit, Float32(psifac), Float32(logpsi1),
           Float32(logpsi2), Float32(q), Float32(crit))
 
-    # Update saved values #TODO: We don't want globals- are these in our structs?
-    global psi_save = psifac #TODO: I think we need to get this from OdeState
-    global crit_save = crit
-    global u_save = copy(u)
+    # Update saved values 
+    oState.psi_save = psifac #TODO: I think we need to get this from OdeState
+    oState.crit_save = crit
+    oState.u_save = deepcopy(u) #TODO: should this be a copy or a deepcopy? I swapped it to a deepcopy but maybe copy was fine
 end
 
 
-function ode_output_get_crit(psi, u, intr::DconInternal, ctrl::DconControl, sq::Spline)
+function ode_output_get_crit(psi, u, intr::DconInternal, ctrl::DconControl, sq::Spline, oState::OdeState)
     # Arguments:
     # psi::Float64
     # u::Array{ComplexF64,3}
     # Returns: (q, singfac, logpsi1, logpsi2, crit)::Tuple{Float64, Float64, Float64, Float64, Float64}
 
-    # Assumed global variables/constants:
-    # m1, sq (with sq.f), spline_eval
     #TODO: there are still a few global variables here that should be in structs. Or that have not been correctly pulled from structs
 
     # Compute dependent variables
@@ -217,7 +194,7 @@ function ode_output_get_crit(psi, u, intr::DconInternal, ctrl::DconControl, sq::
     # Compute critical data for each time step
     spline_eval(sq, psi, 0)
     q = sq.f[4]
-    singfac = abs(m1 - ctrl.nn*q)
+    singfac = abs(oState.m1 - ctrl.nn*q)
     logpsi1 = log10(psi)
     logpsi2 = log10(singfac)
     crit = evalsi[indexi[1]] * sq.f[3]^2
