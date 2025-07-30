@@ -136,6 +136,9 @@ function EquilConfig(path::String)
 
     # Construct validated structs
     control = EquilControl(; symbolize_keys(control_data)...)
+    if !isabspath(control.eq_filename)
+        control.eq_filename = normpath(joinpath(dirname(path), control.eq_filename))
+    end
     output  = EquilOutput(; symbolize_keys(output_data)...)
 
     return EquilConfig(control=control, output=output)
