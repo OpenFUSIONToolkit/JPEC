@@ -8,11 +8,11 @@ using LinearAlgebra.LAPACK #required for banded matrix operations
 #13-16 are for kinetic DCON so skip for now
 
 # scans singular surfaces and prints information about them - function 1 from Fortran DCON
-function sing_scan(intr::DconInternal)
+function sing_scan!(odet::OdeState, intr::DconInternal)
     #mpert and msing  come from DconInternal struct
     println("\n Singular Surfaces:")
     println("  i    psi      rho      q        q1      di0      di      err")
-    global msol = intr.mpert #TODO: why is msol a global variable and should it be declared elsewhere?
+    odet.msol = intr.mpert #TODO: why is msol a global variable and should it be declared elsewhere?
     for ising in 1:intr.msing #TODO: ising is supposed to be an int, I do not think we need to give it a type in Julia??
         sing_vmat(ising) #TODO: we don't want to write this function yet; what to do instead?
     end
@@ -109,16 +109,16 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
 end
 
 # computes limiter values - function 3 from Fortran DCON
-function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium)
+function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, eqCtrl::JPEC.Equilibrium.EquilibriumControl, eqPrm::JPEC.Equilibrium.EquilibriumParameters)
     #declarations 
     itmax = 50
     eps = 1e-10
 
     #TODO: where does qmax and psihigh come from? Is it equil like we have right now?
     #compute and modify the DconInternal struct 
-    intr.qlim   = min(equil.qmax, cntrl.qhigh)
+    intr.qlim   = min(eqPrm.qmax, cntrl.qhigh)
     intr.q1lim  = equil.sq.fs1[mpsi, 4] #TODO: does equil.sq have a field fs1?
-    intr.psilim = equil.psihigh #TODO: do we need to deepcopy psihigh?
+    intr.psilim = eqCtrl.psihigh #TODO: do we need to deepcopy psihigh?
 
     #normalize dmlim to interval [0,1)
     #TODO: This is supposed to be modifying dmlim from the DconControl struct
@@ -131,13 +131,13 @@ function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibri
         end
         #compute qlim
         intr.qlim = (Int(cntrl.nn * intr.qlim) + cntrl.dmlim) / cntrl.nn
-        while intr.qlim > qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
+        while intr.qlim > eqPrm.qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
             intr.qlim -= 1.0 / cntrl.nn
         end
     end
 
     #use newton iteration to find psilim
-    if intr.qlim < qmax
+    if intr.qlim < eqPrm.qmax
         # Find index jpsi that minimizes |equil.sq.fs[:,4] - qlim|
         diffs = abs.(equil.sq.fs[:,4] .- intr.qlim) #broadcaasting, subtracts qlim from each element in equil.sq.fs[:,4]
         jpsi = argmin(diffs)
@@ -175,14 +175,14 @@ function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibri
         end
 
     else
-        intr.qlim = qmax
+        intr.qlim = eqPrm.qmax #TODO: does this need to be a deepcopy?
         intr.q1lim = equil.sq.fs1[mpsi,4]
-        intr.psilim = psihigh
+        intr.psilim = eqCtrl.psihigh
     end
 
     #= More Julia version of the Newton iteration
     #use Newton iteration to find psilim
-    if qlim < qmax
+    if qlim < eqPrm.qmax
         # Find closest index
         _, jpsi = findmin(abs.(equil.sq.fs[:,4] .- qlim))
         jpsi = min(jpsi, mpsi - 1)
@@ -208,16 +208,16 @@ function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibri
         error("Can't find psilim within $itmax iterations.")
 
     else
-        qlim   = qmax
+        qlim   = eqPrm.qmax
         q1     = equil.sq.fs1[mpsi,4]
-        psilim = psihigh
+        psilim = eqCtrl.psihigh
         return qlim, q1, psilim
     end
     =#
 
     #set up record for determining the peak in dW near the boundary.
     if cntrl.psiedge < intr.psilim
-        spline_eval(equil.sq, cntrl.psiedge, 0) #TODO: I don't think this is the right function call
+        spline_eval(equil.sq, cntrl.psiedge, 0) #TODO: I don't know if this is the right function call
 
         qedgestart = Int(equil.sq.f[4])
 
