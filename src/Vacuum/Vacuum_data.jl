@@ -332,6 +332,7 @@ Fortran input namelist group. This struct is the canonical place for all user-in
 - `shape`: Plasma and wall geometry parameters.
 - `diagns`: Diagnostics and output control.
 - `sprk`: Miscellaneous spark/advanced features.
+- `old_version`: Using old version of vacuum if it's true.
 """
 @kwdef struct VacuumSettingsType
     modes::Modes = Modes()
@@ -339,4 +340,5 @@ Fortran input namelist group. This struct is the canonical place for all user-in
     shape::Shape = Shape()
     diagns::Diagns = Diagns()
     sprk::Sprk = Sprk()
+    old_version::Bool = false
 end
