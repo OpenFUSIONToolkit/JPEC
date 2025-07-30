@@ -221,7 +221,7 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.Pl
     end
 
     # Allocate and sort solutions by increasing value of |m-ms1|
-    m = intr.mlow - 1 .+ odet.index
+    m = intr.mlow - 1 .+ collect(1:intr.mpert)
     if ctrl.sort_type == "absm"
         key = abs.(m)
     elseif ctrl.sort_type == "sing"
@@ -233,7 +233,7 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.Pl
     else
         error("Cannot recognize sort_type = $ctrl.sort_type")
     end
-    bubble!(key, odet.index, 1, intr.mpert) # in original Fortran: bubble(key, index, 1, mpert)
+    odet.index = sortperm(key, rev = true) # in original Fortran: bubble(key, index, 1, mpert)
 
     # Initialize solutions
     for ipert = 1:intr.mpert
