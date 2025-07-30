@@ -239,7 +239,7 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
 
 
     # Print and store
-    println("q0: $q0, qmin: $qmin, qmax: $qmax, qa: $qa, q95: $q95, qmax_edge: $qmax_edge, ")
+    println("q0: $q0, qmin: $qmin, qmax: $qmax, qa: $qa, q95: $q95, qmax_edge: $qmax_edge, psiexl: $(equil.params.qextrema_psi), qexl: $(equil.params.qextrema_q), mextrema: $(equil.params.mextrema)")
 
     equil.params.q0   = q0
     equil.params.qmin = qmin
