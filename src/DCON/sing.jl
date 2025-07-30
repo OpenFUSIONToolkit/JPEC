@@ -8,11 +8,21 @@ using LinearAlgebra.LAPACK #required for banded matrix operations
 #13-16 are for kinetic DCON so skip for now
 
 # scans singular surfaces and prints information about them - function 1 from Fortran DCON
-function sing_scan(intr::DconInternal)
+"""
+    sing_scan!(odet::OdeState, intr::DconInternal)
+
+Scan all singular surfaces and print information about them.
+
+- `odet`: ODE integration state (mutable, will be updated)
+- `intr`: DCON internal state (contains singularity data, mpert, msing, etc.)
+
+Prints a summary table of singular surfaces.
+"""
+function sing_scan!(odet::OdeState, intr::DconInternal)
     #mpert and msing  come from DconInternal struct
     println("\n Singular Surfaces:")
     println("  i    psi      rho      q        q1      di0      di      err")
-    global msol = intr.mpert #TODO: why is msol a global variable and should it be declared elsewhere?
+    odet.msol = intr.mpert #TODO: why is msol a global variable and should it be declared elsewhere?
     for ising in 1:intr.msing #TODO: ising is supposed to be an int, I do not think we need to give it a type in Julia??
         sing_vmat(ising) #TODO: we don't want to write this function yet; what to do instead?
     end
@@ -53,30 +63,24 @@ is pushed to `sing_surf_data`.
 function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
 
     # Define functions to evaluate q and its first derivative
-    # TODO: confirm that this is the correct way to get spline data
     qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
     q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4] 
 
-    # TODO: not sure if equil has these yet - assume monotonic for now
-    qex = [qval(0.0), qval(1.0)]
-    psiex = [0.0, 1.0]
-    mex = 2
-
     # Loop over extrema of q, find all rational values in between
-    for iex in 2:mex
-        dq = qex[iex] - qex[iex-1]
-        m = floor(Int, ctrl.nn * qex[iex-1])
+    for iex in 2:equil.params.mextrema
+        dq = equil.params.qextrema_q[iex] - equil.params.qextrema_q[iex-1]
+        m = floor(Int, ctrl.nn * equil.params.qextrema_q[iex-1])
         if dq > 0
             m += 1
         end
         dm = Int(sign(dq * ctrl.nn))
 
         # Loop over possible m's in interval
-        while (m - ctrl.nn * qex[iex-1]) * (m - ctrl.nn * qex[iex]) <= 0
+        while (m - ctrl.nn * equil.params.qextrema_q[iex-1]) * (m - ctrl.nn * equil.params.qextrema_q[iex]) <= 0
             it = 0
-            psi0 = psiex[iex-1]
-            psi1 = psiex[iex]
-            psifac =  0.01 # TODO: JMH - replace with equil.psilow
+            psi0 = equil.params.qextrema_psi[iex-1]
+            psi1 = equil.params.qextrema_psi[iex]
+            psifac = nothing # will be found in bisection method
 
             # Bisection method to find singular surface
             while it < itmax
@@ -102,42 +106,56 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
                         q = m / ctrl.nn,
                         q1 = q1val(psifac),
                 ))
+                println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(q1val(psifac))")
             end
             m += dm
         end
     end
 end
 
+"""
+    sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, eqCtrl::JPEC.Equilibrium.EquilibriumControl, eqPrm::JPEC.Equilibrium.EquilibriumParameters)
+
+Compute and set limiter values for the DCON analysis.
+
+- `intr`: DCON internal state (mutable, will be updated)
+- `ctrl`: DCON control parameters
+- `equil`: Plasma equilibrium object (contains spline data)
+- `eqCtrl`: Equilibrium control parameters
+- `eqPrm`: Equilibrium physical parameters
+
+Modifies fields in `intr` and `ctrl` to set limiter locations and related quantities.
+"""
 # computes limiter values - function 3 from Fortran DCON
-function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium)
+function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium)
     #declarations 
     itmax = 50
     eps = 1e-10
 
     #TODO: where does qmax and psihigh come from? Is it equil like we have right now?
     #compute and modify the DconInternal struct 
-    intr.qlim   = min(equil.qmax, cntrl.qhigh)
-    intr.q1lim  = equil.sq.fs1[mpsi, 4] #TODO: does equil.sq have a field fs1?
-    intr.psilim = equil.psihigh #TODO: do we need to deepcopy psihigh?
+    intr.qlim   = min(equil.params.qmax, ctrl.qhigh)
+    intr.q1lim  = equil.sq.fs1[equil.config.control.mpsi, 4] #TODO: does equil.sq have a field fs1?
+    intr.psilim = equil.config.control.psihigh #TODO: do we need to deepcopy psihigh?
 
     #normalize dmlim to interval [0,1)
     #TODO: This is supposed to be modifying dmlim from the DconControl struct
-    if cntrl.sas_flag
-        while cntrl.dmlim > 1.0
-            cntrl.dmlim -= 1.0
+    if ctrl.sas_flag
+        while ctrl.dmlim > 1.0
+            ctrl.dmlim -= 1.0
         end
-        while cntrl.dmlim < 0.0
-            cntrl.dmlim += 1.0
+        while ctrl.dmlim < 0.0
+            ctrl.dmlim += 1.0
         end
         #compute qlim
-        intr.qlim = (Int(cntrl.nn * intr.qlim) + cntrl.dmlim) / cntrl.nn
-        while intr.qlim > qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
-            intr.qlim -= 1.0 / cntrl.nn
+        intr.qlim = (Int(ctrl.nn * intr.qlim) + ctrl.dmlim) / ctrl.nn
+        while intr.qlim > eqPrm.qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
+            intr.qlim -= 1.0 / ctrl.nn
         end
     end
 
     #use newton iteration to find psilim
-    if intr.qlim < qmax
+    if intr.qlim < equil.params.qmax
         # Find index jpsi that minimizes |equil.sq.fs[:,4] - qlim|
         diffs = abs.(equil.sq.fs[:,4] .- intr.qlim) #broadcaasting, subtracts qlim from each element in equil.sq.fs[:,4]
         jpsi = argmin(diffs)
@@ -175,14 +193,14 @@ function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibri
         end
 
     else
-        intr.qlim = qmax
+        intr.qlim = eqPrm.qmax #TODO: does this need to be a deepcopy?
         intr.q1lim = equil.sq.fs1[mpsi,4]
-        intr.psilim = psihigh
+        intr.psilim = eqCtrl.psihigh
     end
 
     #= More Julia version of the Newton iteration
     #use Newton iteration to find psilim
-    if qlim < qmax
+    if qlim < eqPrm.qmax
         # Find closest index
         _, jpsi = findmin(abs.(equil.sq.fs[:,4] .- qlim))
         jpsi = min(jpsi, mpsi - 1)
@@ -208,23 +226,23 @@ function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibri
         error("Can't find psilim within $itmax iterations.")
 
     else
-        qlim   = qmax
+        qlim   = eqPrm.qmax
         q1     = equil.sq.fs1[mpsi,4]
-        psilim = psihigh
+        psilim = eqCtrl.psihigh
         return qlim, q1, psilim
     end
     =#
 
     #set up record for determining the peak in dW near the boundary.
-    if cntrl.psiedge < intr.psilim
-        spline_eval(equil.sq, cntrl.psiedge, 0) #TODO: I don't think this is the right function call
+    if ctrl.psiedge < intr.psilim
+        spline_eval(equil.sq, ctrl.psiedge, 0) #TODO: I don't know if this is the right function call
 
         qedgestart = Int(equil.sq.f[4])
 
-        intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * cntrl.nn * cntrl.nperq_edge)
+        intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * ctrl.nn * ctrl.nperq_edge)
 
         intr.dw_edge  = fill(-typemax(Float64) * (1 + im), intr.size_edge)
-        intr.q_edge   = [qedgestart + i / (cntrl.nperq_edge * cntrl.nn) for i in 0:intr.size_edge-1]
+        intr.q_edge   = [qedgestart + i / (ctrl.nperq_edge * ctrl.nn) for i in 0:intr.size_edge-1]
         intr.psi_edge = zeros(intr.size_edge)
 
         # monitor some deeper points for an informative profile
@@ -237,6 +255,18 @@ function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibri
     end
 end
 
+"""
+    sing_get_ua!(ua::AbstractArray{ComplexF64,3}, intr::DconInternal, ising::Int, psifac::Real)
+
+Compute the asymptotic series solution for a given singularity.
+
+- `ua`: Output 3D complex array (mutated in-place), shape (mpert, 2*mpert, 2)
+- `intr`: DCON internal state (contains singularity data, mpert, etc.)
+- `ising`: Index of the singularity (integer)
+- `psifac`: Input psi factor (real scalar)
+
+Fills `ua` with the asymptotic solution for the specified singularity and psi value.
+"""
 #computes asymptotic series solutions
 # Inputs:
 #   ising: index of the singularity
@@ -279,6 +309,19 @@ function sing_get_ua!(ua::AbstractArray{ComplexF64,3}, intr::DconInternal, ising
     return ua
 end
 
+"""
+    sing_get_ca!(ca::AbstractArray{ComplexF64,3}, intr::DconInternal, ising::Int, psifac::Real, u::AbstractArray{ComplexF64,3})
+
+Compute the asymptotic expansion coefficients for a given singularity and solution array.
+
+- `ca`: Output 3D complex array (mutated in-place), shape (mpert, msol, 2)
+- `intr`: DCON internal state (contains singularity data, mpert, etc.)
+- `ising`: Index of the singularity (integer)
+- `psifac`: Input psi factor (real scalar)
+- `u`: Input 3D complex array (solution array), shape (mpert, msol, 2)
+
+Fills `ca` with the expansion coefficients for the specified singularity and psi value.
+"""
 #TODO: Are these comments correct?
 #Compute asymptotic coefficients 
 # Inputs:
@@ -323,13 +366,37 @@ function sing_get_ca!(ca::AbstractArray{ComplexF64,3},
     return ca
 end
 
+"""
+    sing_der(
+        neq::Int,
+        psifac::Float64,
+        u::Array{ComplexF64,3},
+        du::Array{ComplexF64,3},
+        ctrl::DconControl,
+        equil::JPEC.Equilibrium.PlasmaEquilibrium,
+        intr::DconInternal
+        #, ffit::FourFitVars
+    )
 
+Evaluate the Euler-Lagrange differential equations for the DCON system.
+
+- `neq`: Number of equations (integer)
+- `psifac`: Flux surface label (real scalar)
+- `u`: Input 3D complex array (solution array), shape (mpert, msol, 2)
+- `du`: Output 3D complex array (derivative array, mutated in-place), shape (mpert, msol, 2)
+- `ctrl`: DCON control parameters
+- `equil`: Plasma equilibrium object (contains spline data)
+- `intr`: DCON internal state (contains singularity data, mpert, etc.)
+- `ffit`: (optional) Fourier fit variables for kinetic DCON (currently commented out)
+
+Fills `du` with the derivatives for the specified state and flux surface.
+"""
 # evaluates Euler-Lagrange differential equations
 function sing_der(neq::Int,
     psifac::Float64,
     u::Array{ComplexF64,3},
     du::Array{ComplexF64,3},
-    cntrl::DconControl,
+    ctrl::DconControl,
     equil::JPEC.Equilibrium.PlasmaEquilibrium,
     intr::DconInternal,
     #ffit::FourFitVars # JMH - commenting out until we fix the data struct
