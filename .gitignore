@@ -5,3 +5,5 @@
 *.DS_Store
 notebooks/spline_examples.ipynb
 .gitattributes
+*.dll
+Manifest.toml

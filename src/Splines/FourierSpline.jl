@@ -1,12 +1,3 @@
-module FourierSpline
-
-const libdir = joinpath(@__DIR__, "..", "..", "deps")
-const libspline = joinpath(libdir, "libspline")
-
-using ..Helper: parse_bctype, ReadOnlyArray, @expose_fields
-
-export fspline_setup, fspline_eval
-
 mutable struct FourierSplineType
     handle::Ptr{Cvoid}
     _xs::Vector{Float64}
@@ -53,8 +44,8 @@ end
 
 function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3}
     , mband::Int, bctype::Int32, fit_method::Int32, fit_flag::Bool)
-    
-    
+
+
     mx = length(xs) - 1
     my = length(ys) - 1
     nqty = size(fs, 3)
@@ -170,7 +161,7 @@ function _fspline_eval(spl::FourierSplineType, x::Float64, y::Float64, derivs::I
             (Ptr{Cvoid}, Float64, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
             spl.handle, x, y, f, fx, fy, fxx, fxy, fyy)
         return f, fx, fy, fxx, fxy, fyy
-        
+
     else
         error("Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2.")
     end
@@ -253,10 +244,10 @@ function fspline_eval(fourier::FourierSplineType, x, y, derivs::Int=0)
         error("Keyword `derivs` must be 0, 1, or 2.")
     end
 
-    
+
     results = _fspline_eval(fourier, x, y, derivs)
-    
-    
+
+
     if fourier.nqty == 1 && isa(x, Real) && isa(y, Real)
         if isa(results, Tuple)
             return map(vec -> vec[1], results)
@@ -267,6 +258,3 @@ function fspline_eval(fourier::FourierSplineType, x, y, derivs::Int=0)
 
     return results
 end
-
-
-end # module FourierSpline

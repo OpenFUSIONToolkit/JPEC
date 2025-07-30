@@ -1,12 +1,3 @@
-module BicubicSpline
-
-const libdir = joinpath(@__DIR__, "..", "..", "deps")
-const libspline = joinpath(libdir, "libspline")
-
-using ..Helper: parse_bctype, ReadOnlyArray, @expose_fields
-
-export bicube_setup, bicube_eval
-
 mutable struct BicubicSplineType
 	handle::Ptr{Cvoid}
 	_xs::Vector{Float64}
@@ -18,12 +9,9 @@ mutable struct BicubicSplineType
 	bctypex::Int32  # Boundary condition type for x
 	bctypey::Int32  # Boundary condition type for y
 
-
 	_fsx::Array{Float64, 3}
 	_fsy::Array{Float64, 3}
 	_fsxy::Array{Float64, 3}
-
-
 
 end
 
@@ -49,7 +37,7 @@ function _MakeBicubicSpline(mx::Int64, my::Int64, nqty::Int64, bctypex::Int32, b
 
 
 
-	return BicubicSplineType(h[], Vector{Float64}(undef, 0), Vector{Float64}(undef, 0), 
+	return BicubicSplineType(h[], Vector{Float64}(undef, 0), Vector{Float64}(undef, 0),
 		Array{Float64,3}(undef, 0, 0, 0), mx, my, nqty, bctypex, bctypey,
 		fsx,fsy, fsxy)
 end
@@ -82,12 +70,12 @@ function _bicube_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
 		bicube.handle, xs, ys, fs)
 
 	ccall((:bicube_c_fit, libspline), Cvoid,
-		(Ptr{Cvoid}, Int32, Int32, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}), 
+		(Ptr{Cvoid}, Int32, Int32, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
 		bicube.handle, bicube.bctypex, bicube.bctypey, bicube._fsx, bicube._fsy, bicube._fsxy)
-	
-	
-	
-	
+
+
+
+
 	return bicube
 end
 
@@ -101,13 +89,13 @@ function bicube_setup(xs, ys, fs; bctypex::Union{String, Int}="not-a-knot",
 	- `fs`: A 3D array of Float64 values representing the function values at the (x,y) coordinates.
 	## Keyword Arguments:
 	- `bctypex`: An integer specifying the boundary condition type for x (Default is 4, not a knot)
-	- `bctypey`: An integer specifying the boundary condition type for y  (Default is 4, not a knot) 
+	- `bctypey`: An integer specifying the boundary condition type for y  (Default is 4, not a knot)
 	## Returns:
 	- A `BicubicSpline` object containing the spline handle, x-coordinates, y-coordinates,
 	function values, number of x-coordinates, number of y-coordinates, number of quantities,
 	and boundary condition types.
 	"""
-	
+
 	local bctype_code_x::Int = parse_bctype(bctypex)
 	local bctype_code_y::Int = parse_bctype(bctypey)
 
@@ -115,9 +103,9 @@ function bicube_setup(xs, ys, fs; bctypex::Union{String, Int}="not-a-knot",
 		error("xs must be a vector of Float64, ys must be a vector of Float64, and fs must be a 3D array of Float64")
 	end
 	bicube = _bicube_setup(xs, ys, fs, Int32(bctype_code_x), Int32(bctype_code_y))
-	
+
 	finalizer(_destroy_bicubic_spline, bicube)
-	
+
 	return bicube
 end
 
@@ -228,8 +216,6 @@ function _bicube_eval(bicube::BicubicSplineType, xs::Vector{Float64}, ys::Vector
 end
 
 
-
-
 function bicube_eval(bicube::BicubicSplineType, x, y, derivs::Int=0)
 	"""
 	# bicube_eval(bicube, x, y)
@@ -244,7 +230,3 @@ function bicube_eval(bicube::BicubicSplineType, x, y, derivs::Int=0)
 	"""
 	return _bicube_eval(bicube, x, y, derivs)
 end
-
-
-
-end # module BicubicSpline
