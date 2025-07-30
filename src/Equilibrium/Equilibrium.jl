@@ -253,9 +253,111 @@ end
 
 
 
+
 function equilibrium_gse!(equil::PlasmaEquilibrium)
     println("Diagnosing Grad-Shafranov solution...")
+
+    rzphi = equil.rzphi
+    sq = equil.sq
+    mpsi, mtheta = rzphi.mx, rzphi.my
+    ro, zo = equil.ro, equil.zo
+    psio = equil.psio
+    verbose = equil.params.verbose
+    diagnose_src = equil.params.diagnose_src
+    diagnose_maxima = equil.params.diagnose_maxima
+
+    rfac = zeros(Float64, mtheta+1)
+    angle = zeros(Float64, mtheta+1)
+    r = zeros(Float64, mpsi+1, mtheta+1)
+    z = zeros(Float64, mpsi+1, mtheta+1)
+
+    for ipsi in 0:mpsi
+        for itheta in 0:mtheta
+            rz_eval = Spl.bicube_eval(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1], 0)
+            rfac[itheta+1] = sqrt(rz_eval[1])
+            angle[itheta+1] = 2π * (rzphi.ys[itheta+1] + rz_eval[2])
+        end
+        r[ipsi+1, :] .= ro .+ rfac .* cos.(angle)
+        z[ipsi+1, :] .= zo .+ rfac .* sin.(angle)
+    end
+    
+    flux_fs = zeros(Float64, mpsi+1, mtheta+1, 2)
+    for ipsi in 0:mpsi
+        for itheta in 0:mtheta
+            f, fx, fy = Spl.bicube_eval(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1], 1)
+            f1, f2, f4 = f[1], f[2], f[4]
+    
+            fy1 = rzphi._fsy[ipsi+1, itheta+1, 1]
+            fy2 = rzphi._fsy[ipsi+1, itheta+1, 2]
+            fx1 = rzphi._fsx[ipsi+1, itheta+1, 1]
+            fx2 = rzphi._fsx[ipsi+1, itheta+1, 2]
+    
+            flux_fs[ipsi+1, itheta+1, 1] = fy1^2 / (4π^2 * f1) + (1 + fy2)^2 * 4 * f1
+            flux_fs[ipsi+1, itheta+1, 2] = fx1 * fy1 / (4π^2 * f1) + fx2 * (1 + fy2) * 4 * f1
+    
+            for iqty in 1:2
+                flux_fs[ipsi+1, itheta+1, iqty] *= 2π * psio / f4
+            end
+        end
+    end
+    
+    
+    
+    flux = Spl.bicube_setup(collect(rzphi.xs), collect(rzphi.ys), flux_fs; bctypex=2, bctypey=2)
+
+    source = zeros(Float64, mpsi+1, mtheta+1)
+    for ipsi in 0:mpsi
+        for itheta in 0:mtheta
+            rz_eval = Spl.bicube_eval(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1], 0)
+            f4 = rz_eval[4]
+            s1 = sq.fs[ipsi+1, 1]
+            s1p = sq.fs1[ipsi+1, 1]
+            s2p = sq.fs1[ipsi+1, 2]
+
+            denom = (2π * r[ipsi+1, itheta+1])^2
+            source[ipsi+1, itheta+1] = f4 / (2π * psio * π^2) * (s1 * s1p / denom + s2p)
+        end
+    end
+
+    total = flux.fsx[:, :, 1] .- flux.fsy[:, :, 2] .+ source
+    error = abs.(total) ./ maximum([maximum(abs.(flux.fsx[:, :, 1])), maximum(abs.(flux.fsy[:, :, 2])), maximum(abs.(source))])
+    errlog = ifelse.(error .> 0, log10.(error), 0.0)
+
+    if diagnose_maxima
+        fxmax = maximum(abs.(flux.fsx[:, :, 1]))
+        fymax = maximum(abs.(flux.fsy[:, :, 2]))
+        smax = maximum(abs.(source))
+        emax = maximum(abs.(error))
+        lmax = maximum(errlog)
+        jmax = ind2sub(size(errlog), argmax(errlog))
+        println(" fxmax = $fxmax, fymax = $fymax, smax = $smax")
+        println(" emax = $emax, lmax = $lmax, maxloc = ", jmax .- 1)
+    end
+
+
+    # Diagnostics and bin file output omitted for now...
+
+   # Integrated error criterion
+    term = zeros(Float64, mpsi+1, 2)
+    for ipsi in 0:mpsi
+        fs_matrix = zeros(Float64, mtheta+1, 2)
+        fs_matrix[:, 1] = flux.fsx[ipsi+1, :, 1]
+        fs_matrix[:, 2] = source[ipsi+1, :]
+
+        spline = Spl.spline_setup(Vector(flux.ys), fs_matrix; bctype=2)
+        Spl.spline_integrate!(spline)
+
+        term[ipsi+1, :] .= spline.fsi[end, :]
+        # spline will be automatically deallocated by finalizer
+    end
+
+    totali = sum(term, dims=2)
+    errori = abs.(totali)
+    errlogi = @. ifelse(errori > 0, log10(errori), 0.0)
+
     return equil
+
 end
+
 
 end # module Equilibrium
