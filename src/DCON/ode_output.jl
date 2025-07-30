@@ -139,15 +139,15 @@ function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconF
 
     # Compute new crit
     dpsi = psifac - psi_save
-    q, singfac, logpsi1, logpsi2, crit = ode_output_get_crit(psifac, u)
+    q, singfac, logpsi1, logpsi2, crit = ode_output_get_crit(psifac, u, intr, ctrl, sq)
 
     # Check for zero crossing
     if crit * crit_save < 0
         fac = crit / (crit - crit_save)
         psi_med = psifac - fac * (psifac - psi_save)
-        dpsi_med = psi_med - psi_save
+        dpsi = psi_med - psi_save
         u_med = u .- fac .* (u .- u_save)
-        q_med, singfac_med, logpsi1_med, logpsi2_med, crit_med = ode_output_get_crit(psi_med, u_med)
+        q_med, singfac_med, logpsi1_med, logpsi2_med, crit_med = ode_output_get_crit(psi_med, u_med, intr, ctrl, sq)
 
         if (crit_med - crit) * (crit_med - crit_save) < 0 &&
            abs(crit_med) < 0.5 * min(abs(crit), abs(crit_save))
@@ -170,14 +170,14 @@ function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconF
     write(crit_bin_unit, Float32(psifac), Float32(logpsi1),
           Float32(logpsi2), Float32(q), Float32(crit))
 
-    # Update saved values
+    # Update saved values #TODO: We don't want globals- are these in our structs?
     global psi_save = psifac
     global crit_save = crit
     global u_save = copy(u)
 end
 
 
-function ode_output_get_crit(psi, u)
+function ode_output_get_crit(psi, u, intr::DconInternal, ctrl::DconControl, sq::Spline)
     # Arguments:
     # psi::Float64
     # u::Array{ComplexF64,3}
@@ -185,9 +185,10 @@ function ode_output_get_crit(psi, u)
 
     # Assumed global variables/constants:
     # mpert, m1, nn, sq (with sq.f), spline_eval
+    #TODO: there are still a few global variables here that should be in structs. Or that have not been correctly pulled from structs
 
     # Compute dependent variables
-    uu = u[:, 1:mpert, :]
+    uu = u[:, 1:intr.mpert, :]
 
     # Compute inverse plasma response matrix
     wp = conj.(transpose(uu[:, :, 1]))
@@ -195,7 +196,7 @@ function ode_output_get_crit(psi, u)
     temp = conj.(transpose(temp))
 
     # LU factorization and solve
-    ipiv = zeros(Int, mpert)
+    ipiv = zeros(Int, intr.mpert)
     info = Ref{Int}(0)
     temp_lapack = copy(temp)
     LAPACK.zgetrf!(temp_lapack, ipiv)
@@ -204,18 +205,18 @@ function ode_output_get_crit(psi, u)
     wp = (wp_lapack + conj.(transpose(wp_lapack))) / 2
 
     # Compute and sort inverse eigenvalues
-    evalsi = zeros(Float64, mpert)
-    work = zeros(ComplexF64, 2*mpert-1)
-    rwork = zeros(Float64, 3*mpert-2)
+    evalsi = zeros(Float64, intr.mpert)
+    work = zeros(ComplexF64, 2*intr.mpert-1)
+    rwork = zeros(Float64, 3*intr.mpert-2)
     evalsi, wp_diag = LAPACK.zheev!('N', 'U', wp)
-    indexi = collect(1:mpert)
+    indexi = collect(1:intr.mpert)
     key = -abs.(evalsi)
     indexi = sortperm(key)
 
     # Compute critical data for each time step
     spline_eval(sq, psi, 0)
     q = sq.f[4]
-    singfac = abs(m1 - nn*q)
+    singfac = abs(m1 - ctrl.nn*q)
     logpsi1 = log10(psi)
     logpsi2 = log10(singfac)
     crit = evalsi[indexi[1]] * sq.f[3]^2
