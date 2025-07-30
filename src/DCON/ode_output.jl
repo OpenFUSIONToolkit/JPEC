@@ -1,7 +1,7 @@
 using LinearAlgebra
 using Printf
 
-function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::JPEC::JPEC.Equilibrium.PlasmaEquilibrium; op_force::Union{Bool,Nothing}=nothing)
+function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, oState::OdeState, equil::JPEC::JPEC.Equilibrium.PlasmaEquilibrium; op_force::Union{Bool,Nothing}=nothing)
     # Set optional parameters
     force = false
     if op_force !== nothing
@@ -12,7 +12,7 @@ function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconC
     ode_output_monitor(intr, ctrl, fNames, equil)
     if out_evals || bin_evals
         dout = DconOutput() #TODO: this probably needs to be passed in instead
-        ode_output_get_evals(intr, ctrl, dout, fNames, equil)
+        ode_output_get_evals(intr, ctrl, dout, fNames, equil, oState)
     end
 
     # Write solutions
@@ -34,9 +34,9 @@ function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconC
 end
 
 
-function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium, m1::Int)
+function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium, oState::OdeState)
     # Currently identified as global variables:
-    # istep, m1
+    # istep
 
     # Access all variables from structs, not globals.
     # Pretty much just giving them all aliases so we don't have to type `intr.` and `ctrl.` every time.
@@ -51,11 +51,9 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconO
     psifac = intr.sing.psifac
     q = equil.sq.f[4]
 
-    #TODO: where do m1 and istep come from?
-
     # Compute plasma response matrix
     temp = conj.(transpose(u[:, 1:mpert, 1]))
-    wp = u[:, 1:intr.mpert, 2]
+    wp = u[:, 1:mpert, 2]
     wp = conj.(transpose(wp))
 
     ipiv = zeros(Int, mpert)
@@ -96,7 +94,7 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconO
     if bin_evals && psifac > 0.1
         spline_eval(sq, psifac, 0) #TODO: Where does sq come from?
         q = sq.f[4]
-        singfac = abs(m1 - nn * q)
+        singfac = abs(oState.m1 - nn * q)
         logpsi1 = log10(psifac)
         logpsi2 = log10(singfac)
         for ipert in 2:mpert
@@ -112,7 +110,7 @@ end
 
 function ode_output_monitor!(oState::OdeState, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium)#, sVars::SingVars)
     # Assumed global variables:
-    # istep and m1
+    # istep
 
     mpert = intr.mpert
     nn = intr.nn
@@ -125,11 +123,11 @@ function ode_output_monitor!(oState::OdeState, intr::DconInternal, ctrl::DconCon
     q = equil.sq.f[4]
     msol = oState.msol 
 
-    #TODO: where are istep and m1
+    #TODO: where is istep 
 
     # Compute new crit
     dpsi = psifac - oState.psi_save
-    q, singfac, logpsi1, logpsi2, crit = ode_output_get_crit(psifac, u, intr, ctrl, sq)
+    q, singfac, logpsi1, logpsi2, crit = ode_output_get_crit(psifac, u, intr, ctrl, sq, oState)
 
     # Check for zero crossing
     if crit * oState.crit_save < 0
@@ -137,7 +135,7 @@ function ode_output_monitor!(oState::OdeState, intr::DconInternal, ctrl::DconCon
         psi_med = psifac - fac * (psifac - oState.psi_save)
         dpsi = psi_med - oState.psi_save
         u_med = u .- fac .* (u .- oState.u_save)
-        q_med, singfac_med, logpsi1_med, logpsi2_med, crit_med = ode_output_get_crit(psi_med, u_med, intr, ctrl, sq)
+        q_med, singfac_med, logpsi1_med, logpsi2_med, crit_med = ode_output_get_crit(psi_med, u_med, intr, ctrl, sq, oState)
 
         if (crit_med - crit) * (crit_med - oState.crit_save) < 0 &&
            abs(crit_med) < 0.5 * min(abs(crit), abs(oState.crit_save))
@@ -167,14 +165,12 @@ function ode_output_monitor!(oState::OdeState, intr::DconInternal, ctrl::DconCon
 end
 
 
-function ode_output_get_crit(psi, u, intr::DconInternal, ctrl::DconControl, sq::Spline)
+function ode_output_get_crit(psi, u, intr::DconInternal, ctrl::DconControl, sq::Spline, oState::OdeState)
     # Arguments:
     # psi::Float64
     # u::Array{ComplexF64,3}
     # Returns: (q, singfac, logpsi1, logpsi2, crit)::Tuple{Float64, Float64, Float64, Float64, Float64}
 
-    # Assumed global variables/constants:
-    # m1
     #TODO: there are still a few global variables here that should be in structs. Or that have not been correctly pulled from structs
 
     # Compute dependent variables
@@ -206,7 +202,7 @@ function ode_output_get_crit(psi, u, intr::DconInternal, ctrl::DconControl, sq::
     # Compute critical data for each time step
     spline_eval(sq, psi, 0)
     q = sq.f[4]
-    singfac = abs(m1 - ctrl.nn*q)
+    singfac = abs(oState.m1 - ctrl.nn*q)
     logpsi1 = log10(psi)
     logpsi2 = log10(singfac)
     crit = evalsi[indexi[1]] * sq.f[3]^2
