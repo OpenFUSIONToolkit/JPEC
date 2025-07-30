@@ -16,7 +16,6 @@ using JPEC
 # plasma_eq = JPEC.Equilibrium.setup_equilibrium(equil_input)
 # sq = plasma_eq.sq
 
-const diagnose_ca = false
 const eps = 1e-10
 
 """
@@ -55,7 +54,7 @@ OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
 
 function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal)
     # Initialization
-    odet = init_ode_state(intr.mpert, intr.mpert)
+    odet = OdeState(intr.mpert, intr.mpert)
 
     if ctrl.sing_start <= 0
         ode_axis_init(ctrl, equil, intr, odet)
@@ -64,10 +63,6 @@ function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, i
         # ode_sing_init()
     else
         error("Invalid value for sing_start: $(ctrl.sing_start) > msing = $(intr.msing)")
-    end
-    #ode_output_open() # TODO: have to handle io
-    if diagnose_ca
-        ascii_open(ca_unit, "ca.out", "UNKNOWN")
     end
 
     # Integration loop
@@ -106,11 +101,6 @@ function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, i
         end
     end
 
-    # Finalize
-    ode_output_close()
-    if diagnose_ca
-        ascii_close(ca_unit)
-    end
 end
 
 
@@ -158,7 +148,7 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
     q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     # Preliminary computations
-    psifac = equil.sq.xs[1]  # TODO: this was Fortran sq%xs(0)? - confirm this is psilow? Don't know how to access xs
+    psifac = equil.sq.xs[1]  
 
     # Use Newton iteration to find starting psi if qlow is above q0
     # TODO: add this. For now, assume qlow = 0.0 and start at the first singular surface
