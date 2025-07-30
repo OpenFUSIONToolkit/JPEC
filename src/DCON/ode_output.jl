@@ -38,7 +38,7 @@ end
 function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium, odet::OdeState)
     # Access all variables from structs, not globals.
     # Pretty much just giving them all aliases so we don't have to type `intr.` and `ctrl.` every time.
-    u = intr.ud #TODO: is ud the same as u
+    u = odet.u #TODO: is ud the same as u
     mpert = intr.mpert
     out_evals = dout.out_evals
     bin_evals = dout.bin_evals
@@ -112,7 +112,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     crit_out_unit = fNames.crit_out_unit
     crit_bin_unit = fNames.crit_bin_unit
     termbycross_flag = ctrl.termbycross_flag
-    u = intr.ud # Assuming ud is the same as u
+    u = odet.u
     sq = equil.sq
     psifac = intr.sing.psifac #TODO: Is this the right thing
     q = equil.sq.f[4]
