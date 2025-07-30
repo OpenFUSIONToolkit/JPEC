@@ -77,6 +77,10 @@ function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
 end
 
 
+"""
+    equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
+Finds the separatrix locations in the plasma equilibrium (rsep, zsep, rext, zext).
+"""
 function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
     rzphi = pe.rzphi
     mpsi = size(rzphi.fs, 1) - 1
@@ -100,7 +104,7 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
         it = 0
         while true
             it += 1
-            f, fx, fy = Spl.bicube_eval(rzphi, psifac, theta, 1, return_gradient=true)
+            f, _, fy = Spl.bicube_eval(rzphi, psifac, theta, 1)
             eta = theta + f[2] - eta0
             eta_theta = 1 + fy[2]
             dtheta = -eta / eta_theta
@@ -110,38 +114,63 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
             end
         end
         f = Spl.bicube_eval(rzphi, psifac, theta, 0)
-        rsep[iside] = pe.params.ro + sqrt(f[1]) * cos(twopi * (theta + f[2]))
+        rsep[iside] = pe.ro + sqrt(f[1]) * cos(twopi * (theta + f[2]))
         eta0 = 0.5
         idx = findmin(abs.(vector .- eta0))[2]
         theta = rzphi.ys[idx]
     end
 
-    # Find top and bottom
-    for it in 0:mtheta
-        f = Spl.bicube_eval(rzphi, rzphi.xs[mpsi+1], rzphi.ys[it+1], 0)
-        vector[it+1] = sqrt(f[1]) * sin(twopi * (rzphi.ys[it+1] + f[2]))
+    # Top and bottom separatrix locations using Newton iteration
+    zsep = zeros(2)
+    rext = zeros(2)
+    zext = zeros(2)
+
+    for iside in 1:2
+        eta0 = (iside == 1) ? 0.0 : 0.5
+        idx = findmin(abs.(vector .- eta0))[2]
+        theta = rzphi.ys[idx]
+        while true
+            f, _, _, _, _, fyy = Spl.bicube_eval(rzphi, psifac, theta, 2)
+            fy = Spl.bicube_eval(rzphi, psifac, theta, 2)[3]
+            r2, r2y, r2yy = f[1], fy[1], fyy[1]
+            eta, eta1, eta2 = f[2], fy[2], fyy[2]
+            rfac = sqrt(r2)
+            rfac1 = r2y / (2 * rfac)
+            rfac2 = (r2yy - r2y * rfac1 / rfac) / (2 * rfac)
+            phase = twopi * (theta + eta)
+            phase1 = twopi * (1 + eta1)
+            phase2 = twopi * eta2
+            cosfac = cos(phase)
+            sinfac = sin(phase)
+            z = pe.zo + rfac * sinfac
+            z1 = rfac * phase1 * cosfac + rfac1 * sinfac
+            z2 = (2 * rfac1 * phase1 + rfac * phase2) * cosfac + (rfac2 - rfac * phase1^2) * sinfac
+            dtheta = -z1 / z2
+            theta += dtheta
+            if abs(dtheta) < 1e-12 * abs(theta)
+                break
+            end
+        end
+        rext[iside] = pe.ro + rfac * cosfac
+        zsep[iside] = z
+        zext[iside] = z
     end
 
-    top_idx = argmax(vector)
-    bottom_idx = argmin(vector)
-    top_theta = rzphi.ys[top_idx]
-    bottom_theta = rzphi.ys[bottom_idx]
-
-    # Placeholder computation of zsep, rext
-    pe.params.zsep = [pe.params.zo + 0.1, pe.params.zo - 0.1]  # To be refined using Newton method as in Fortran
-    rext = [pe.params.ro + 0.1, pe.params.ro - 0.1]
-
-    return rsep, zsep, rext
+    pe.params.rsep = rsep
+    pe.params.zsep = zsep
+    pe.params.rext = rext
+    pe.params.zext = zext
+    return (rsep, zsep, rext, zext)
 end
 
 
 function equilibrium_global_parameters!(equil::PlasmaEquilibrium)
     # Set global parameters based on the equilibrium data
-    equil.global_params.rmean = mean(equil.r)
-    equil.global_params..zmean = mean(equil.z)
-    equil.b0 = mean(equil.b)
-    equil.q0 = mean(equil.q)
-    equil.psi0 = mean(equil.psi)
+    # equil.params.rmean = mean(equil.r)
+    # equil.params..zmean = mean(equil.z)
+    # equil.b0 = mean(equil.b)
+    # equil.q0 = mean(equil.q)
+    # equil.psi0 = mean(equil.psi)
 
     # Add any other global parameters as needed
     return equil
