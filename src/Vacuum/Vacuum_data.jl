@@ -83,7 +83,7 @@ immutable/thread-safe for the duration of a run. Anything set directly by user i
 - `farwal`: "Far wall" logic, set by geometry checks.
 - `kernelsign`: Sign for kernel; +1 or -1 (set by main routine, default +1).
 """
-struct VacuumGlobalsType
+@kwdef struct VacuumGlobalsType
     mth::Int
     mth1::Int
     mth2::Int
@@ -133,11 +133,11 @@ Numerical and input control parameters for grid and harmonics.
 - `leqarcw`: 1 turns on equal arcs distribution of the nodes on the shell. Best results unless
   the wall is very close to the plasma. See `ishape=6` option.
 """
-struct Modes
-    mth::Int
-    xiin::NTuple{9, Int}
-    lsymz::Bool
-    leqarcw::Int
+@kwdef struct Modes
+    mth::Int = 480
+    xiin::NTuple{9, Int} = (0, 0, 0, 0, 0, 0, 0, 1, 0)
+    lsymz::Bool = true
+    leqarcw::Int = 1
 end
 
 """
@@ -179,22 +179,22 @@ Parameters for vacuum wall and geometry. (Paper Table: "vacdat")
 - `delfac`: Controls grid size to calculate derivatives in `spark` type calculations.
 - `cn0`: Constant added to the cal K matrix to make it nonsingular for n=0 modes.
 """
-struct Vacdat
-    ishape::Int
-    aw::Float64
-    bw::Float64
-    cw::Float64
-    dw::Float64
-    tw::Float64
-    nsing::Int
-    epsq::Float64
-    noutv::Int
-    idgt::Int
-    idot::Int
-    idsk::Int
-    delg::Float64
-    delfac::Float64
-    cn0::Int
+@kwdef struct Vacdat
+    ishape::Int = 6
+    aw::Float64 = 0.05
+    bw::Float64 = 1.5
+    cw::Float64 = 0.0
+    dw::Float64 = 0.5
+    tw::Float64 = 0.05
+    nsing::Int = 500
+    epsq::Float64 = 1e-05
+    noutv::Int = 37
+    idgt::Int = 6
+    idot::Int = 0
+    idsk::Int = 0
+    delg::Float64 = 15.01
+    delfac::Float64 = 0.001
+    cn0::Int = 1
 end
 
 """
@@ -215,19 +215,19 @@ Plasma and wall geometric parameters. (Paper Table: "shape")
 - `bbulg` (beta_b): Subtending half-angle of the extent of the bulge.
 - `tbulg` (tau_b): Inverse roundedness of the bulge corners.
 """
-struct Shape
-    ipshp::Int
-    xpl::Float64
-    apl::Float64
-    a::Float64
-    b::Float64
-    bpl::Float64
-    dpl::Float64
-    r::Float64
-    abulg::Float64
-    bbulg::Float64
-    tbulg::Float64
-    qain::Float64
+@kwdef struct Shape
+    ipshp::Int = 0
+    xpl::Float64 = 100.0
+    apl::Float64 = 1.0
+    a::Float64 = 20.0
+    b::Float64 = 170.0
+    bpl::Float64 = 1.0
+    dpl::Float64 = 0.0
+    r::Float64 = 1.0
+    abulg::Float64 = 0.932
+    bbulg::Float64 = 17.0
+    tbulg::Float64 = 0.02
+    qain::Float64 = 2.5
 end
 
 """
@@ -264,33 +264,33 @@ Diagnostics and output control parameters. (Paper Table: "diags")
 - `zlpmin`, `zlpmax`: Z grid bounds for field evaluation.
 - `linterior`: Field logic (0 = exterior, 1 = interior).
 """
-struct Diagns
-    lkdis::Bool
-    ieig::Int
-    iloop::Int
-    lpsub::Int
-    nloop::Int
-    nloopr::Int
-    nphil::Int
-    nphse::Int
-    xofsl::Float64
-    ntloop::Int
-    aloop::Float64
-    bloop::Float64
-    dloop::Float64
-    rloop::Float64
-    deloop::Float64
-    mx::Int
-    mz::Int
-    nph::Int
-    nxlpin::Int
-    nzlpin::Int
-    epslp::Float64
-    xlpmin::Float64
-    xlpmax::Float64
-    zlpmin::Float64
-    zlpmax::Float64
-    linterior::Int
+@kwdef struct Diagns
+    lkdis::Bool = false
+    ieig::Int = 0
+    iloop::Int = 0
+    lpsub::Int = 1
+    nloop::Int = 128
+    nloopr::Int = 0
+    nphil::Int = 3
+    nphse::Int = 1
+    xofsl::Float64 = 0.0
+    ntloop::Int = 32
+    aloop::Float64 = 0.01
+    bloop::Float64 = 1.6
+    dloop::Float64 = 0.5
+    rloop::Float64 = 1.0
+    deloop::Float64 = 0.001
+    mx::Int = 21
+    mz::Int = 21
+    nph::Int = 0
+    nxlpin::Int = 6
+    nzlpin::Int = 11
+    epslp::Float64 = 0.02
+    xlpmin::Float64 = 0.7
+    xlpmax::Float64 = 2.7
+    zlpmin::Float64 = -1.5
+    zlpmax::Float64 = 1.5
+    linterior::Int = 2
 end
 
 """
@@ -300,25 +300,25 @@ Spark and Feedback type variables. (Paper Table: "sprk")
 
 Note: Under Development.
 """
-struct Sprk
-    nminus::Int
-    nplus::Int
-    mphi::Int
-    lwrt11::Int
-    civ::Float64
-    sp2sgn1::Int
-    sp2sgn2::Int
-    sp2sgn3::Int
-    sp2sgn4::Int
-    sp2sgn5::Int
-    sp3sgn1::Int
-    sp3sgn2::Int
-    sp3sgn3::Int
-    sp3sgn4::Int
-    sp3sgn5::Int
-    lff::Int
-    ff::Float64
-    fv::Vector{Float64}
+@kwdef struct Sprk
+    nminus::Int = 0
+    nplus::Int = 0
+    mphi::Int = 16
+    lwrt11::Int = 0
+    civ::Float64 = 0.0
+    sp2sgn1::Int = 1
+    sp2sgn2::Int = 1
+    sp2sgn3::Int = 1
+    sp2sgn4::Int = 1
+    sp2sgn5::Int = 1
+    sp3sgn1::Int = -1
+    sp3sgn2::Int = -1
+    sp3sgn3::Int = -1
+    sp3sgn4::Int = 1
+    sp3sgn5::Int = 1
+    lff::Int = 0
+    ff::Float64 = 1.6
+    fv::Vector{Float64} = [1.6, 1.6, 1.6, 1.6, 1.6, 1.0, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6]
 end
 
 """
@@ -333,10 +333,10 @@ Fortran input namelist group. This struct is the canonical place for all user-in
 - `diagns`: Diagnostics and output control.
 - `sprk`: Miscellaneous spark/advanced features.
 """
-struct VacuumSettingsType
-    modes::Modes
-    vacdat::Vacdat
-    shape::Shape
-    diagns::Diagns
-    sprk::Sprk
+@kwdef struct VacuumSettingsType
+    modes::Modes = Modes()
+    vacdat::Vacdat = Vacdat()
+    shape::Shape = Shape()
+    diagns::Diagns = Diagns()
+    sprk::Sprk = Sprk()
 end
