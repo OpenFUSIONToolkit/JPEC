@@ -9,14 +9,14 @@ using ..Equilibrium
 
 #= Core Control Flow =#
 
-function MainProgram()
+function MainProgram(in_path::String)
     println("DCON START -> v$(Version)")
     timer_start()   # Timer stub
 
 # -----------------------------------------------------------------------
 #      read input data.
 # -----------------------------------------------------------------------
-    inputs = TOML.parsefile("dcon.toml")
+    inputs = TOML.parsefile(in_path*"/dcon.toml")
     ctrl = DconControl(; (Symbol(k)=>v for (k,v) in inputs["DCON_CONTROL"])...)
     outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
     intr = DconInternal() 
@@ -29,12 +29,12 @@ function MainProgram()
 # -----------------------------------------------------------------------
 #     set up equilibrium structures
 # -----------------------------------------------------------------------
-    equil = setup_equilibrium("equil.toml")
+    equil = setup_equilibrium(in_path*"/equil.toml")
 
 #  -----------------------------------------------------------------------
 #  TODO:     optionally reform the eq splines to concentrate at true truncation (EQUIL TEAM)
 #  -----------------------------------------------------------------------
-    sing_lim()  # determine if qhigh is truncating before psihigh
+    sing_lim!(intr, ctrl, equil)  # determine if qhigh is truncating before psihigh
 #. This needs to be handled
 #    IF(psilim /= psihigh .AND. reform_eq_with_psilim)THEN
 #      CALL equil_read(out_unit, psilim) # this needs to be like plasma_eq = LoadEquilibrium(psilim) 

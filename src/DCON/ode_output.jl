@@ -1,7 +1,7 @@
 using LinearAlgebra
 using Printf
 
-function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames; op_force::Union{Bool,Nothing}=nothing)
+function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::JPEC::JPEC.Equilibrium.PlasmaEquilibrium; op_force::Union{Bool,Nothing}=nothing)
     # Set optional parameters
     force = false
     if op_force !== nothing
@@ -9,9 +9,10 @@ function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconC
     end
 
     # Compute and print critical data for each time step
-    ode_output_monitor(intr, ctrl, fNames)
+    ode_output_monitor(intr, ctrl, fNames, equil)
     if out_evals || bin_evals
-        ode_output_get_evals(intr, ctrl)
+        dout = DconOutput() #TODO: this probably needs to be passed in instead
+        ode_output_get_evals(intr, ctrl, dout, fNames, equil)
     end
 
     # Write solutions
@@ -33,7 +34,7 @@ function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconC
 end
 
 
-function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium)
+function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium)
     # Assumed global variables:
     # u, mpert, out_evals, bin_evals, istep, psifac, q, m1, nn, sq
     # evals_out_unit, evals_bin_unit
@@ -42,11 +43,11 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, equil::JPEC
     # Pretty much just giving them all aliases so we don't have to type `intr.` and `ctrl.` every time.
     u = intr.ud #TODO: is ud the same as u
     mpert = intr.mpert
-    out_evals = ctrl.out_evals
-    bin_evals = ctrl.bin_evals
+    out_evals = dout.out_evals
+    bin_evals = dout.bin_evals
     nn = intr.nn
-    evals_out_unit = ctrl.evals_out_unit
-    evals_bin_unit = ctrl.evals_bin_unit
+    evals_out_unit = fNames.evals_out_unit
+    evals_bin_unit = fNames.evals_bin_unit
     sq = equil.sq 
     psifac = intr.sing.psifac
     q = equil.sq.f[4]
@@ -110,7 +111,7 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, equil::JPEC
     return
 end
 
-function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconFileNames)
+function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium)#, sVars::SingVars)
     # Assumed global variables:
     # psifac, u, u_save, istep, crit_out_unit, crit_bin_unit, term_unit, out_unit
     # nzero, termbycross_flag
@@ -123,11 +124,15 @@ function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconF
     crit_out_unit = fNames.crit_out_unit
     crit_bin_unit = fNames.crit_bin_unit
     termbycross_flag = ctrl.termbycross_flag
-    msol = sq.msol # Assuming msol is part of sq or similar structure
+    u = intr.ud # Assuming ud is the same as u
+    sq = equil.sq
+    psifac = intr.sing.psifac
+    q = equil.sq.f[4]
+    #msol = sVars.msol # Assuming msol is part of sq or similar structure
 
     #TODO: term_unit and out_unit are not defined in the provided context.
     #TODO: Where is monitor_unit from 
-    #TODO: Also nzero does not seem to be in a struct either and sq and where is u coming from? And istep and m1 and q and psifac
+    #TODO: Also nzero does not seem to be in a struct and where is istep and m1
 
     # Static variables (simulate Fortran SAVE)
     global crit_save = get(Globals, :crit_save, 0.0)
@@ -157,7 +162,7 @@ function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconF
             global nzero += 1
         end
         if termbycross_flag
-            program_stop("Terminated by zero crossing.")
+            error("Terminated by zero crossing.")  #Julia version of program_stop("Terminated by zero crossing.")
         end
     end
 
@@ -167,7 +172,7 @@ function ode_output_monitor(intr::DconInternal, ctrl::DconControl, fNames::DconF
           Float32(logpsi2), Float32(q), Float32(crit))
 
     # Update saved values #TODO: We don't want globals- are these in our structs?
-    global psi_save = psifac
+    global psi_save = psifac #TODO: I think we need to get this from OdeState
     global crit_save = crit
     global u_save = copy(u)
 end
