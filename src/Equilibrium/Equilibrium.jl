@@ -135,11 +135,14 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
         eta0 = (iside == 1) ? 0.0 : 0.5
         idx = findmin(abs.(vector .- eta0))[2]
         theta = rzphi.ys[idx]
+        rfac = 0.0
+        cosfac = 0.0
+        z = 0.0
         while true
-            f, _, _, _, _, fyy = Spl.bicube_eval(rzphi, psifac, theta, 2)
-            fy = Spl.bicube_eval(rzphi, psifac, theta, 2)[3]
+            f, fx, fy, fxx, fxy, fyy = Spl.bicube_eval(rzphi, psifac, theta, 2)
             r2, r2y, r2yy = f[1], fy[1], fyy[1]
             eta, eta1, eta2 = f[2], fy[2], fyy[2]
+
             rfac = sqrt(r2)
             rfac1 = r2y / (2 * rfac)
             rfac2 = (r2yy - r2y * rfac1 / rfac) / (2 * rfac)
@@ -170,12 +173,113 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
 end
 
 
-function equilibrium_global_parameters!(equil::PlasmaEquilibrium)
-    # Set global parameters based on the equilibrium data
-    # Add any other global parameters as needed
-    return equil
-    
+function equilibrium_global_parameters!(pe::PlasmaEquilibrium)
+    rzphi = pe.rzphi
+    sq = pe.sq
+    mpsi = size(rzphi.fs, 1) - 1
+    mtheta = size(rzphi.fs, 2) - 1
+    twopi = 2π
+    mu0 = 4π * 1e-7
+
+    # Use separatrix geometry
+    rsep, zsep, rext, _ = equil_out_sep_find!(pe)
+
+    rmean = (rsep[2] + rsep[1]) / 2
+    amean = (rsep[2] - rsep[1]) / 2
+    aratio = rmean / amean
+    kappa = (zsep[1] - zsep[2]) / (rsep[2] - rsep[1])
+    delta1 = (rmean - rext[1]) / amean
+    delta2 = (rmean - rext[2]) / amean
+    dpsi = 1.0 - rzphi.xs[mpsi+1]
+    bt0 = (sq.fs[mpsi+1, 1] + sq.fs1[mpsi+1, 1] * dpsi) / (twopi * rmean)
+
+    pe.params.rmean = rmean
+    pe.params.amean = amean
+    pe.params.aratio = aratio
+    pe.params.kappa = kappa
+    pe.params.delta1 = delta1
+    pe.params.delta2 = delta2
+    pe.params.bt0 = bt0
+
+    psio = pe.psio
+    gs1 = zeros(Float64, mtheta+1)
+    gs2 = zeros(Float64, mtheta+1)
+
+    for itheta in 0:mtheta
+        f, _, fy = Spl.bicube_eval(rzphi, rzphi.xs[mpsi+1], rzphi.ys[itheta+1], 1)
+        jac = f[4]
+        chi1 = twopi * psio / jac
+        jacfac = π / jac
+        rfac = sqrt(f[1])
+        eta = twopi * (rzphi.ys[itheta+1] + f[2])
+        r = pe.ro + rfac * cos(eta)
+        v21 = jacfac * fy[1] / (twopi * rfac)
+        v22 = jacfac * (1 + fy[2]) * (2 * rfac)
+        v33 = jacfac * twopi * (r / π)
+        dvsq = (v21^2 + v22^2) * (v33 * jac^2)^2
+        gs1[itheta+1] = sqrt(dvsq) / (twopi * r)
+        gs2[itheta+1] = chi1 * dvsq / (twopi * r)^2
+    end
+
+    int1 = sum(gs1) / (mtheta+1)
+    int2 = sum(gs2) / (mtheta+1)
+    crnt = int2 / (1e6 * mu0)
+    bp0 = int2 / int1
+    bwall = 1e6 * mu0 * crnt / (twopi * amean)
+
+    pe.params.crnt = crnt
+    pe.params.bwall = bwall
+
+    # Flux surface integrals
+    hs1 = sq.fs[:,2] .* sq.fs[:,3]                 # p * dV/dpsi
+    hs2 = sq.fs[:,3]                               # dV/dpsi
+    hs3 = sq.fs[:,2].^2 .* sq.fs[:,3]              # p^2 * dV/dpsi
+
+    dpsi_vec = diff(sq.xs)
+    fsi1 = sum((hs1[1:end-1] .+ hs1[2:end]) .* dpsi_vec) / 2
+    fsi2 = sum((hs2[1:end-1] .+ hs2[2:end]) .* dpsi_vec) / 2
+    fsi3 = sum((hs3[1:end-1] .+ hs3[2:end]) .* dpsi_vec) / 2
+
+    volume = sum((sq.fs[1:end-1,3] .+ sq.fs[2:end,3]) .* dpsi_vec) / 2
+
+    p0 = sq.fs[1,2] - sq.fs1[1,2] * sq.xs[1]  # linear extrapolation
+    betat = 2 * (fsi1 / fsi2) / bt0^2
+    betaj = 2 * sqrt(fsi3 / fsi2) / bwall^2
+    betan = 100 * amean * bt0 * betat / crnt
+    betap1 = 2 * (fsi1 / fsi2) / bp0^2
+    betap2 = 4 * fsi1 / ((1e6 * mu0 * crnt)^2 * pe.ro)
+    betap3 = 4 * fsi1 / ((1e6 * mu0 * crnt)^2 * rmean)
+    li1 = fsi3 / fsi2 / bp0^2
+    li2 = 2 * fsi3 / ((1e6 * mu0 * crnt)^2 * pe.ro)
+    li3 = 2 * fsi3 / ((1e6 * mu0 * crnt)^2 * rmean)
+
+    pe.params.psi0 = psio
+    pe.params.psi_axis = pe.psio
+    pe.params.psi_boundary = 1.0
+    pe.params.psi_boundary_norm = 1.0
+    pe.params.psi_axis_norm = 0.0
+    pe.params.psi_norm = 0.0
+    pe.params.psi_axis_offset = 0.0
+    pe.params.psi_boundary_offset = 0.0
+    pe.params.psi_axis_sign = 1
+    pe.params.psi_boundary_sign = -1
+    pe.params.psi_boundary_zero = false
+
+    pe.params.q0 = sq.fs[1,4]
+    pe.params.b0 = bt0
+
+    pe.params.volume = volume
+    pe.params.betat = betat
+    pe.params.betan = betan
+    pe.params.betaj = betaj
+    pe.params.betap1 = betap1
+    pe.params.betap2 = betap2
+    pe.params.betap3 = betap3
+    pe.params.li1 = li1
+    pe.params.li2 = li2
+    pe.params.li3 = li3
 end
+
 
 
 

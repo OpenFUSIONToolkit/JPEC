@@ -8,7 +8,7 @@ using Base: @kwdef
 # --- Helper function --- 
 
 
-function symbolize_keys(dict::Dict{String, Any})
+function symbolize_keys(dict::Dict{String,Any})
     return Dict(Symbol(k) => v for (k, v) in dict)
 end
 
@@ -43,40 +43,40 @@ end
     """
     function EquilControl(eq_type, eq_filename, jac_type, power_bp, power_b, power_r,
         grid_type, psilow, psihigh, mpsi, mtheta, newq0, etol, use_classic_splines,
-        input_only,use_galgrid)
+        input_only, use_galgrid)
         if jac_type == "hamada"
             @info "Forcing hamada coordinate jacobian exponents: power_*"
-            power_b=0
-            power_bp=0
-            power_r=0
+            power_b = 0
+            power_bp = 0
+            power_r = 0
         elseif jac_type == "pest"
             @info "Forcing pest coordinate jacobian exponents: power_*"
-            power_b=0
-            power_bp=0
-            power_r=2
+            power_b = 0
+            power_bp = 0
+            power_r = 2
         elseif jac_type == "equal_arc"
             @info "Forcing equal_arc coordinate jacobian exponents: power_*"
-            power_b=0
-            power_bp=1
-            power_r=0
+            power_b = 0
+            power_bp = 1
+            power_r = 0
         elseif jac_type == "boozer"
             @info "Forcing boozer coordinate jacobian exponents: power_*"
-            power_b=2
-            power_bp=0
-            power_r=0
+            power_b = 2
+            power_bp = 0
+            power_r = 0
         elseif jac_type == "park"
             @info "Forcing park coordinate jacobian exponents: power_*"
-            power_b=1
-            power_bp=0
-            power_r=0
+            power_b = 1
+            power_bp = 0
+            power_r = 0
         elseif jac_type == "other"
             @info "Using manual jacobian exponents: power b, bp, r = $(power_b), $(power_bp), $(power_r)"
         elseif jac_type != "other"
             error("Cannot recognize jac_type = $(jac_type)")
         end
         return new(eq_type, eq_filename, jac_type, power_bp, power_b, power_r,
-        grid_type, psilow, psihigh, mpsi, mtheta, newq0, etol, use_classic_splines,
-        input_only,use_galgrid)
+            grid_type, psilow, psihigh, mpsi, mtheta, newq0, etol, use_classic_splines,
+            input_only, use_galgrid)
     end
 end
 
@@ -109,8 +109,8 @@ Constructor that allows users to form a EquilibriumConfig struct from dictionari
     for convinience when most of the defaults are fine.
 """
 function EquilibriumConfig(control::Dict, output::Dict)
-    construct = EquilControl(;control...)
-    outstruct = EquilibriumOutput(;output...)
+    construct = EquilControl(; control...)
+    outstruct = EquilibriumOutput(; output...)
     return EquilibriumConfig(control=construct, output=outstruct)
 end
 
@@ -124,7 +124,7 @@ function EquilibriumConfig(path::String)
 
     # Extract EQUIL_CONTROL with default fallback
     control_data = get(raw, "EQUIL_CONTROL", Dict())
-    output_data  = get(raw, "EQUIL_OUTPUT", Dict())
+    output_data = get(raw, "EQUIL_OUTPUT", Dict())
 
     # Check for required fields in control_data
     required_keys = ("eq_filename", "eq_type")
@@ -139,7 +139,7 @@ function EquilibriumConfig(path::String)
     if !isabspath(control.eq_filename)
         control.eq_filename = normpath(joinpath(dirname(path), control.eq_filename))
     end
-    output  = EquilibriumOutput(; symbolize_keys(output_data)...)
+    output = EquilibriumOutput(; symbolize_keys(output_data)...)
 
     return EquilibriumConfig(control=control, output=output)
 end
@@ -179,7 +179,7 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
     mtau::Int = 128       # the number of grid points in the poloidal direction
     ma::Int = 128         # the number of grid points in the radial direction
 
-    zeroth ::Bool = false     #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
+    zeroth::Bool = false     #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
 end
 
 """
@@ -267,11 +267,11 @@ mutable struct DirectRunInput
     config::EquilibriumConfig
     sq_in::Any       # 1D profile spline (CubicSplineType)
     psi_in::Any      # 2D flux spline (BicubicSplineType)
-    rmin::Float64
-    rmax::Float64
-    zmin::Float64
-    zmax::Float64
-    psio::Float64
+    rmin::Float64    # Minimum R-coordinate of the computational grid [m].
+    rmax::Float64    # Maximum R-coordinate of the computational grid [m].
+    zmin::Float64    # Minimum Z-coordinate of the computational grid [m].
+    zmax::Float64    # Maximum Z-coordinate of the computational grid [m].
+    psio::Float64    # The total flux difference |ψ_axis - ψ_boundary| [Weber / radian].
 end
 
 """
@@ -284,10 +284,8 @@ A container struct for inputs to the `inverse_run` function.
 """
 mutable struct InverseRunInput
     config::EquilibriumConfig
-
     sq_in::Any           # 1D spline input profile (e.g. F*Bt, Pressure, q)
     rz_in::Any           # 2D bicubic spline input for (R,Z) geometry
-
     ro::Float64          # R axis location
     zo::Float64          # Z axis location
     psio::Float64        # Total flux difference |psi_axis - psi_boundary|
@@ -296,47 +294,57 @@ end
 
 
 @kwdef mutable struct EquilibriumParameters
-    ro::Union{Nothing, Float64} = nothing # R-coordinate of the magnetic axis [m]
-    zo::Union{Nothing, Float64} = nothing # Z-coordinate of the magnetic axis [m]
-    psio::Union{Nothing, Float64} = nothing # Total flux difference |Ψ_axis - Ψ_boundary| [Weber / radian]
-    rsep::Union{Nothing, Vector{Float64}} = nothing # R-coordinates of the plasma boundary [m]
-    zsep::Union{Nothing, Vector{Float64}} = nothing # Z-coordinates of the plasma boundary [m]
-    rext::Union{Nothing, Vector{Float64}} = nothing # R-coordinates of the plasma edge [m]
-    zext::Union{Nothing, Vector{Float64}} = nothing # Z-coordinates of the plasma edge [m]
-    psi0::Union{Nothing, Float64} = nothing # Normalized poloidal flux
-    b0::Union{Nothing, Float64} = nothing # Total magnetic field strength at the axis [T]
-    q0::Union{Nothing, Float64} = nothing # Safety factor at the axis
-    qmin::Union{Nothing, Float64} = nothing # Minimum safety factor in the plasma
-    qmax::Union{Nothing, Float64} = nothing # Maximum safety factor in the plasma
-    qa::Union{Nothing, Float64} = nothing # Safety factor at the plasma edge
-    q95::Union{Nothing, Float64} = nothing # Safety factor at 95% flux surface
-    qextrema_psi::Union{Nothing, Vector{Float64}} = nothing # Normalized poloidal flux values where q has extrema
-    qextrema_q::Union{Nothing, Vector{Float64}} = nothing # Safety factor values at the extrema points
-    mextrema::Union{Nothing, Int} = nothing # Number of extrema points in the q-profile
-    psi_norm::Union{Nothing, Float64} = nothing # Normalized poloidal flux at the axis
-    b_norm::Union{Nothing, Float64} = nothing # Normalized total magnetic field strength at the axis
-    psi_axis::Union{Nothing, Float64} = nothing # Normalized poloidal flux at the axis
-    psi_boundary::Union{Nothing, Float64} = nothing # Poloidal flux at the boundary
-    psi_boundary_norm::Union{Nothing, Float64} = nothing # Normalized poloidal flux at the boundary
-    psi_axis_norm::Union{Nothing, Float64} = nothing # Normalized poloidal flux at the axis
-    psi_boundary_offset::Union{Nothing, Float64} = nothing # Offset for the boundary poloidal flux
-    psi_axis_offset::Union{Nothing, Float64} = nothing  # Offset for the axis poloidal flux
-    psi_boundary_sign::Union{Nothing, Int} = nothing # Sign of the boundary poloidal flux
-    psi_axis_sign::Union{Nothing, Int} = nothing # Sign of the axis poloidal flux
-    psi_boundary_zero::Union{Nothing, Bool} = nothing # Whether the boundary poloidal flux is zero
-    rmean::Union{Nothing, Float64} = nothing # Mean R-coordinate of the plasma [m]
-    amean::Union{Nothing, Float64} = nothing # Mean minor radius of the plasma [m]
-    aratio::Union{Nothing, Float64} = nothing # Aspect ratio of the plasma (R0/a)
-    kappa::Union{Nothing, Float64} = nothing # Elongation of the plasma cross-section
-    delta1::Union{Nothing, Float64} = nothing # Triangularity of the plasma cross-section (upper triangularity)
-    delta2::Union{Nothing, Float64} = nothing # Triangularity of the plasma cross-section (lower triangularity)
-    bt0::Union{Nothing, Float64} = nothing # Toroidal magnetic field at the axis [T]
-    crnt::Union{Nothing, Float64} = nothing # Plasma current at the axis [A]
-    bwall::Union{Nothing, Float64} = nothing # Toroidal magnetic field at the wall [T] 
+    ro::Union{Nothing,Float64} = nothing # R-coordinate of the magnetic axis [m]
+    zo::Union{Nothing,Float64} = nothing # Z-coordinate of the magnetic axis [m]
+    psio::Union{Nothing,Float64} = nothing # Total flux difference |Ψ_axis - Ψ_boundary| [Weber / radian]
+    rsep::Union{Nothing,Vector{Float64}} = nothing # R-coordinates of the plasma boundary [m]
+    zsep::Union{Nothing,Vector{Float64}} = nothing # Z-coordinates of the plasma boundary [m]
+    rext::Union{Nothing,Vector{Float64}} = nothing # R-coordinates of the plasma edge [m]
+    zext::Union{Nothing,Vector{Float64}} = nothing # Z-coordinates of the plasma edge [m]
+    psi0::Union{Nothing,Float64} = nothing # Normalized poloidal flux
+    b0::Union{Nothing,Float64} = nothing # Total magnetic field strength at the axis [T]
+    q0::Union{Nothing,Float64} = nothing # Safety factor at the axis
+    qmin::Union{Nothing,Float64} = nothing # Minimum safety factor in the plasma
+    qmax::Union{Nothing,Float64} = nothing # Maximum safety factor in the plasma
+    qa::Union{Nothing,Float64} = nothing # Safety factor at the plasma edge
+    q95::Union{Nothing,Float64} = nothing # Safety factor at 95% flux surface
+    qextrema_psi::Union{Nothing,Vector{Float64}} = nothing # Normalized poloidal flux values where q has extrema
+    qextrema_q::Union{Nothing,Vector{Float64}} = nothing # Safety factor values at the extrema points
+    mextrema::Union{Nothing,Int} = nothing # Number of extrema points in the q-profile
+    psi_norm::Union{Nothing,Float64} = nothing # Normalized poloidal flux at the axis
+    b_norm::Union{Nothing,Float64} = nothing # Normalized total magnetic field strength at the axis
+    psi_axis::Union{Nothing,Float64} = nothing # Normalized poloidal flux at the axis
+    psi_boundary::Union{Nothing,Float64} = nothing # Poloidal flux at the boundary
+    psi_boundary_norm::Union{Nothing,Float64} = nothing # Normalized poloidal flux at the boundary
+    psi_axis_norm::Union{Nothing,Float64} = nothing # Normalized poloidal flux at the axis
+    psi_boundary_offset::Union{Nothing,Float64} = nothing # Offset for the boundary poloidal flux
+    psi_axis_offset::Union{Nothing,Float64} = nothing  # Offset for the axis poloidal flux
+    psi_boundary_sign::Union{Nothing,Int} = nothing # Sign of the boundary poloidal flux
+    psi_axis_sign::Union{Nothing,Int} = nothing # Sign of the axis poloidal flux
+    psi_boundary_zero::Union{Nothing,Bool} = nothing # Whether the boundary poloidal flux is zero
+    rmean::Union{Nothing,Float64} = nothing # Mean R-coordinate of the plasma [m]
+    amean::Union{Nothing,Float64} = nothing # Mean minor radius of the plasma [m]
+    aratio::Union{Nothing,Float64} = nothing # Aspect ratio of the plasma (R0/a)
+    kappa::Union{Nothing,Float64} = nothing # Elongation of the plasma cross-section
+    delta1::Union{Nothing,Float64} = nothing # Triangularity of the plasma cross-section (upper triangularity)
+    delta2::Union{Nothing,Float64} = nothing # Triangularity of the plasma cross-section (lower triangularity)
+    bt0::Union{Nothing,Float64} = nothing # Toroidal magnetic field at the axis [T]
+    crnt::Union{Nothing,Float64} = nothing # Plasma current at the axis [A]
+    bwall::Union{Nothing,Float64} = nothing # Toroidal magnetic field at the wall [T] 
     verbose::Bool = false # Whether to print verbose output
     diagnose_src::Bool = false # Whether to diagnose source data
     diagnose_maxima::Bool = false # Whether to diagnose maxima in the equilibrium
     
+    voluSme::Union{Nothing,Float64} = nothing # Plasma volume [m³]
+    betat::Union{Nothing,Float64} = nothing # Toroidal beta (normalized pressure) at the axis
+    betan::Union{Nothing,Float64} = nothing # Normalized beta at the axis
+    betaj::Union{Nothing,Float64} = nothing # Total beta at the axis
+    betap1::Union{Nothing,Float64} = nothing # Pressure beta at the axis
+    betap2::Union{Nothing,Float64} = nothing # Toroidal beta at the axis
+    betap3::Union{Nothing,Float64} = nothing # Poloidal beta at the axis
+    li1::Union{Nothing,Float64} = nothing  # Internal inductance at the axis
+    li2::Union{Nothing,Float64} = nothing  # External inductance at the axis
+    li3::Union{Nothing,Float64} = nothing  # Total inductance at the axis
 end
 
 
@@ -378,9 +386,9 @@ provides a complete representation of the processed plasma equilibrium in flux c
 """
 mutable struct PlasmaEquilibrium
     config::EquilibriumConfig
-    params::EquilibriumParameters  # Parameters for the equilibrium
-    sq::Spl.CubicSplineType                     # Final 1D profile spline
-    rzphi::Spl.BicubicSplineType                # Final 2D coordinate mapping spline
+    params::EquilibriumParameters           # Parameters for the equilibrium
+    sq::Spl.CubicSplineType                 # Final 1D profile spline
+    rzphi::Spl.BicubicSplineType            # Final 2D coordinate mapping spline
     eqfun::Spl.BicubicSplineType
     ro::Float64
     zo::Float64
