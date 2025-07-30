@@ -624,6 +624,6 @@ function equilibrium_solver(raw_profile::DirectRunInput)
 
     println("--- Direct Equilibrium Processing Finished ---")
 
-    return PlasmaEquilibrium(raw_profile.config, sq, rzphi, eqfun, ro, zo, psio)
+    return PlasmaEquilibrium(raw_profile.config,EquilibriumParameters(), sq, rzphi, eqfun, ro, zo, psio)
 end
 

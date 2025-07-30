@@ -295,38 +295,46 @@ end
 
 
 
-mutable struct EquilibriumParameters
-    ro::Float64                 # R-coordinate of the magnetic axis [m]
-    zo::Float64                 # Z-coordinate of the magnetic axis [m]
-    psio::Float64               # Total flux difference |Ψ_axis - Ψ_boundary|
-    rsep::Vector{Float64}       # R-coordinates of the separatrix [m]
-    zsep::Vector{Float64}       # Z-coordinates of the separatrix [m]
-    rext::Vector{Float64}       # R-coordinates of the outermost flux surface [m]
-    zext::Vector{Float64}       # Z-coordinates of the outermost flux surface [m]
-    psi0::Float64               # Reference poloidal flux value [Weber/radian]
-    b0::Float64                 # Toroidal magnetic field strength at the magnetic axis [T]
-    q0::Float64                 # Safety factor at the magnetic axis
-    psi_norm::Float64           # Normalized poloidal flux at the magnetic axis
-    b_norm::Float64             # Normalized toroidal magnetic field strength at the magnetic axis
-    psi_axis::Float64           # Poloidal flux at the magnetic axis [Weber/radian]
-    psi_boundary::Float64       # Poloidal flux at the boundary [Weber/radian]
-    psi_boundary_norm::Float64  # Normalized poloidal flux at the boundary
-    psi_axis_norm::Float64      # Normalized poloidal flux at the magnetic axis
-    psi_boundary_offset::Float64  # Offset for the poloidal flux at the boundary
-    psi_axis_offset::Float64    # Offset for the poloidal flux at the magnetic axis
-    psi_boundary_sign::Int      # Sign of the poloidal flux at the boundary
-    psi_axis_sign::Int          # Sign of the poloidal flux at the magnetic axis
-    psi_boundary_zero::Bool     # Whether the poloidal flux at the boundary is zero    
-    rmean::Float64              # Mean R-coordinate of the plasma [m]
-    amean::Float64              # Mean minor radius of the plasma [m]
-    aratio::Float64             # Aspect ratio of the plasma
-    kappa::Float64              # Elongation of the plasma cross-section
-    delta1::Float64             # Triangularity of the plasma cross-section
-    delta2::Float64             # Second triangularity of the plasma cross-section
-    bt0::Float64                # Toroidal magnetic field strength at the magnetic axis [T]
-    crnt::Float64               # Plasma current at the magnetic axis [A]
-    bwall::Float64              # Toroidal magnetic field strength at the wall [T]
+Base.@kwdef mutable struct EquilibriumParameters
+    ro::Union{Nothing, Float64} = nothing
+    zo::Union{Nothing, Float64} = nothing
+    psio::Union{Nothing, Float64} = nothing
+    rsep::Union{Nothing, Vector{Float64}} = nothing
+    zsep::Union{Nothing, Vector{Float64}} = nothing
+    rext::Union{Nothing, Vector{Float64}} = nothing
+    zext::Union{Nothing, Vector{Float64}} = nothing
+    psi0::Union{Nothing, Float64} = nothing
+    b0::Union{Nothing, Float64} = nothing
+    q0::Union{Nothing, Float64} = nothing
+    qmin::Union{Nothing, Float64} = nothing
+    qmax::Union{Nothing, Float64} = nothing
+    qa::Union{Nothing, Float64} = nothing
+    q95::Union{Nothing, Float64} = nothing
+    qextrema_psi::Union{Nothing, Vector{Float64}} = nothing
+    qextrema_q::Union{Nothing, Vector{Float64}} = nothing
+    psi_norm::Union{Nothing, Float64} = nothing
+    b_norm::Union{Nothing, Float64} = nothing
+    psi_axis::Union{Nothing, Float64} = nothing
+    psi_boundary::Union{Nothing, Float64} = nothing
+    psi_boundary_norm::Union{Nothing, Float64} = nothing
+    psi_axis_norm::Union{Nothing, Float64} = nothing
+    psi_boundary_offset::Union{Nothing, Float64} = nothing
+    psi_axis_offset::Union{Nothing, Float64} = nothing
+    psi_boundary_sign::Union{Nothing, Int} = nothing
+    psi_axis_sign::Union{Nothing, Int} = nothing
+    psi_boundary_zero::Union{Nothing, Bool} = nothing
+    rmean::Union{Nothing, Float64} = nothing
+    amean::Union{Nothing, Float64} = nothing
+    aratio::Union{Nothing, Float64} = nothing
+    kappa::Union{Nothing, Float64} = nothing
+    delta1::Union{Nothing, Float64} = nothing
+    delta2::Union{Nothing, Float64} = nothing
+    bt0::Union{Nothing, Float64} = nothing
+    crnt::Union{Nothing, Float64} = nothing
+    bwall::Union{Nothing, Float64} = nothing
 end
+
+
 
 
 
@@ -365,7 +373,7 @@ provides a complete representation of the processed plasma equilibrium in flux c
 """
 mutable struct PlasmaEquilibrium
     config::EquilConfig
-    params::EquilibriumParameters  # Global parameters for the equilibrium
+    params::EquilibriumParameters  # Parameters for the equilibrium
     sq::Spl.CubicSplineType                     # Final 1D profile spline
     rzphi::Spl.BicubicSplineType                # Final 2D coordinate mapping spline
     eqfun::Spl.BicubicSplineType
