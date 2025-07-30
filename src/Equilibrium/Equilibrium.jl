@@ -4,7 +4,7 @@ module Equilibrium
 # --- Module-level Dependencies ---
 import ..Spl
 
-using Printf, DifferentialEquations, LinearAlgebra
+using Printf, DifferentialEquations, LinearAlgebra, HDF5
 using TOML
 
 
@@ -263,7 +263,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
     ro, zo = equil.ro, equil.zo
     psio = equil.psio
     verbose = equil.params.verbose
-    diagnose_src = equil.params.diagnose_src
+    diagnose_src = true #equil.params.diagnose_src
     diagnose_maxima = equil.params.diagnose_maxima
 
     rfac = zeros(Float64, mtheta+1)
@@ -334,9 +334,6 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
         println(" emax = $emax, lmax = $lmax, maxloc = ", jmax .- 1)
     end
 
-
-    # Diagnostics and bin file output omitted for now...
-
    # Integrated error criterion
     term = zeros(Float64, mpsi+1, 2)
     for ipsi in 0:mpsi
@@ -354,6 +351,51 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
     totali = sum(term, dims=2)
     errori = abs.(totali)
     errlogi = @. ifelse(errori > 0, log10(errori), 0.0)
+
+    if diagnose_src
+        println("Writing diagnostics to HDF5 files...")
+    
+        # Write contour data
+        h5open("gsec.h5", "w") do file
+            file["mpsi"] = mpsi
+            file["mtheta"] = mtheta
+            file["r"] = Float32.(r)
+            file["z"] = Float32.(z)
+            file["flux_fsx"] = Float32.(flux.fsx[:, :, 1])
+            file["flux_fsy"] = Float32.(flux.fsy[:, :, 2])
+            file["source"] = Float32.(source)
+            file["total"] = Float32.(total)
+            file["error"] = Float32.(error)
+            file["errlog"] = Float32.(errlog)
+        end
+    
+        # Write xy plot data
+        h5open("gse.h5", "w") do file
+            gse_data = Array{Float32, 3}(undef, mpsi+1, mtheta+1, 7)
+            for ipsi in 0:mpsi
+                for itheta in 0:mtheta
+                    gse_data[ipsi+1, itheta+1, 1] = Float32(flux.ys[itheta+1])
+                    gse_data[ipsi+1, itheta+1, 2] = Float32(flux.xs[ipsi+1])
+                    gse_data[ipsi+1, itheta+1, 3] = Float32(flux.fs[ipsi+1, itheta+1, 1])
+                    gse_data[ipsi+1, itheta+1, 4] = Float32(flux.fs[ipsi+1, itheta+1, 2])
+                    gse_data[ipsi+1, itheta+1, 5] = Float32(source[ipsi+1, itheta+1])
+                    gse_data[ipsi+1, itheta+1, 6] = Float32(total[ipsi+1, itheta+1])
+                    gse_data[ipsi+1, itheta+1, 7] = Float32(error[ipsi+1, itheta+1])
+                end
+            end
+            file["gse_data"] = gse_data
+        end
+    
+        # Write integrated error criterion
+        h5open("gsei.h5", "w") do file
+            file["xs"] = Float32.(flux.xs)
+            file["term"] = Float32.(term)
+            file["totali"] = Float32.(totali)
+            file["errori"] = Float32.(errori)
+            file["errlogi"] = Float32.(errlogi)
+        end
+    end
+    
 
     return equil
 
