@@ -50,16 +50,15 @@ end
 
 function ode_run(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal)
     # Initialization
-    odet = init_ode_state(intr.mpert, intr.msol)
+    odet = init_ode_state(intr.mpert, intr.mpert)
 
     if ctrl.sing_start <= 0
         ode_axis_init(ctrl, equil, intr)
     elseif ctrl.sing_start <= intr.msing
-        @warn "sing_start = 0 not implemented yet!"
-        ode_sing_init()
+        error("sing_start > 0 not implemented yet!")
+        # ode_sing_init()
     else
-        message = "sing_start = $(ctrl.sing_start) > msing = $(intr.msing)"
-        program_stop(message)
+        error("Invalid value for sing_start: $(ctrl.sing_start) > msing = $(intr.msing)")
     end
     flag_count = 0
     #ode_output_open() # TODO: have to handle io
@@ -654,8 +653,7 @@ function ode_unorm(sing_flag::Bool)
     unorm[mpert+1:msol] .= sqrt.(sum(abs.(u[:, mpert+1:msol, 2]).^2, dims=1)[:])
     if minimum(unorm[1:msol]) == 0
         jmax = argmin(unorm[1:msol])
-        message = "_unorm: unorm(1,$jmax) = 0"
-        program_stop(message)
+        error("One of the first solution vector norms unorm(1,$jmax) = 0")
     end
 
     # Normalize unorm and perform Gaussian reduction if required
