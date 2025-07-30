@@ -55,7 +55,7 @@ OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
 
 function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal)
     # Initialization
-    odet = init_ode_state(intr.mpert, intr.mpert)
+    odet = OdeState(intr.mpert, intr.mpert)
 
     if ctrl.sing_start <= 0
         ode_axis_init(ctrl, equil, intr, odet)
@@ -159,7 +159,7 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
     q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     # Preliminary computations
-    psifac = equil.sq.xs[1]  # TODO: this was Fortran sq%xs(0)? - confirm this is psilow? Don't know how to access xs
+    psifac = equil.sq.xs[1]  
 
     # Use Newton iteration to find starting psi if qlow is above q0
     # TODO: add this. For now, assume qlow = 0.0 and start at the first singular surface
