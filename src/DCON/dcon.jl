@@ -1,6 +1,7 @@
 
 using LinearAlgebra
 using TOML
+using ..Equilibrium
 
 # --- Placeholder for global variables, modules and utilities --- #
 # using Equil, ODE, Ball, Mercier, FreeBoundary, Resist, Pentrc
@@ -21,10 +22,15 @@ function MainProgram()
     intr = DconInternal() 
 
 # -----------------------------------------------------------------------
-#     set variables. (EQUIL TEAM)
+#     set up variables
 # -----------------------------------------------------------------------
-    #delta_mhigh=delta_mhigh*2 # do we need this?
-    equil = LoadEquilibrium()
+    ctrl.delta_mhigh *= 2   # for consistency with Fortran DCON
+
+# -----------------------------------------------------------------------
+#     set up equilibrium structures
+# -----------------------------------------------------------------------
+    equil = setup_equilibrium("equil.toml")
+
 #    CALL equil_out_global # these need to be addressed
 #    CALL equil_out_qfind
 
@@ -227,24 +233,6 @@ function MainProgram()
     println("Normal termination.")
 end
 
-function LoadEquilibrium() # EQUIL TEAM
-    equil_input = JPEC.Equilibrium.EquilInput(
-      "beta_1.00",        # eq_filename
-      "efit",          # eq_type
-      "boozer",        # jac_type
-      0.01,             # psilow
-      1.0,             # psihigh
-      100,             # mpsi (number of radial grid points)
-      128              # mtheta (number of poloidal grid points)
-    )
-
-    # 2. Run the main equilibrium setup function.
-    #    This will read the file, solve the direct problem, and return the final object.
-    println("Starting equilibrium reconstruction...")
-    plasma_eq = JPEC.Equilibrium.setup_equilibrium(equil_input)
-    println("Equilibrium reconstruction complete.")
-    return plasma_eq
-end
 
 function AnalyzeMode(n, ctrl, outp)
     # Mode workflow for a given n
