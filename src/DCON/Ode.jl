@@ -551,17 +551,17 @@ function ode_unorm(sing_flag::Bool)
     return
 end
 
-function ode_fixup(sing_flag::Bool, test::Bool)
-    # ...existing code...
+function ode_fixup(intr::DconInternal, odet::OdeState, dout::DconOutput, sing_flag::Bool, test::Bool)
+    # ...existing code... --> diagnose stuff would go here
 
     secondary = false
-    mask = trues(2, msol)
+    mask = trues(2, odet.msol)
     jmax = zeros(Int, 1)
 
     # Initial output
-    println(crit_out_unit, "Gaussian Reduction at istep = $istep, psi = $psifac, q = $q")
+    println(crit_out_unit, "Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $q")
     if !sing_flag
-        println(crit_out_unit, "Gaussian Reduction at istep = $istep, psi = $psifac, q = $q")
+        println(crit_out_unit, "Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $q")
     end
     istate = 1
     flag_count = 0
@@ -569,53 +569,54 @@ function ode_fixup(sing_flag::Bool, test::Bool)
     # Initialize fixfac
     if !test
         fixfac .= 0
-        for isol in 1:msol
+        for isol in 1:odet.msol
             fixfac[isol, isol] = 1
         end
         # Sort unorm
-        index[1:msol] .= collect(1:msol)
-        index[1:mpert] .= sortperm_subrange(unorm, 1:mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
-        index[mpert+1:msol] .= sortperm_subrange(unorm, mpert+1:msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
+        index[1:odet.msol] .= collect(1:odet.msol)
+        index[1:intr.mpert] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
+        index[intr.mpert+1:odet.msol] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
     end
 
     # Triangularize primary solutions
     mask .= true
-    for isol in 1:mpert
+    for isol in 1:intr.mpert
         ksol = index[isol]
         mask[2, ksol] = false
         if !test
             # Find max location
             absvals = abs.(u[:, ksol, 1])
-            masked = absvals .* mask[1, 1:mpert]
+            masked = absvals .* mask[1, 1:intr.mpert]
             kpert = argmax(masked)
+            #kpert = findmax(abs.(odet.u[:, ksol, 1]) .* (mask[1, 1:intr.mpert] .|> Int))[2] #TODO: ChatGPT suggests this might be better than the above three lines
             mask[1, kpert] = false
         end
-        for jsol in 1:msol
+        for jsol in 1:odet.msol
             if mask[2, jsol]
                 if !test
-                    fixfac[ksol, jsol] = -u[kpert, jsol, 1] / u[kpert, ksol, 1]
+                    fixfac[ksol, jsol] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
                 end
-                u[:, jsol, :] .= u[:, jsol, :] .+ u[:, ksol, :] .* fixfac[ksol, jsol]
+                odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* fixfac[ksol, jsol]
                 if !test
-                    u[kpert, jsol, 1] = 0
+                    odet.u[kpert, jsol, 1] = 0
                 end
             end
         end
     end
 
     # Triangularize secondary solutions
-    if msol > mpert && secondary
+    if odet.msol > intr.mpert && secondary
         mask .= true
-        for isol in mpert + 1:msol
+        for isol in intr.mpert + 1:odet.msol
             ksol = index[isol]
             mask[2, ksol] = false
             if !test
                 absvals = abs.(u[:, ksol, 2])
-                masked = absvals .* mask[1, 1:mpert]
+                masked = absvals .* mask[1, 1:intr.mpert]
                 kpert = argmax(masked)
                 mask[1, kpert] = false
             end
-            for jsol in mpert + 1:msol
+            for jsol in intr.mpert + 1:odet.msol
                 if mask[2, jsol]
                     if !test
                         fixfac[ksol, jsol] = -u[kpert, jsol, 2] / u[kpert, ksol, 2]
@@ -630,13 +631,13 @@ function ode_fixup(sing_flag::Bool, test::Bool)
     end
 
     # Save fixfac to file
-    if bin_euler && !test
-        write(euler_bin_unit, 2)
+    if dout.bin_euler && !test
+        write(dout.euler_bin_unit, 2)
         write(euler_bin_unit, sing_flag, msol)
         write(euler_bin_unit, fixfac, index[1:msol])
     end
 
-    # ...existing code...
+    # ...existing code... --> diagnose stuff would go here
     return
 end
 
