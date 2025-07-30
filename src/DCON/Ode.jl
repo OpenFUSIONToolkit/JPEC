@@ -2,8 +2,6 @@
 
 using LinearAlgebra
 
-using JPEC
-
 # Placeholder for dependencies
 # using Fourfit
 # using OdeOutput
