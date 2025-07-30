@@ -31,9 +31,6 @@ function MainProgram()
 # -----------------------------------------------------------------------
     equil = setup_equilibrium("equil.toml")
 
-#    CALL equil_out_global # these need to be addressed
-#    CALL equil_out_qfind
-
 #  -----------------------------------------------------------------------
 #  TODO:     optionally reform the eq splines to concentrate at true truncation (EQUIL TEAM)
 #  -----------------------------------------------------------------------

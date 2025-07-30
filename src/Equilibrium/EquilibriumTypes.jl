@@ -294,6 +294,21 @@ mutable struct InverseRunInput
 end
 
 
+
+struct GlobalEquilibriumParameters
+    rmean::Float64
+    amean::Float64
+    aratio::Float64
+    kappa::Float64
+    delta1::Float64
+    delta2::Float64
+    bt0::Float64
+    crnt::Float64
+    bwall::Float64
+end
+
+
+
 """
     PlasmaEquilibrium(...)
 
@@ -329,9 +344,10 @@ provides a complete representation of the processed plasma equilibrium in flux c
 """
 mutable struct PlasmaEquilibrium
     config::EquilConfig
-    sq::Any             # Final 1D profile spline
-    rzphi::Any          # Final 2D coordinate mapping spline
-    eqfun::Any
+    global_params::GlobalEquilibriumParameters  # Global parameters for the equilibrium
+    sq::Spl.CubicSplineType                     # Final 1D profile spline
+    rzphi::Spl.BicubicSplineType                # Final 2D coordinate mapping spline
+    eqfun::Spl.BicubicSplineType
     ro::Float64
     zo::Float64
     psio::Float64

@@ -69,8 +69,34 @@ function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
     # Run the appropriate solver (direct or inverse) to get a PlasmaEquilibrium struct
     plasma_equilibrium = equilibrium_solver(eq_input)
 
+    # add global parameters to the PlasmaEquilibrium struct
+    equilibrium_global_parameters!(plasma_equilibrium)
+
     println("--- Equilibrium Setup Complete ---")
     return plasma_equilibrium
 end
+
+
+function equilibrium_sep_find!(equil::PlasmaEquilibrium)
+    # This function is a placeholder for finding the separatrix.
+    # It should be implemented based on the specific requirements of the equilibrium.
+    # For now, we will just return the input equilibrium as is.
+    return equil
+end
+
+
+function equilibrium_global_parameters!(equil::PlasmaEquilibrium)
+    # Set global parameters based on the equilibrium data
+    equil.global_params.rmean = mean(equil.r)
+    equil.global_params..zmean = mean(equil.z)
+    equil.b0 = mean(equil.b)
+    equil.q0 = mean(equil.q)
+    equil.psi0 = mean(equil.psi)
+
+    # Add any other global parameters as needed
+    return equil
+    
+end
+
 
 end # module Equilibrium
