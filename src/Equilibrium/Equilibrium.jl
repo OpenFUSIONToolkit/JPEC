@@ -10,14 +10,12 @@ using TOML
 
 # --- Internal Module Structure ---
 include("EquilibriumTypes.jl")
+include("ReadEquilibrium.jl")
 include("DirectEquilibrium.jl")
 include("InverseEquilibrium.jl")
 include("AnalyticEquilibrium.jl")
-include("ReadEquilibrium.jl")
 
-
-
-
+# --- Expose types and functions to the user ---
 
 export setup_equilibrium, EquilConfig,EquilControl, EquilOutput, PlasmaEquilibrium
 

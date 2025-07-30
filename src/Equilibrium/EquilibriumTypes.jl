@@ -177,8 +177,8 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
 
     sigma_type::String = "default" # can be 'default' or 'wesson'. If 'wesson', switch sigma profile to sigma0*(1-(r/a)**2)**p_sig
 
-    mtau::Float64 = 128       # the number of grid points in the poloidal direction
-    ma::Float64 = 128         # the number of grid points in the radial direction
+    mtau::Int = 128       # the number of grid points in the poloidal direction
+    ma::Int = 128         # the number of grid points in the radial direction
 
     zeroth ::Bool = false     #  If set to true, it neglects the Shafranov shift, creating an ideal concentric circular cross-section.
 end
