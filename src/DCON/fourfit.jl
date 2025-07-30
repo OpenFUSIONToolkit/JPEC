@@ -339,52 +339,72 @@ end
 # HELPER FUNCTIONS (라인 130 부근에 배치 - module 시작 부분)
 # ====================================================================
 
+
+
 """
-    extract_fourier_coefficients(fspline, psi, mband)
+    extract_fourier_coefficients(fspline, psi, mband, verbose=false)
 
 Extract Fourier coefficients from fitted metric spline at given psi.
-This function extracts the complex Fourier coefficients from the fitted fspline.
+COMPLETELY CORRECTED VERSION: Direct access to JPEC fspline internal structure.
 """
-function extract_fourier_coefficients(fspline, psi, mband)
+function extract_fourier_coefficients(fspline, psi, mband, verbose::Bool=false)
     try
-        # 🔧 실제 JPEC fspline에서 데이터 추출 시도
-        if hasfield(typeof(fspline), :cs) && hasfield(typeof(fspline.cs), :fs)
-            # fspline.cs.fs에서 직접 데이터 추출
-            fs_data = fspline.cs.fs
-            xs_data = fspline.cs.xs
-            ys_data = fspline.cs.ys
+        if verbose && psi ≈ 0.01  # Only print for first call
+            println("   🔍 Analyzing fspline structure:")
+            println("   fspline type: $(typeof(fspline))")
             
-            # psi에 가장 가까운 인덱스 찾기
+            # Print all fields to understand structure
+            if hasfield(typeof(fspline), :cs)
+                println("   Has cs field: $(hasfield(typeof(fspline.cs), :fspl))")
+                if hasfield(typeof(fspline.cs), :fspl)
+                    println("   fspl size: $(size(fspline.cs.fspl))")
+                end
+            end
+        end
+        
+        # 🔧 Method 1: Direct access to JPEC fspline Fourier coefficients
+        if hasfield(typeof(fspline), :cs) && hasfield(typeof(fspline.cs), :fspl)
+            
+            fspl_data = fspline.cs.fspl  # This contains the Fourier coefficients
+            xs_data = fspline.cs.xs      # psi coordinates
+            
+            # Find psi index
             psi_idx = searchsortedfirst(xs_data, psi)
             psi_idx = clamp(psi_idx, 1, length(xs_data))
             
-            # 해당 psi에서의 모든 theta 데이터 추출
-            if size(fs_data, 3) >= 8
-                metric_data = fs_data[psi_idx, :, 1:8]  # (ntheta, 8)
-                ntheta = size(metric_data, 1)
-                
-                # FFT를 사용하여 Fourier 계수 추출
-                coeffs = zeros(ComplexF64, 8 * (mband + 1))
+            if verbose && psi ≈ 0.01
+                println("   fspl_data size: $(size(fspl_data))")
+                println("   Using psi_idx: $psi_idx for psi=$psi")
+            end
+            
+            # JPEC fspline stores coefficients as [psi, component, fourier_mode]
+            # Extract coefficients for all components and modes
+            n_coeffs = 8 * (mband + 1)
+            coeffs = zeros(ComplexF64, n_coeffs)
+            
+            if size(fspl_data, 2) >= 8 && size(fspl_data, 3) >= 2*mband+1
                 
                 for comp in 1:8
-                    data = metric_data[:, comp]
-                    fft_result = fft(data)
-                    
                     for dm in 0:mband
-                        idx = dm + 1
-                        coeff_idx = (comp-1) * (mband+1) + idx
+                        idx = (comp-1) * (mband+1) + (dm + 1)
                         
-                        if dm == 0
-                            coeffs[coeff_idx] = fft_result[1] / ntheta
+                        # JPEC stores modes from -mband to +mband
+                        mode_idx = dm + mband + 1  # Convert to 1-based index
+                        
+                        if mode_idx <= size(fspl_data, 3)
+                            coeffs[idx] = fspl_data[psi_idx, comp, mode_idx]
                         else
-                            if dm < ntheta ÷ 2
-                                pos_freq = fft_result[dm + 1] / ntheta
-                                neg_freq = conj(fft_result[end - dm + 1]) / ntheta
-                                coeffs[coeff_idx] = (pos_freq + neg_freq) / 2
-                            else
-                                coeffs[coeff_idx] = 0.0 + 0.0im
-                            end
+                            coeffs[idx] = 0.0 + 0.0im
                         end
+                    end
+                end
+                
+                if verbose && psi ≈ 0.01
+                    println("   ✅ Successfully extracted $(length(coeffs)) coefficients from fspl")
+                    println("   Sample coefficients:")
+                    for dm in 0:min(2, mband)
+                        idx = dm + 1
+                        println("     dm=$dm: g11=$(coeffs[idx]), g22=$(coeffs[idx + mband+1]), g33=$(coeffs[idx + 2*(mband+1)])")
                     end
                 end
                 
@@ -392,44 +412,114 @@ function extract_fourier_coefficients(fspline, psi, mband)
             end
         end
         
-        # 🔧 Fallback: psi-dependent 값 생성
-        n_coeffs = 8 * (mband + 1)
-        coeffs = zeros(ComplexF64, n_coeffs)
-        
-        psi_factor = psi
-        
-        for i in 1:(mband+1)
-            # g11 component - increases with psi
-            coeffs[i] = (1.0 + 2.0 * psi_factor) + 0.0im
-            # g22 component - increases more strongly  
-            coeffs[i + mband+1] = (2.0 + 5.0 * psi_factor) + 0.0im
-            # g33 component - toroidal field component
-            coeffs[i + 2*(mband+1)] = (5.0 + 15.0 * psi_factor) + 0.0im
-            # Other components - small cross terms
-            coeffs[i + 3*(mband+1)] = 0.01 * psi_factor + 0.0im  # g23
-            coeffs[i + 4*(mband+1)] = 0.01 * psi_factor + 0.0im  # g31
-            coeffs[i + 5*(mband+1)] = 0.01 * psi_factor + 0.0im  # g12
-            coeffs[i + 6*(mband+1)] = 0.0 + 0.0im                # jmat
-            coeffs[i + 7*(mband+1)] = 0.0 + 0.0im                # jmat1
+        # 🔧 Method 2: Use JPEC fspline_eval with proper theta sampling
+        if hasmethod(JPEC.SplinesMod.fspline_eval, (typeof(fspline), Vector{Float64}, Vector{Float64}, Int))
+            
+            # Sample at multiple theta points to extract Fourier series
+            ntheta = 64  # Must be power of 2 for FFT
+            theta_points = [2π * i / ntheta for i in 0:ntheta-1]
+            psi_points = fill(psi, ntheta)
+            
+            try
+                # Evaluate at all theta points
+                f_result = JPEC.SplinesMod.fspline_eval(fspline, psi_points, theta_points, 0)
+                
+                if size(f_result, 3) >= 8
+                    n_coeffs = 8 * (mband + 1)
+                    coeffs = zeros(ComplexF64, n_coeffs)
+                    
+                    for comp in 1:8
+                        # Extract theta variation for this component
+                        theta_data = f_result[:, 1, comp]  # All theta points
+                        
+                        # FFT to get Fourier coefficients
+                        fft_result = fft(theta_data)
+                        
+                        for dm in 0:mband
+                            idx = (comp-1) * (mband+1) + (dm + 1)
+                            
+                            if dm == 0
+                                # DC component
+                                coeffs[idx] = fft_result[1] / ntheta
+                            elseif dm <= ntheta ÷ 2
+                                # Positive frequency
+                                coeffs[idx] = fft_result[dm + 1] / ntheta
+                            else
+                                coeffs[idx] = 0.0 + 0.0im
+                            end
+                        end
+                    end
+                    
+                    if verbose && psi ≈ 0.01
+                        println("   ✅ Extracted coefficients using FFT method")
+                        println("   Sample coefficients:")
+                        for dm in 0:min(2, mband)
+                            idx = dm + 1
+                            println("     dm=$dm: g11=$(coeffs[idx]), g22=$(coeffs[idx + mband+1]), g33=$(coeffs[idx + 2*(mband+1)])")
+                        end
+                    end
+                    
+                    return coeffs
+                end
+                
+            catch e
+                if verbose && psi ≈ 0.01
+                    println("   ⚠️ FFT method failed: $e")
+                end
+            end
         end
         
-        return coeffs
+        # 🔧 Method 3: Direct evaluation at theta=0 only (single point)
+        if hasmethod(JPEC.SplinesMod.fspline_eval, (typeof(fspline), Vector{Float64}, Vector{Float64}, Int))
+            
+            try
+                # Evaluate only at theta=0
+                f_result = JPEC.SplinesMod.fspline_eval(fspline, [psi], [0.0], 0)
+                
+                if size(f_result, 3) >= 8
+                    # Use only the DC components (dm=0) from evaluation
+                    n_coeffs = 8 * (mband + 1)
+                    coeffs = zeros(ComplexF64, n_coeffs)
+                    
+                    for comp in 1:8
+                        # Only set DC component (dm=0)
+                        idx = (comp-1) * (mband+1) + 1  # dm=0 index
+                        coeffs[idx] = f_result[1, 1, comp] + 0.0im
+                        
+                        # Higher modes set to zero (conservative approach)
+                        for dm in 1:mband
+                            idx_dm = (comp-1) * (mband+1) + (dm + 1)
+                            coeffs[idx_dm] = 0.0 + 0.0im
+                        end
+                    end
+                    
+                    if verbose && psi ≈ 0.01
+                        println("   ✅ Using DC-only coefficients from single point evaluation")
+                        println("   Sample coefficients:")
+                        for comp in 1:3
+                            idx = (comp-1) * (mband+1) + 1
+                            println("     comp=$comp, dm=0: $(coeffs[idx])")
+                        end
+                    end
+                    
+                    return coeffs
+                end
+                
+            catch e
+                if verbose && psi ≈ 0.01
+                    println("   ⚠️ Single point evaluation failed: $e")
+                end
+            end
+        end
+        
+        # If all methods fail, this is a real problem
+        error("All Fourier extraction methods failed - JPEC fspline not accessible")
         
     catch e
-        # Final fallback - psi-dependent 기본값
-        n_coeffs = 8 * (mband + 1)
-        coeffs = zeros(ComplexF64, n_coeffs)
-        
-        psi_factor = psi
-        for i in 1:(mband+1)
-            coeffs[i] = (1.0 + psi_factor) + 0.0im                    # g11
-            coeffs[i + mband+1] = (2.0 + 2.0 * psi_factor) + 0.0im   # g22  
-            coeffs[i + 2*(mband+1)] = (1.5 + 3.0 * psi_factor) + 0.0im # g33
-        end
-        
-        return coeffs
+        error("Fourier coefficient extraction completely failed: $e")
     end
 end
+
 
 # 이제 fourfit_make_matrix 함수 정의...
 """
@@ -680,126 +770,72 @@ function fourfit_make_matrix(metric::MetricData, sq, rzphi, psio;
 # ================================================================
 
 use_default_coefficients = false  # Initialize flag
+# ================================================================
+# 6.2 EXTRACT FOURIER COEFFICIENTS (개선된 버전)
+# ================================================================
+
+
+
+# ================================================================
+# 6.2 EXTRACT FOURIER COEFFICIENTS (완전 수정된 버전)
+# ================================================================
 
 if metric.fspline !== nothing
-    try
-        # 🔧 디버깅을 위한 출력 추가
-        if verbose && ipsi == 0
-            println("   🔍 Attempting to extract Fourier coefficients from metric.fspline")
-            println("   metric.fspline type: $(typeof(metric.fspline))")
-        end
-        
-        # 🔧 함수 호출을 모듈 내부 함수로 수정
-coeffs = extract_fourier_coefficients(metric.fspline, psifac, mband)        
-        # 🔧 계수 추출 성공 여부 확인
-        if length(coeffs) >= 8 * (mband + 1)
-            # Map coefficients to metric components (lower half)
-            for dm in 0:-1:-mband
-                idx = abs(dm) + 1
-                g11[dm] = coeffs[idx]                    # 1:mband+1
-                g22[dm] = coeffs[idx + mband+1]          # mband+2:2*mband+2
-                g33[dm] = coeffs[idx + 2*(mband+1)]      # 2*mband+3:3*mband+3
-                g23[dm] = coeffs[idx + 3*(mband+1)]      # 3*mband+4:4*mband+4
-                g31[dm] = coeffs[idx + 4*(mband+1)]      # 4*mband+5:5*mband+5
-                g12[dm] = coeffs[idx + 5*(mband+1)]      # 5*mband+6:6*mband+6
-                jmat[dm] = coeffs[idx + 6*(mband+1)]     # 6*mband+7:7*mband+7
-                jmat1[dm] = coeffs[idx + 7*(mband+1)]    # 7*mband+8:8*mband+8
-            end
-            
-            # Compute upper half using conjugate symmetry
-            for dm in 1:mband
-                g11[dm] = conj(g11[-dm])
-                g22[dm] = conj(g22[-dm])
-                g33[dm] = conj(g33[-dm])
-                g23[dm] = conj(g23[-dm])
-                g31[dm] = conj(g31[-dm])
-                g12[dm] = conj(g12[-dm])
-                jmat[dm] = conj(jmat[-dm])
-                jmat1[dm] = conj(jmat1[-dm])
-            end
-            
-            # Diagnostic output for first surface
-            if verbose && ipsi == 0
-                println("   ✅ Extracted Fourier coefficients successfully")
-                println("   Sample coefficients:")
-                println("      g11[0] = $(g11[0])")
-                println("      g22[0] = $(g22[0])")
-                println("      g33[0] = $(g33[0])")
-            end
-            
-        else
-            if verbose && ipsi < 5
-                println("⚠️  Extracted coefficients array too short: $(length(coeffs)) < $(8 * (mband + 1))")
-            end
-            use_default_coefficients = true
-        end
-        
-    catch e
-        if verbose && ipsi < 5
-            println("⚠️  Fourier coefficient extraction failed: $e")
-            println("   Using default coefficients")
-        end
-        use_default_coefficients = true
-    end
-else
     if verbose && ipsi == 0
-        println("   ⚠️  metric.fspline is nothing, using default coefficients")
+        println("   🔍 Extracting Fourier coefficients from metric.fspline")
     end
-    use_default_coefficients = true
+    
+    # 🔧 개선된 추출 함수 호출 - fallback 없음
+    coeffs = extract_fourier_coefficients(metric.fspline, psifac, mband,verbose)
+    
+    if length(coeffs) >= 8 * (mband + 1)
+        # 🔧 올바른 계수 매핑
+        for dm in -mband:mband
+            abs_dm = abs(dm)
+            idx = abs_dm + 1
+            
+            if dm >= 0
+                # Positive and zero modes - direct assignment
+                g11[dm] = coeffs[idx]                    
+                g22[dm] = coeffs[idx + mband+1]          
+                g33[dm] = coeffs[idx + 2*(mband+1)]     
+                g23[dm] = coeffs[idx + 3*(mband+1)]     
+                g31[dm] = coeffs[idx + 4*(mband+1)]     
+                g12[dm] = coeffs[idx + 5*(mband+1)]     
+                jmat[dm] = coeffs[idx + 6*(mband+1)]    
+                jmat1[dm] = coeffs[idx + 7*(mband+1)]   
+            else
+                # Negative modes - conjugate symmetry
+                pos_dm = abs(dm)
+                pos_idx = pos_dm + 1
+                g11[dm] = conj(coeffs[pos_idx])
+                g22[dm] = conj(coeffs[pos_idx + mband+1])
+                g33[dm] = conj(coeffs[pos_idx + 2*(mband+1)])
+                g23[dm] = conj(coeffs[pos_idx + 3*(mband+1)])
+                g31[dm] = conj(coeffs[pos_idx + 4*(mband+1)])
+                g12[dm] = conj(coeffs[pos_idx + 5*(mband+1)])
+                jmat[dm] = conj(coeffs[pos_idx + 6*(mband+1)])
+                jmat1[dm] = conj(coeffs[pos_idx + 7*(mband+1)])
+            end
+        end
+        
+        # 🔧 진단 출력 (실제 추출된 값들 확인)
+        if verbose && ipsi == 0
+            println("   ✅ Extracted REAL coefficients for each dm:")
+            for dm in -mband:mband
+                println("     dm=$dm: g11=$(round(real(g11[dm]), digits=6))+$(round(imag(g11[dm]), digits=6))i")
+            end
+        end
+        
+    else
+        error("Insufficient coefficients extracted: $(length(coeffs)) < $(8 * (mband + 1))")
+    end
+    
+else
+    error("No metric.fspline available - metric tensor calculation failed")
 end
 
-# Use default values if extraction failed
-if use_default_coefficients
-    if verbose && ipsi == 0
-        println("   Using flux-dependent Fourier coefficients")
-    end
-    
-    # 🔧 Flux surface에 따라 변화하는 기본값 사용
-    psi_factor = psifac  # 0 to 1에 따라 변화
-    
-    for dm in -mband:mband
-        if dm == 0
-            # 🔧 Flux surface에 따라 변화하는 대각 성분
-            g11[dm] = (1.0 + 0.5 * psi_factor) + 0.0im           # 중심에서 경계로 증가
-            g22[dm] = (1.0 + 2.0 * psi_factor) + 0.0im           # 더 강한 변화
-            g33[dm] = (5.0 + 10.0 * psi_factor) + 0.0im          # 토로이달 성분
-        else
-            # 🔧 모드에 따른 감쇠와 flux 의존성
-            decay_factor = 1.0 / (1.0 + abs(dm)^2) * (1.0 + 0.1 * psi_factor)
-            g11[dm] = 0.01 * decay_factor + 0.0im
-            g22[dm] = 0.01 * decay_factor + 0.0im  
-            g33[dm] = 0.01 * decay_factor + 0.0im
-        end
-        
-        # 🔧 Cross terms도 flux dependent하게
-        if dm == 0
-            g23[dm] = 0.01 * psi_factor + 0.0im      # 경계에서 더 큰 coupling
-            g31[dm] = 0.01 * psi_factor + 0.0im
-            g12[dm] = 0.01 * psi_factor + 0.0im
-            jmat[dm] = 0.0 + 0.0im
-            jmat1[dm] = 0.0 + 0.0im
-        else
-            decay_factor = 1.0 / (1.0 + abs(dm)^2) * psi_factor
-            g23[dm] = 0.001im * decay_factor * sign(dm)
-            g31[dm] = 0.001im * decay_factor * sign(dm)
-            g12[dm] = 0.001im * decay_factor * sign(dm)
-            jmat[dm] = 0.0 + 0.0im
-            jmat1[dm] = 0.0 + 0.0im
-        end
-    end
-    
-    # Verify conjugate symmetry for positive modes
-    for dm in 1:mband
-        g11[dm] = conj(g11[-dm])
-        g22[dm] = conj(g22[-dm])
-        g33[dm] = conj(g33[-dm])
-        g23[dm] = conj(g23[-dm])
-        g31[dm] = conj(g31[-dm])
-        g12[dm] = conj(g12[-dm])
-        jmat[dm] = conj(jmat[-dm])
-        jmat1[dm] = conj(jmat1[-dm])
-    end
-end
+# 🚫 모든 fallback 코드 제거 - 위의 코드가 실패하면 프로그램 중단
         # ================================================================
         # 6.3 MATRIX CONSTRUCTION (Fortran lines 185-243)
         # ================================================================
@@ -993,7 +1029,56 @@ end
         # ================================================================
         # 6.7 EIGENVALUE COMPUTATION (Fortran lines 265-270)
         # ================================================================
+# ================================================================
+# 6.6 COMPUTE COMPOSITE MATRICES F, G, K (Fortran lines 258-264)
+# ================================================================
 
+# ... 기존 코드 ...
+
+# 🔍 DIAGNOSTIC: 복소수 특성 분석
+if verbose && ipsi == 0
+    println("\n🔍 Matrix Complex Analysis:")
+    
+    # F matrix 분석
+    f_real_count = count(x -> abs(imag(x)) < 1e-12, fmat)
+    f_complex_count = length(fmat) - f_real_count
+    println("   F matrix: $f_real_count real, $f_complex_count complex elements")
+    println("   F sample elements:")
+    for i in 1:min(3, size(fmat, 1))
+        for j in 1:min(3, size(fmat, 2))
+            val = fmat[i, j]
+            println("     F[$i,$j] = $(round(real(val), digits=6)) + $(round(imag(val), digits=6))i")
+        end
+    end
+    
+    # G matrix 분석  
+    g_real_count = count(x -> abs(imag(x)) < 1e-12, gmat)
+    g_complex_count = length(gmat) - g_real_count
+    println("   G matrix: $g_real_count real, $g_complex_count complex elements")
+    
+    # K matrix 분석
+    k_real_count = count(x -> abs(imag(x)) < 1e-12, kmat)
+    k_complex_count = length(kmat) - k_real_count
+    println("   K matrix: $k_real_count real, $k_complex_count complex elements")
+    println("   K sample elements:")
+    for i in 1:min(3, size(kmat, 1))
+        for j in 1:min(3, size(kmat, 2))
+            val = kmat[i, j]
+            println("     K[$i,$j] = $(round(real(val), digits=6)) + $(round(imag(val), digits=6))i")
+        end
+    end
+    
+    # Fourier 계수들의 복소수 특성
+    println("   Fourier coefficients complex analysis:")
+    for dm in -mband:mband
+        g11_val = g11[dm]
+        g22_val = g22[dm]
+        g33_val = g33[dm]
+        println("     dm=$dm: g11=$(round(real(g11_val), digits=4))+$(round(imag(g11_val), digits=4))i")
+        println("            g22=$(round(real(g22_val), digits=4))+$(round(imag(g22_val), digits=4))i")
+        println("            g33=$(round(real(g33_val), digits=4))+$(round(imag(g33_val), digits=4))i")
+    end
+end
 # ================================================================
 # 6.7 EIGENVALUE COMPUTATION (Fortran lines 265-270)
 # ================================================================
