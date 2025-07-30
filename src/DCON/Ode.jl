@@ -19,48 +19,35 @@ using JPEC
 const diagnose_ca = false
 const eps = 1e-10
 
-mutable struct OdeState
-    mpert::Int
-    msol::Int
-    istep::Int
-    ix::Int
-    atol::Float64
-    singfac::Float64
-    neq::Int
-    next::String
-    flag_count::Int
-    new::Bool
-    u::Array{ComplexF64, 3}
-    du::Array{ComplexF64, 3}
-    u_save::Array{ComplexF64, 3}
-    index::Vector{Int}
-    unorm::Vector{Float64}
-    unorm0::Vector{Float64}
-    fixfac::Array{ComplexF64,2}
+"""
+OdeState
 
-    # Defines an inner constructor that allows for initialization using mpert/msol
-    function OdeState(mpert::Int, msol::Int)
-        new(
-            mpert,                                     # mpert
-            msol,                                      # msol
-            0,                                         # istep
-            0,                                         # ix
-            1e-10,                                     # atol
-            0.0,                                       # singfac
-            0,                                         # neq
-            "",                                        # next
-            0,                                         # flag_count
-            true,                                      # new
-            zeros(ComplexF64, mpert, mpert, 2),        # u
-            zeros(ComplexF64, mpert, mpert, 2),        # du
-            zeros(ComplexF64, mpert, mpert, 2),        # u_save
-            collect(1:mpert),                          # index
-            zeros(Float64, 2*mpert),                   # unorm
-            zeros(Float64, 2*mpert),                   # unorm0
-            zeros(ComplexF64, msol, msol)              # fixfac
-        )
-    end
+A mutable struct to hold the state of the ODE solver for DCON.
+This struct contains all necessary fields to manage the ODE integration process,
+including solution vectors, tolerances, and flags for the integration process.
+"""
+@kwdef mutable struct OdeState
+    mpert::Int                  # poloidal mode number count
+    msol::Int                   # number of solutions
+    psi_save::Float64 = 0.0     # last saved psi value
+    istep::Int= 0               # integration step count
+    ix::Int= 0                  # index for psiout in spline
+    atol::Float64 = 1e-10       # absolute tolerance
+    singfac::Float64 = 0.0      # separation from singular surface
+    neq::Int = 0                # number of equations
+    next::String = ""           # next action ("cross" or "finish")
+    flag_count::Int = 0         # count of flags raised
+    new::Bool = true            # flag for new solution
+    u::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)            # solution vectors
+    du::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)           # derivative vectors 
+    u_save::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)       # saved solution vectors
+    index::Vector{Int} = collect(1:mpert)                                   # indices for sorting solutions
+    unorm::Vector{Float64} = zeros(Float64, 2*mpert)                        # norms of solution vectors
+    unorm0::Vector{Float64} = zeros(Float64, 2*mpert)                       # initial norms of solution vectors
+    fixfac::Array{ComplexF64,2} = zeros(ComplexF64, msol, msol)             # fixup factors for Gaussian reduction
 end
+
+OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
 
 
 function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal)
