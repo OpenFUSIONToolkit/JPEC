@@ -1,5 +1,5 @@
 [EQUIL_CONTROL]
-eq_type = "inverse_testing"             # Type of the input 2D equilibrium file
+eq_type = "chease2"             # Type of the input 2D equilibrium file
 eq_filename = "inverse.chease.10"  # path to equilibrium file
 
 jac_type = "hamada"          # Coordinate system (hamada, pest, boozer, equal_arc)
