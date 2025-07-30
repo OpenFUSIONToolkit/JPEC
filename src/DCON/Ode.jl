@@ -1,7 +1,3 @@
-
-
-using LinearAlgebra
-
 # Placeholder for dependencies
 # using Fourfit
 # using OdeOutput
@@ -9,12 +5,7 @@ using LinearAlgebra
 # using Free
 # using DifferentialEquations
 
-# For now, we set up the equilibrium spline locally, but this should be replaced with a proper import
-# JMH - removed this because it through an error due to undefined equil_input at precompilation
-# plasma_eq = JPEC.Equilibrium.setup_equilibrium(equil_input)
-# sq = plasma_eq.sq
-
-const eps = 1e-10
+const eps = 1e-10 # TODO: this shouldn't be here, right? 
 
 """
 OdeState

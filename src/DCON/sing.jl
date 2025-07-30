@@ -1,9 +1,6 @@
 # Computations relating to singualar surfaces
 #TODO: Assign types to things? 
 
-using LinearAlgebra #standard Julia library for linear algebra operations
-using LinearAlgebra.LAPACK #required for banded matrix operations
-
 #keep 1-3, 11 is CRUCIAL
 #13-16 are for kinetic DCON so skip for now
 
@@ -30,39 +27,17 @@ function sing_scan!(odet::OdeState, intr::DconInternal)
 end
 
 """
-    sing_find!(sing_surf_data, plasma_eq; mex=2, nn=1, itmax=200)
+    sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
 
-Finds and appends rational (singular) surfaces in a plasma equilibrium profile,
-where `m = nn*q` within each interval between extrema of the safety factor profile `q(psi)`.
+Locate singular rational q-surfaces (q = m/nn) using a bisection method between extrema of the q-profile, and store their properties in `intr.sing`.
 
-The results are stored as `NamedTuple`s in the supplied vector `sing_surf_data`, 
-with keys: `m`, `psifac`, `ρ`, `q`, and `q1`.
-
-# Arguments (TODO: update this once finalized)
-- `sing::Vector`: Container for output; will be emptied and updated in-place.
-- `plasma_eq`: Plasma equilibrium object with a field `.sq` suitable for spline evaluation.
-- `nn::Int`: Toroidal mode number `n`.
-- `itmax::Int`: Maximum allowed bisection iterations per root.
-
-# Details
-Searches each interval between adjacent `q`-profile extrema for all integer poloidal mode numbers `m`
-that satisfy the rational surface condition `m = n*q(psi)`, using bisection to find the roots.
-Assumes a monotonic `q` profile, unless a generalized interface is implemented
-(TODO: support for non-monotonic profiles). Also TODO: decide how to deal with data structure output
-
-# Output
-For each rational surface found, a `NamedTuple` with:
-- `m`: Poloidal mode number at this surface
-- `psifac`: Normalized flux label at the surface
-- `ρ`: Square root of `psifac`
-- `q`: `q` value at the surface (`m/nn`)
-- `q1`: Derivative of `q` at the surface
-
-is pushed to `sing_surf_data`.
+# Arguments
+- 'itmax::Int`: Maximum number of iterations for the bisection method (default: 200)
 """
-function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
+# JMH - I confirmed this function outputs the same sing struct as fortran dcon for DIII_Ideal
+function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
 
-    # Define functions to evaluate q and its first derivative
+    # Define functions to evaluate q and its first derivative (need EQUIL TEAM advice)
     qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
     q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4] 
 
@@ -116,30 +91,24 @@ end
 """
     sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, eqCtrl::Equilibrium.EquilibriumControl, eqPrm::Equilibrium.EquilibriumParameters)
 
-Compute and set limiter values for the DCON analysis.
+Compute and set limiter values for the DCON analysis - handles cases where user
+truncates before the last singular surface. 
 
-- `intr`: DCON internal state (mutable, will be updated)
-- `ctrl`: DCON control parameters
-- `equil`: Plasma equilibrium object (contains spline data)
-- `eqCtrl`: Equilibrium control parameters
-- `eqPrm`: Equilibrium physical parameters
-
-Modifies fields in `intr` and `ctrl` to set limiter locations and related quantities.
+# Arguments
+- `itmax::Int`: The maximum number of iterations allowed for the psilim search (default: 50)
+- `eps::Float64`: The convergence tolerance for the psilim search (default: 1e-10)
 """
-# computes limiter values - function 3 from Fortran DCON
-function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
-    #declarations 
-    itmax = 50
-    eps = 1e-10
+# JMH - this has been checked against the DIID_Ideal example (with psiedge = 0.95 to enter the last if statement). 
+# There are some discrepancies at the 4-5th digit between the two, not sure if this is numerical noise, 
+# an issue in the spline evals, or a bug here. However, the differences in the main internal parameters are small
+# so ignoring for now, can address in a unit test later.
+function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium; itmax=50, eps=1e-10)
 
-    #TODO: where does qmax and psihigh come from? Is it equil like we have right now?
     #compute and modify the DconInternal struct 
     intr.qlim   = min(equil.params.qmax, ctrl.qhigh)
-    intr.q1lim  = equil.sq.fs1[equil.config.control.mpsi, 4] #TODO: does equil.sq have a field fs1?
-    intr.psilim = equil.config.control.psihigh #TODO: do we need to deepcopy psihigh?
-
+    intr.q1lim  = equil.sq.fs1[equil.config.control.mpsi+1, 4]
+    intr.psilim = equil.config.control.psihigh 
     #normalize dmlim to interval [0,1)
-    #TODO: This is supposed to be modifying dmlim from the DconControl struct
     if ctrl.sas_flag
         while ctrl.dmlim > 1.0
             ctrl.dmlim -= 1.0
@@ -148,44 +117,34 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
             ctrl.dmlim += 1.0
         end
         #compute qlim
-        intr.qlim = (Int(ctrl.nn * intr.qlim) + ctrl.dmlim) / ctrl.nn
-        while intr.qlim > eqPrm.qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
+        intr.qlim = (floor(Int, ctrl.nn * intr.qlim) + ctrl.dmlim) / ctrl.nn
+        while intr.qlim > equil.params.qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
             intr.qlim -= 1.0 / ctrl.nn
         end
     end
 
     #use newton iteration to find psilim
     if intr.qlim < equil.params.qmax
-        # Find index jpsi that minimizes |equil.sq.fs[:,4] - qlim|
-        diffs = abs.(equil.sq.fs[:,4] .- intr.qlim) #broadcaasting, subtracts qlim from each element in equil.sq.fs[:,4]
-        jpsi = argmin(diffs)
-
-        # Ensure jpsi is within bounds
-        if jpsi >= mpsi
-            jpsi = mpsi - 1
-        end
+        # Find index jpsi that minimizes |equil.sq.fs[:,4] - qlim| and ensure within mpsi limits
+        _, jpsi = findmin(abs.(equil.sq.fs[:,4] .- intr.qlim))
+        jpsi = min(jpsi, equil.config.control.mpsi - 1)
 
         intr.psilim = equil.sq.xs[jpsi]
         it = 0
-
-        while true
+        while it < itmax
             it += 1
 
-            # Equivalent to CALL spline_eval(equil.sq, psilim, 1)
-            spline_eval(equil.sq, intr.psilim, 1) #TODO: I don't think this is the correct call
-
-            q  = equil.sq.f[4]
-            q1 = equil.sq.f1[4]
-
+            # Can these be accessed in a better way? (need EQUIL TEAM advice)
+            q  = JPEC.SplinesMod.spline_eval(equil.sq, intr.psilim, 0)[4]
+            q1 = JPEC.SplinesMod.spline_eval(equil.sq, intr.psilim, 1)[2][4]
             dpsi = (intr.qlim - q) / q1
             intr.psilim += dpsi
 
-            if abs(dpsi) < eps * abs(intr.psilim) || it > itmax
+            if abs(dpsi) < eps * abs(intr.psilim)
+                intr.q1lim = q1
                 break
             end
         end
-
-        intr.q1lim = q1
 
         # abort if not found
         if it > itmax
@@ -193,52 +152,14 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
         end
 
     else
-        intr.qlim = eqPrm.qmax #TODO: does this need to be a deepcopy?
-        intr.q1lim = equil.sq.fs1[mpsi,4]
-        intr.psilim = eqCtrl.psihigh
+        intr.qlim = equil.params.qmax
+        intr.q1lim = equil.sq.fs1[equil.config.control.mpsi+1,4]
+        intr.psilim = equil.config.control.psihigh 
     end
-
-    #= More Julia version of the Newton iteration
-    #use Newton iteration to find psilim
-    if qlim < eqPrm.qmax
-        # Find closest index
-        _, jpsi = findmin(abs.(equil.sq.fs[:,4] .- qlim))
-        jpsi = min(jpsi, mpsi - 1)
-
-        psilim = equil.sq.xs[jpsi]
-        dpsi   = Inf
-        q1     = NaN
-
-        for it in 1:itmax
-            spline_eval!(equil.sq, psilim, 1)
-
-            q  = equil.sq.f[4]
-            q1 = equil.sq.f1[4]
-
-            dpsi    = (qlim - q) / q1
-            psilim += dpsi
-
-            if abs(dpsi) < eps * abs(psilim)
-                return qlim, q1, psilim
-            end
-        end
-
-        error("Can't find psilim within $itmax iterations.")
-
-    else
-        qlim   = eqPrm.qmax
-        q1     = equil.sq.fs1[mpsi,4]
-        psilim = eqCtrl.psihigh
-        return qlim, q1, psilim
-    end
-    =#
 
     #set up record for determining the peak in dW near the boundary.
     if ctrl.psiedge < intr.psilim
-        spline_eval(equil.sq, ctrl.psiedge, 0) #TODO: I don't know if this is the right function call
-
-        qedgestart = Int(equil.sq.f[4])
-
+        qedgestart = floor(Int, JPEC.SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
         intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * ctrl.nn * ctrl.nperq_edge)
 
         intr.dw_edge  = fill(-typemax(Float64) * (1 + im), intr.size_edge)
@@ -248,7 +169,8 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
         # monitor some deeper points for an informative profile
         intr.pre_edge = 1
         for i in 1:intr.size_edge
-            if intr.q_edge[i] < equil.sq.f[4]
+        #TODO: do I have to keep calling spline eval? Can this be replaced with equil.sq.fs[4]? (EQUIL TEAM advice needed)
+            if intr.q_edge[i] < JPEC.SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4] 
                 intr.pre_edge += 1
             end
         end

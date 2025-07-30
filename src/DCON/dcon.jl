@@ -1,14 +1,3 @@
-
-using LinearAlgebra
-using TOML
-using ..Equilibrium
-
-# --- Placeholder for global variables, modules and utilities --- #
-# using Equil, ODE, Ball, Mercier, FreeBoundary, Resist, Pentrc
-# (Define your global variables/constants and include relevant physics/data modules)
-
-#= Core Control Flow =#
-
 function MainProgram(in_path::String)
     println("DCON START -> v$(Version)")
     timer_start()   # Timer stub
@@ -34,13 +23,14 @@ function MainProgram(in_path::String)
 #  -----------------------------------------------------------------------
 #  TODO:     optionally reform the eq splines to concentrate at true truncation (EQUIL TEAM)
 #  -----------------------------------------------------------------------
-    #sing_lim!(intr, ctrl, equil)  # determine if qhigh is truncating before psihigh
-#. This needs to be handled
-#    IF(psilim /= psihigh .AND. reform_eq_with_psilim)THEN
-#      CALL equil_read(out_unit, psilim) # this needs to be like plasma_eq = LoadEquilibrium(psilim) 
-#      CALL equil_out_global
-#      CALL equil_out_qfind
-#    ENDIF
+    sing_lim!(intr, ctrl, equil)  # determine if qhigh is truncating before psihigh
+    if intr.psilim != equil.config.control.psihigh && ctrl.reform_eq_with_psilim
+      @warn "psilim != psihigh not implemented yet, skipping reforming equilibrium splines"
+      # JMH - Nik please put the logic we discussed here
+      # something like ?
+      # equil.config.control.psihigh = intr.psilim
+      # equil = set_up_equilibrium(equil.config)
+    end
 
 # -----------------------------------------------------------------------
 # TODO:    record the equilibrium properties (EQUIL TEAM)
