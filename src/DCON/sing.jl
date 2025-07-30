@@ -614,9 +614,9 @@ end
 
 #= AI versions of the functions from sing.F, completely unedited and definitely not supposed to be in here
 
-
-function sing_vmat(ising)
-    if ising < 1 || ising > msing
+# Subprogram 4 in GPEC
+function sing_vmat(ising::Int, intr::DconInternal, ctrl::DconControl, equil::PlasmaEquilibrium)
+    if ising < 1 || ising > intr.msing
         return
     end
     singp = sing[ising]
