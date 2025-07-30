@@ -6,9 +6,6 @@
 - `InverseRunInput`:     Internal data structure for the inverse solver.
 - `PlasmaEquilibrium`:   The final, user-facing output object.
 """
-module EquilibriumTypes
-
-export EquilInput, DirectRunInput, InverseRunInput, LarInput, SolInput, PlasmaEquilibrium
 
 """
     EquilInput(...)
@@ -229,4 +226,3 @@ mutable struct SolInput
     f0fac::Float64
 end
 
-end # module Types
