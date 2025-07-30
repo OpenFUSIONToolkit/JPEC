@@ -60,7 +60,7 @@ For each rational surface found, a `NamedTuple` with:
 
 is pushed to `sing_surf_data`.
 """
-function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
+function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
 
     # Define functions to evaluate q and its first derivative
     qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
@@ -114,7 +114,7 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
 end
 
 """
-    sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, eqCtrl::JPEC.Equilibrium.EquilibriumControl, eqPrm::JPEC.Equilibrium.EquilibriumParameters)
+    sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, eqCtrl::Equilibrium.EquilibriumControl, eqPrm::Equilibrium.EquilibriumParameters)
 
 Compute and set limiter values for the DCON analysis.
 
@@ -127,7 +127,7 @@ Compute and set limiter values for the DCON analysis.
 Modifies fields in `intr` and `ctrl` to set limiter locations and related quantities.
 """
 # computes limiter values - function 3 from Fortran DCON
-function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium)
+function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
     #declarations 
     itmax = 50
     eps = 1e-10
@@ -373,7 +373,7 @@ end
         u::Array{ComplexF64,3},
         du::Array{ComplexF64,3},
         ctrl::DconControl,
-        equil::JPEC.Equilibrium.PlasmaEquilibrium,
+        equil::Equilibrium.PlasmaEquilibrium,
         intr::DconInternal
         #, ffit::FourFitVars
     )
@@ -397,7 +397,7 @@ function sing_der(neq::Int,
     u::Array{ComplexF64,3},
     du::Array{ComplexF64,3},
     ctrl::DconControl,
-    equil::JPEC.Equilibrium.PlasmaEquilibrium,
+    equil::Equilibrium.PlasmaEquilibrium,
     intr::DconInternal,
     #ffit::FourFitVars # JMH - commenting out until we fix the data struct
     )

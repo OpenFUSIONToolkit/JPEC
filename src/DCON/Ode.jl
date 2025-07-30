@@ -53,7 +53,7 @@ end
 OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
 
 
-function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
     # Initialization
     odet = OdeState(intr.mpert, intr.mpert)
 
@@ -144,7 +144,7 @@ Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are
 
 """
 
-function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState)
+function ode_axis_init(ising::Int, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState)
 
     # This might be wrong - double check once equil is more defined. 
     qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
@@ -350,7 +350,7 @@ end
 #     return nothing  # or could return a struct with all these values, for a more Julian approach
 # end
 
-function ode_ideal_cross(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
+function ode_ideal_cross(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
     # ...existing code...
 
     # Fixup solution at singular surface
@@ -448,7 +448,7 @@ function ode_resist_cross()
     return
 end
 
-function ode_step(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
+function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
     # ODE integrator step
     # Compute relative tolerances
     singfac_local = typemax(Float64)
