@@ -6,8 +6,6 @@ data from files. It translates the raw data into the initial data structures and
 fitted splines required by the coordinate solvers.
 """
 
-using .EquilibriumTypes: EquilInput, PlasmaEquilibrium, DirectRunInput, InverseRunInput, LarInput, SolInput
-
 """
     prepare_solver_input(equil_in)
 
