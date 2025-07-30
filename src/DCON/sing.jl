@@ -50,7 +50,7 @@ For each rational surface found, a `NamedTuple` with:
 
 is pushed to `sing_surf_data`.
 """
-function sing_find!(ctrl::DconControl, equil::DconEquilibrium, intr::DconInternal; itmax=200)
+function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
 
     # Define functions to evaluate q and its first derivative
     # TODO: confirm that this is the correct way to get spline data
@@ -109,7 +109,7 @@ function sing_find!(ctrl::DconControl, equil::DconEquilibrium, intr::DconInterna
 end
 
 # computes limiter values - function 3 from Fortran DCON
-function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::PlasmaEquilibrium)
+function sing_lim!(intr::DconInternal, cntrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium)
     #declarations 
     itmax = 50
     eps = 1e-10
@@ -330,9 +330,10 @@ function sing_der(neq::Int,
     u::Array{ComplexF64,3},
     du::Array{ComplexF64,3},
     cntrl::DconControl,
-    equil::PlasmaEquilibrium,
+    equil::JPEC.Equilibrium.PlasmaEquilibrium,
     intr::DconInternal,
-    ffit::FourFitVars )
+    #ffit::FourFitVars # JMH - commenting out until we fix the data struct
+    )
 
     # Workspace
     singfac::Vector{Float64} = zeros(Float64, intr.mpert)

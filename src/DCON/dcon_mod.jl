@@ -1,8 +1,8 @@
 module DconMod
 
+include("dcon_structs.jl")
 include("dcon.jl")
 include("Ode.jl")
 include("sing.jl")
-include("dcon_struct.jl")
 
 end

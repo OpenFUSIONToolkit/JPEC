@@ -79,7 +79,8 @@ end
     q_edge::Union{Nothing, Vector{Float64}} = nothing
     psi_edge::Union{Nothing, Vector{Float64}} = nothing
     dw_edge::Union{Nothing, Vector{Complex{Float64}}} = nothing
-    ud::Union{Nothing, Matrix{Float64,3} } = nothing #storage for u-derivative and xss
+    ud::Union{Nothing, Array{Float64,3} } = nothing #storage for u-derivative and xss # JMH - is there overlap with OdeState here? 
+    # JMH - changed previous line from Matrix to Array due to error - might have to modify depending on what ud looks like
 end
 
 @kwdef struct DconControl
@@ -174,50 +175,51 @@ end
     out_ahg2msc::Bool = true
 end
 
-@kwdef struct FourFitVars
+# JMH - what is a CsplineType? Can't find it anywhere. Commenting out so it will compile
+# @kwdef struct FourFitVars
 
-    # Spline matrices
-    amats::CsplineType
-    bmats::CsplineType
-    cmats::CsplineType
-    dmats::CsplineType
-    emats::CsplineType
-    hmats::CsplineType
-    dbats::CsplineType
-    ebats::CsplineType
-    fbats::CsplineType
-    fmats::CsplineType
-    kmats::CsplineType
-    gmats::CsplineType
-    kaats::CsplineType
-    gaats::CsplineType
-    f0mats::CsplineType
-    pmats::CsplineType
-    paats::CsplineType
-    kkmats::CsplineType
-    kkaats::CsplineType
-    r1mats::CsplineType
-    r2mats::CsplineType
-    r3mats::CsplineType
-    akmats::CsplineType
-    bkmats::CsplineType
-    ckmats::CsplineType
+#     # Spline matrices
+#     amats::CsplineType
+#     bmats::CsplineType
+#     cmats::CsplineType
+#     dmats::CsplineType
+#     emats::CsplineType
+#     hmats::CsplineType
+#     dbats::CsplineType
+#     ebats::CsplineType
+#     fbats::CsplineType
+#     fmats::CsplineType
+#     kmats::CsplineType
+#     gmats::CsplineType
+#     kaats::CsplineType
+#     gaats::CsplineType
+#     f0mats::CsplineType
+#     pmats::CsplineType
+#     paats::CsplineType
+#     kkmats::CsplineType
+#     kkaats::CsplineType
+#     r1mats::CsplineType
+#     r2mats::CsplineType
+#     r3mats::CsplineType
+#     akmats::CsplineType
+#     bkmats::CsplineType
+#     ckmats::CsplineType
 
-    k0s::SplineType
+#     k0s::SplineType
 
-    ipiva::Vector{Int}
-    asmat::Array{ComplexF64,2}
-    bsmat::Array{ComplexF64,2}
-    csmat::Array{ComplexF64,2}
-    jmat::Vector{ComplexF64}
+#     ipiva::Vector{Int}
+#     asmat::Array{ComplexF64,2}
+#     bsmat::Array{ComplexF64,2}
+#     csmat::Array{ComplexF64,2}
+#     jmat::Vector{ComplexF64}
 
-    parallel_threads::Int = 0
-    dcon_kin_threads::Int = 0
+#     parallel_threads::Int = 0
+#     dcon_kin_threads::Int = 0
 
-    # kinetic ABCDEH mats for sing_mod
-    kwmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
-    ktmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
-end
+#     # kinetic ABCDEH mats for sing_mod
+#     kwmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
+#     ktmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
+# end
 
 @kwdef struct SingVars
 
@@ -229,6 +231,8 @@ end
       n1::Vector{Int} = Int[]
       n2::Vector{Int} = Int[]
 
-      m0mat::Union{Nothing, Matrix{ComplexF64,2}} = nothing
-      sing_detf::Union{Nothing, Matrix{ComplexF64,2}} = nothing
+    #   m0mat::Union{Nothing, Matrix{ComplexF64,2}} = nothing
+    #   sing_detf::Union{Nothing, Matrix{ComplexF64,2}} = nothing
+      m0mat::Union{Nothing, Array{ComplexF64,2}} = nothing # JMH - same as DconInternal - changing to array so it will compile, might be wrong
+      sing_detf::Union{Nothing, Array{ComplexF64,2}} = nothing
 end

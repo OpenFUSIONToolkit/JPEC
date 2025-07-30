@@ -344,7 +344,3 @@ function timer_start()
 end
 
 const Version = "JULIA-PORT-1.0"
-
-# Entrypoint
-using .DCONMain
-DCONMain.MainProgram()
