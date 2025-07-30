@@ -20,6 +20,9 @@ Evaluates Mercier criterion and related quantities for MHD stability analysis.
 - `spline_fit()`: Fits spline with periodic boundary conditions - from DconMod
 - `spline_int()`: Integrates splined functions - from DconMod
 """
+# --- Module-level Dependencies ---
+import ..Spl
+
 function mercier_scan(plasma_eq)
     
     # Local variables
@@ -57,19 +60,19 @@ function mercier_scan(plasma_eq)
             
             theta = rzphi.ys[itheta]
             rfac = sqrt(rzphi.f[1])
-            eta = twopi * (theta + rzphi.f[2])
+            eta = 2π * (theta + rzphi.f[2])
             r = ro + rfac * cos(eta)
             jac = rzphi.f[4]  # Jacobian
             
             # Evaluate other local quantities (metric components)
             v21 = rzphi.fy[1] / (2 * rfac * jac)
-            v22 = (1 + rzphi.fy[2]) * twopi * rfac / jac
+            v22 = (1 + rzphi.fy[2]) * 2π * rfac / jac
             v23 = rzphi.fy[3] * r / jac
-            v33 = twopi * r / jac
+            v33 = 2π * r / jac
             
             # Magnetic field squared and flux derivative squared
             bsq = chi1^2 * (v21^2 + v22^2 + (v23 + q * v33)^2)
-            dpsisq = (twopi * r)^2 * (v21^2 + v22^2)
+            dpsisq = (2π * r)^2 * (v21^2 + v22^2)
             
             # Evaluate integrands for Mercier analysis
             ff_fs[itheta, 1] = bsq / dpsisq
@@ -102,12 +105,14 @@ function mercier_scan(plasma_eq)
         h = twopif * p1 * v1 / (q1 * chi1^3) * (avg[2] - avg[1] / avg[5])
         
         # Store results in output spline structure
-        locstab_fs[ipsi, 1] = di * psis # is this the right psis?
-        locstab_fs[ipsi, 2] = (di + (h - 0.5)^2) * psis # is this the right psis?
+        locstab_fs[ipsi, 1] = di * psis # is this the right 'psis'?
+        locstab_fs[ipsi, 2] = (di + (h - 0.5)^2) * psis # is this the right 'psis'?
         locstab_fs[ipsi, 3] = h
     end
+
+    locstab = Spl.spline_setup(psis, locstab_fs; bctype=3) # bctype=3 is 'extrapolate'
     
     return locstab
 end
 
-end # module MercierMod
+end
