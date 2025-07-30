@@ -103,11 +103,11 @@ function MainProgram(in_path::String)
       #   println(" Fourier analysis of metric tensor components")
       # end
 
-      fourfit_make_metric(equil.rzphi, equil.sq) #TODO: replace this with structures once fourfit.jl fucntion is reworked
+      metric_result = fourfit_make_metric(equil.rzphi, equil.sq) #TODO: replace this with structures once fourfit.jl fucntion is reworked
       if ctrl.verbose
         println("Computing F, G, and K Matrices")
       end
-      fourfit_make_matrix(out_fund) #TODO: what is out_fund? 
+      matrix_result = fourfit_make_matrix(metric_result, equil.sq, equil.rzphi, 2π) #TODO: same as above
       println("mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband), nn = $(ctrl.nn), sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
 
  #     if kin_flag
