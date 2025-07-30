@@ -2,7 +2,7 @@
 using JPEC
 using TOML
 
-@kwdef struct ResistType
+@kwdef mutable struct ResistType
     e::Float64 = 0.0
     f::Float64 = 0.0
     h::Float64 = 0.0
@@ -15,7 +15,7 @@ using TOML
     taur::Float64 = 0.0
 end
 
-@kwdef struct SingType
+@kwdef mutable struct SingType
     m::Int = 0
     order::Int = 0
     r1::NTuple{1,Int} = (0,)
@@ -34,7 +34,7 @@ end
     restype::ResistType = ResistType()
 end
 
-@kwdef struct DconFileNames
+@kwdef mutable struct DconFileNames
     out_bal1_unit::String = "bal1.out"
     out_bal2_unit::String = "bal2.out"
     bin_bal1_unit::String = "bal1.bin"
@@ -54,7 +54,7 @@ end
     err_unit::String = "error.bin"
 end
 
-@kwdef struct DconInternal
+@kwdef mutable struct DconInternal
     mlow::Int = 0 #Copy of delta_mlow, but with limits enforced
     mhigh::Int = 0 #Copy of delta_mhigh, but with limits enforced
     mpert::Int = 0 #mpert = mhigh-mlow+1
@@ -83,7 +83,7 @@ end
     # JMH - changed previous line from Matrix to Array due to error - might have to modify depending on what ud looks like
 end
 
-@kwdef struct DconControl
+@kwdef mutable struct DconControl
     verbose::Bool = true
     bal_flag::Bool = false
     mat_flag::Bool = false
@@ -138,7 +138,7 @@ end
     parallel_threads::Int = 0
 end
 
-@kwdef struct DconOutput
+@kwdef mutable struct DconOutput
     interp::Bool = false
     crit_break::Bool = true
     out_bal1::Bool = false
@@ -221,7 +221,7 @@ end
 #     ktmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
 # end
 
-@kwdef struct SingVars
+@kwdef mutable struct SingVars
 
       msol::Int = 0
       sing_order::Int = 2
