@@ -31,7 +31,8 @@ including solution vectors, tolerances, and flags for the integration process.
     psi_save::Float64 = 0.0     # last saved psi value
     istep::Int= 0               # integration step count
     ix::Int= 0                  # index for psiout in spline
-    atol::Float64 = 1e-10       # absolute tolerance
+    atol0::Float64 = 1e-10       # absolute tolerance
+    atol::Array{ComplexF64,2} = zeros(ComplexF64, msol, msol)       #  tolerance 
     singfac::Float64 = 0.0      # separation from singular surface
     psifac::Float64 = 0.0       # normalized flux coordinate
     neq::Int = 0                # number of equations
@@ -83,7 +84,7 @@ function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, i
             if test
                 break
             end
-            ode_step()
+            ode_step(ising, ctrl, equil, intr, odet)
             first = false
         end
 
@@ -97,7 +98,7 @@ function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, i
             elseif kin_flag
                 ode_kin_cross()
             else
-                ode_ideal_cross!(ising, odet, intr, ctrl)
+                ode_ideal_cross!(ising, ctrl, equil, intr, odet)
             end
         else
             break
@@ -350,29 +351,29 @@ end
 #     return nothing  # or could return a struct with all these values, for a more Julian approach
 # end
 
-function ode_ideal_cross(ising::Int, odet::OdeState, intr::DconInternal, ctrl::DconControl)
+function ode_ideal_cross(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
     # ...existing code...
 
     # Fixup solution at singular surface
-    if verbose
-        println("psi = $(sing[ising].psifac), q = $(sing[ising].q)")
+    if ctrl.verbose
+        println("psi = $(intr.sing[ising].psifac), q = $(intr.sing[ising].q)")
     end
     ode_unorm(true)    
 
     # Write asymptotic coefficients before reinit
-    if bin_euler
-        sing_get_ca(ising, odet.psifac, u, ca)
-        write(euler_bin_unit, 4)
-        write(euler_bin_unit, sing[ising].psifac, sing[ising].q, sing[ising].q1)
-        write(euler_bin_unit, msol)
-        write(euler_bin_unit, ca)
+    if ctrl.bin_euler
+   #     sing_get_ca(ising, odet.psifac, u, ca)
+   #     write(euler_bin_unit, 4)
+   #     write(euler_bin_unit, intr.sing[ising].psifac, intr.sing[ising].q, intr.sing[ising].q1)
+   #     write(euler_bin_unit, msol)
+   #     write(euler_bin_unit, ca)
     end
 
     # Re-initialize
     psi_old = odet.psifac
-    ipert0 = round(Int, nn * sing[ising].q) - mlow + 1
-    dpsi = sing[ising].psifac - odet.psifac
-    odet.psifac = sing[ising].psifac + dpsi
+    ipert0 = round(Int, ctrl.nn * intr.sing[ising].q) - intr.mlow + 1
+    dpsi = intr.sing[ising].psifac - odet.psifac
+    odet.psifac = intr.sing[ising].psifac + dpsi
     sing_get_ua(ising, odet.psifac, ua)
     if !con_flag
         u[:, index[1], :] .= 0  # originally u(ipert0,:,:) = 0
@@ -386,43 +387,43 @@ function ode_ideal_cross(ising::Int, odet::OdeState, intr::DconInternal, ctrl::D
     end
 
     # Write asymptotic coefficients after reinit
-    if bin_euler
-        sing_get_ca(ising, odetpsifac, u, ca)
-        write(euler_bin_unit, msol)
-        write(euler_bin_unit, ca)
-        write(euler_bin_unit, sing[ising].restype.e, sing[ising].restype.f,
-              sing[ising].restype.h, sing[ising].restype.m,
-              sing[ising].restype.g, sing[ising].restype.k,
-              sing[ising].restype.eta, sing[ising].restype.rho,
-              sing[ising].restype.taua, sing[ising].restype.taur)
+    if ctrl.bin_euler
+  #      sing_get_ca(ising, odetpsifac, u, ca)
+  #      write(euler_bin_unit, msol)
+  #      write(euler_bin_unit, ca)
+  #      write(euler_bin_unit, sing[ising].restype.e, sing[ising].restype.f,
+  #            sing[ising].restype.h, sing[ising].restype.m,
+  #            sing[ising].restype.g, sing[ising].restype.k,
+  #            sing[ising].restype.eta, sing[ising].restype.rho,
+  #            sing[ising].restype.taua, sing[ising].restype.taur)
     end
 
     # Find next ising
     while true
         ising += 1
-        if ising > msing || psilim < sing[min(ising, msing)].psifac
+        if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac
             break
         end
-        q = sing[ising].q
-        if mlow <= nn * q && mhigh >= nn * q
+        q = intr.sing[ising].q
+        if intr.mlow <= ctrl.nn * q && intr.mhigh >= ctrl.nn * q
             break
         end
     end
 
     # Compute conditions at next singular surface
-    if ising > msing || psilim < sing[min(ising, msing)].psifac
-        psimax = psilim * (1 - eps)
-        m1 = round(Int, nn * qlim) + sign(one, nn * sq.fs1[mpsi, 4])
+    if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac
+        psimax = intr.psilim * (1 - eps)
+        m1 = round(Int, ctrl.nn * intr.qlim) + intr.sign(one, ctrl.nn * equil.sq.fs1[mpsi, 4])
         next = "finish"
     else
-        psimax = sing[ising].psifac - singfac_min / abs(nn * sing[ising].q1)
-        m1 = round(Int, nn * sing[ising].q)
-        println(crit_out_unit, "ising = $ising, psifac = $(sing[ising].psifac), q = $(sing[ising].q), di = $(sing[ising].di), alpha = $(sing[ising].alpha)")
+        psimax = sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
+        m1 = round(Int,ctrl.nn * intr.sing[ising].q)
+        println(crit_out_unit, "ising = $ising, psifac = $(intr.sing[ising].psifac), q = $(intr.sing[ising].q), di = $(intr.sing[ising].di), alpha = $(intr.sing[ising].alpha)")
     end
 
     # Restart ode solver
-    istate = 1
-    istep += 1
+    istate = 1 # is this in use?
+    odet.istep += 1
     rwork[1] = psimax
     new = true
     u_save .= u
@@ -448,41 +449,41 @@ function ode_resist_cross()
     return
 end
 
-function ode_step(ising::Int, odet::OdeState, intr::DconInternal, ctrl::DconControl)
+function ode_step(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
     # ODE integrator step
     # Compute relative tolerances
     singfac_local = typemax(Float64)
     if ctrl.kin_flag
-        if ising == 1 && intr.kmsing >= 1
-            singfac_local = abs(odet.psifac - kinsing[ising].psifac) /
-                            (kinsing[ising].psifac - psilow)
-        elseif ising <= intr.kmsing
-            singfac_local = min(
-                abs(odet.psifac - kinsing[ising].psifac),
-                abs(odet.psifac - kinsing[ising-1].psifac)
-            ) / abs(kinsing[ising].psifac - kinsing[ising-1].psifac)
-        end
+ #       if ising == 1 && intr.kmsing >= 1
+ #           singfac_local = abs(odet.psifac - kinsing[ising].psifac) /
+ #                           (kinsing[ising].psifac - psilow)
+ #       elseif ising <= intr.kmsing
+ #           singfac_local = min(
+ #               abs(odet.psifac - kinsing[ising].psifac),
+ #               abs(odet.psifac - kinsing[ising-1].psifac)
+ #           ) / abs(kinsing[ising].psifac - kinsing[ising-1].psifac)
+ #       end
     else
-        if ising <= msing
-            singfac_local = abs(sing[ising].m - nn * q)
+        if ising <= intr.msing
+            singfac_local = abs(intr.sing[ising].m - ctrl.nn * q)
         end
         if ising > 1
             singfac_local = min(
                 singfac_local,
-                abs(sing[ising-1].m - nn * q)
+                abs(intr.sing[ising-1].m - ctrl.nn * q)
             )
         end
     end
-    tol = singfac_local < crossover ? tol_r : tol_nr
+    tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
     rtol = tol
 
     # Compute absolute tolerances
-    for ieq in 1:2, isol in 1:msol
+    for ieq in 1:2, isol in 1:odet.msol
         atol0 = maximum(abs.(u[:, isol, ieq])) * tol
         if atol0 == 0
             atol0 = typemax(Float64)
         end
-        atol[:, isol, ieq] .= ComplexF64(atol0, atol0)
+        odet.atol[:, isol, ieq] .= ComplexF64(atol0, atol0)
     end
 
     # Choose psiout
