@@ -159,7 +159,7 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
     q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     # Preliminary computations
-    psifac = equil.psilow  # TODO: this was Fortran sq%xs(0)? - confirm this is psilow? Don't know how to access xs 
+    psifac = equil.sq.xs[1]  # TODO: this was Fortran sq%xs(0)? - confirm this is psilow? Don't know how to access xs
 
     # Use Newton iteration to find starting psi if qlow is above q0
     # TODO: add this. For now, assume qlow = 0.0 and start at the first singular surface
@@ -245,12 +245,12 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
     bubble!(key, odet.index, 1, intr.mpert) # in original Fortran: bubble(key, index, 1, mpert)
 
     # Initialize solutions
-    for ipert = 1:mpert
+    for ipert = 1:intr.mpert
         odet.u[index[ipert], ipert, 2] = 1
     end
     odet.msol = intr.mpert
-    odet.neq = 4 * intr.mpert * msol
-    odet.u_save .= u
+    odet.neq = 4 * intr.mpert * odet.msol
+    odet.u_save .= odet.u
     odet.psi_save = psifac
 
     # Compute conditions at next singular surface
@@ -442,7 +442,6 @@ function ode_ideal_cross()
         write(crit_bin_unit)
     end
 
-    # ...existing code...
 end
 
 # Example stub for kinetic crossing
