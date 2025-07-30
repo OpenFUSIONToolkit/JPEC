@@ -50,10 +50,10 @@ function setup_equilibrium(eq_config::EquilConfig)
         eq_input = read_chease2(eq_config)
     elseif eq_type == "lar"
         lar_config = LargeAspectRatioConfig(eq_config.control.eq_filename)
-        eq_input = lar_run(lar_config)
+        eq_input = lar_run(eq_config, lar_config)
     elseif eq_type == "sol"
         sol_config = SolevevConfig(eq_config.control.eq_filename)
-        eq_input = sol_run(sol_config)
+        eq_input = sol_run(eq_config, sol_config)
     else
         error("Equilibrium type $(equil_in.eq_type) is not implemented")
     end
