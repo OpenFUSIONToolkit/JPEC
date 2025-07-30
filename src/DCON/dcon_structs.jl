@@ -136,6 +136,8 @@ end
     wv_farwall_flag::Bool = false
     dcon_kin_threads::Int = 0
     parallel_threads::Int = 0
+    diagnose::Bool = false
+    diagnose_ca::Bool = false
 end
 
 @kwdef mutable struct DconOutput
