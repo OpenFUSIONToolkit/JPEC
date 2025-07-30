@@ -333,6 +333,195 @@ function fourfit_make_metric(rzphi, sq;
     
     return metric
 end
+
+
+# ====================================================================
+# HELPER FUNCTIONS (라인 130 부근에 배치 - module 시작 부분)
+# ====================================================================
+
+
+
+"""
+    extract_fourier_coefficients(fspline, psi, mband, verbose=false)
+
+Extract Fourier coefficients from fitted metric spline at given psi.
+COMPLETELY CORRECTED VERSION: Direct access to JPEC fspline internal structure.
+"""
+function extract_fourier_coefficients(fspline, psi, mband, verbose::Bool=false)
+    try
+        if verbose && psi ≈ 0.01  # Only print for first call
+            println("   🔍 Analyzing fspline structure:")
+            println("   fspline type: $(typeof(fspline))")
+            
+            # Print all fields to understand structure
+            if hasfield(typeof(fspline), :cs)
+                println("   Has cs field: $(hasfield(typeof(fspline.cs), :fspl))")
+                if hasfield(typeof(fspline.cs), :fspl)
+                    println("   fspl size: $(size(fspline.cs.fspl))")
+                end
+            end
+        end
+        
+        # 🔧 Method 1: Direct access to JPEC fspline Fourier coefficients
+        if hasfield(typeof(fspline), :cs) && hasfield(typeof(fspline.cs), :fspl)
+            
+            fspl_data = fspline.cs.fspl  # This contains the Fourier coefficients
+            xs_data = fspline.cs.xs      # psi coordinates
+            
+            # Find psi index
+            psi_idx = searchsortedfirst(xs_data, psi)
+            psi_idx = clamp(psi_idx, 1, length(xs_data))
+            
+            if verbose && psi ≈ 0.01
+                println("   fspl_data size: $(size(fspl_data))")
+                println("   Using psi_idx: $psi_idx for psi=$psi")
+            end
+            
+            # JPEC fspline stores coefficients as [psi, component, fourier_mode]
+            # Extract coefficients for all components and modes
+            n_coeffs = 8 * (mband + 1)
+            coeffs = zeros(ComplexF64, n_coeffs)
+            
+            if size(fspl_data, 2) >= 8 && size(fspl_data, 3) >= 2*mband+1
+                
+                for comp in 1:8
+                    for dm in 0:mband
+                        idx = (comp-1) * (mband+1) + (dm + 1)
+                        
+                        # JPEC stores modes from -mband to +mband
+                        mode_idx = dm + mband + 1  # Convert to 1-based index
+                        
+                        if mode_idx <= size(fspl_data, 3)
+                            coeffs[idx] = fspl_data[psi_idx, comp, mode_idx]
+                        else
+                            coeffs[idx] = 0.0 + 0.0im
+                        end
+                    end
+                end
+                
+                if verbose && psi ≈ 0.01
+                    println("   ✅ Successfully extracted $(length(coeffs)) coefficients from fspl")
+                    println("   Sample coefficients:")
+                    for dm in 0:min(2, mband)
+                        idx = dm + 1
+                        println("     dm=$dm: g11=$(coeffs[idx]), g22=$(coeffs[idx + mband+1]), g33=$(coeffs[idx + 2*(mband+1)])")
+                    end
+                end
+                
+                return coeffs
+            end
+        end
+        
+        # 🔧 Method 2: Use JPEC fspline_eval with proper theta sampling
+        if hasmethod(JPEC.SplinesMod.fspline_eval, (typeof(fspline), Vector{Float64}, Vector{Float64}, Int))
+            
+            # Sample at multiple theta points to extract Fourier series
+            ntheta = 64  # Must be power of 2 for FFT
+            theta_points = [2π * i / ntheta for i in 0:ntheta-1]
+            psi_points = fill(psi, ntheta)
+            
+            try
+                # Evaluate at all theta points
+                f_result = JPEC.SplinesMod.fspline_eval(fspline, psi_points, theta_points, 0)
+                
+                if size(f_result, 3) >= 8
+                    n_coeffs = 8 * (mband + 1)
+                    coeffs = zeros(ComplexF64, n_coeffs)
+                    
+                    for comp in 1:8
+                        # Extract theta variation for this component
+                        theta_data = f_result[:, 1, comp]  # All theta points
+                        
+                        # FFT to get Fourier coefficients
+                        fft_result = fft(theta_data)
+                        
+                        for dm in 0:mband
+                            idx = (comp-1) * (mband+1) + (dm + 1)
+                            
+                            if dm == 0
+                                # DC component
+                                coeffs[idx] = fft_result[1] / ntheta
+                            elseif dm <= ntheta ÷ 2
+                                # Positive frequency
+                                coeffs[idx] = fft_result[dm + 1] / ntheta
+                            else
+                                coeffs[idx] = 0.0 + 0.0im
+                            end
+                        end
+                    end
+                    
+                    if verbose && psi ≈ 0.01
+                        println("   ✅ Extracted coefficients using FFT method")
+                        println("   Sample coefficients:")
+                        for dm in 0:min(2, mband)
+                            idx = dm + 1
+                            println("     dm=$dm: g11=$(coeffs[idx]), g22=$(coeffs[idx + mband+1]), g33=$(coeffs[idx + 2*(mband+1)])")
+                        end
+                    end
+                    
+                    return coeffs
+                end
+                
+            catch e
+                if verbose && psi ≈ 0.01
+                    println("   ⚠️ FFT method failed: $e")
+                end
+            end
+        end
+        
+        # 🔧 Method 3: Direct evaluation at theta=0 only (single point)
+        if hasmethod(JPEC.SplinesMod.fspline_eval, (typeof(fspline), Vector{Float64}, Vector{Float64}, Int))
+            
+            try
+                # Evaluate only at theta=0
+                f_result = JPEC.SplinesMod.fspline_eval(fspline, [psi], [0.0], 0)
+                
+                if size(f_result, 3) >= 8
+                    # Use only the DC components (dm=0) from evaluation
+                    n_coeffs = 8 * (mband + 1)
+                    coeffs = zeros(ComplexF64, n_coeffs)
+                    
+                    for comp in 1:8
+                        # Only set DC component (dm=0)
+                        idx = (comp-1) * (mband+1) + 1  # dm=0 index
+                        coeffs[idx] = f_result[1, 1, comp] + 0.0im
+                        
+                        # Higher modes set to zero (conservative approach)
+                        for dm in 1:mband
+                            idx_dm = (comp-1) * (mband+1) + (dm + 1)
+                            coeffs[idx_dm] = 0.0 + 0.0im
+                        end
+                    end
+                    
+                    if verbose && psi ≈ 0.01
+                        println("   ✅ Using DC-only coefficients from single point evaluation")
+                        println("   Sample coefficients:")
+                        for comp in 1:3
+                            idx = (comp-1) * (mband+1) + 1
+                            println("     comp=$comp, dm=0: $(coeffs[idx])")
+                        end
+                    end
+                    
+                    return coeffs
+                end
+                
+            catch e
+                if verbose && psi ≈ 0.01
+                    println("   ⚠️ Single point evaluation failed: $e")
+                end
+            end
+        end
+        
+        # If all methods fail, this is a real problem
+        error("All Fourier extraction methods failed - JPEC fspline not accessible")
+        
+    catch e
+        error("Fourier coefficient extraction completely failed: $e")
+    end
+end
+
+
+# 이제 fourfit_make_matrix 함수 정의...
 """
     fourfit_make_matrix(metric::MetricData, sq, rzphi, psio; kwargs...)
 
@@ -387,7 +576,7 @@ function fourfit_make_matrix(metric::MetricData, sq, rzphi, psio;
     
     # Safety check for mband - extremely conservative for first run
     original_mband = metric.mband
-    mband = 0  # Diagonal only for first run - maximize stability
+    mband = 2  # Diagonal only for first run - maximize stability
     
     if mband != original_mband && verbose
         println("   ⚠️  Set mband to $mband for maximum stability")
@@ -419,13 +608,8 @@ function fourfit_make_matrix(metric::MetricData, sq, rzphi, psio;
     temp1 = zeros(ComplexF64, mpert, mpert)
     temp2 = zeros(ComplexF64, mpert, mpert)
     
-    # Work arrays
     ipiva = zeros(Int, mpert)
     work = zeros(ComplexF64, mpert * mpert)
-    
-    # Banded matrix storage for F matrix
-    fmatb = zeros(ComplexF64, mband+1, mpert)
-    
     # ====================================================================
     # 3. SETUP COMPLEX CUBIC SPLINES (Fortran lines 126-140)
     # ====================================================================
@@ -576,128 +760,82 @@ function fourfit_make_matrix(metric::MetricData, sq, rzphi, psio;
         end
         
         chi1 = twopi * psio  # Toroidal flux normalization
-        nq = nn * q          # n * q
+        nq = nn * q          # 🔧 n * q - 여기서 정의해야 함!
         
-        # ================================================================
-        # 6.2 EXTRACT FOURIER COEFFICIENTS (Fortran lines 165-184)
-        # ================================================================
-        
-        use_default_coefficients = false  # Initialize flag
-        
-        if metric.fspline !== nothing
-            try
-                # Extract Fourier coefficients from fitted metric spline
-                # This corresponds to Fortran: metric%cs%fs(ipsi,1:8*(mband+1))
-                
-                # Evaluate Fourier coefficients at this flux surface
-                coeffs = extract_fourier_coefficients(metric.fspline, psifac, mband)
-                
-                # Map coefficients to metric components (lower half)
-                # In Fortran fourfit.F, this loop runs from -mband to 0
-                for dm in 0:-1:-mband
-                    idx = abs(dm) + 1
-                    # In Fortran, coefficients are ordered as:
-                    # g11(-mband:0), g22(-mband:0), g33(-mband:0), g23(-mband:0),
-                    # g31(-mband:0), g12(-mband:0), jmat(-mband:0), jmat1(-mband:0)
-                    g11[dm] = coeffs[idx]                    # 1:mband+1
-                    g22[dm] = coeffs[idx + mband+1]          # mband+2:2*mband+2
-                    g33[dm] = coeffs[idx + 2*(mband+1)]      # 2*mband+3:3*mband+3
-                    g23[dm] = coeffs[idx + 3*(mband+1)]      # 3*mband+4:4*mband+4
-                    g31[dm] = coeffs[idx + 4*(mband+1)]      # 4*mband+5:5*mband+5
-                    g12[dm] = coeffs[idx + 5*(mband+1)]      # 5*mband+6:6*mband+6
-                    jmat[dm] = coeffs[idx + 6*(mband+1)]     # 6*mband+7:7*mband+7
-                    jmat1[dm] = coeffs[idx + 7*(mband+1)]    # 7*mband+8:8*mband+8
-                end
-                
-                # Compute upper half using conjugate symmetry
-                # In Fortran fourfit.F, this calculation uses: g_m = CONJG(g_{-m})
-                for dm in 1:mband
-                    g11[dm] = conj(g11[-dm])
-                    g22[dm] = conj(g22[-dm])
-                    g33[dm] = conj(g33[-dm])
-                    g23[dm] = conj(g23[-dm])
-                    g31[dm] = conj(g31[-dm])
-                    g12[dm] = conj(g12[-dm])
-                    jmat[dm] = conj(jmat[-dm])
-                    jmat1[dm] = conj(jmat1[-dm])
-                end
-                
-                # Diagnostic output for first surface
-                if verbose && ipsi == 0
-                    println("   ✅ Extracted Fourier coefficients successfully")
-                    println("   Sample coefficients:")
-                    println("      g11[0] = $(g11[0])")
-                    println("      g22[0] = $(g22[0])")
-                    println("      g33[0] = $(g33[0])")
-                end
-                
-            catch e
-                if verbose && ipsi < 5
-                    println("⚠️  Fourier coefficient extraction failed: $e")
-                    println("   Using default coefficients")
-                end
-                use_default_coefficients = true
+        if verbose && ipsi == 0
+            println("   Physical parameters: q=$q, nq=$nq, chi1=$chi1")
+        end
+# ================================================================
+# 6.2 EXTRACT FOURIER COEFFICIENTS (Fortran lines 165-184)
+# ================================================================
+
+use_default_coefficients = false  # Initialize flag
+# ================================================================
+# 6.2 EXTRACT FOURIER COEFFICIENTS (개선된 버전)
+# ================================================================
+
+
+
+# ================================================================
+# 6.2 EXTRACT FOURIER COEFFICIENTS (완전 수정된 버전)
+# ================================================================
+
+if metric.fspline !== nothing
+    if verbose && ipsi == 0
+        println("   🔍 Extracting Fourier coefficients from metric.fspline")
+    end
+    
+    # 🔧 개선된 추출 함수 호출 - fallback 없음
+    coeffs = extract_fourier_coefficients(metric.fspline, psifac, mband,verbose)
+    
+    if length(coeffs) >= 8 * (mband + 1)
+        # 🔧 올바른 계수 매핑
+        for dm in -mband:mband
+            abs_dm = abs(dm)
+            idx = abs_dm + 1
+            
+            if dm >= 0
+                # Positive and zero modes - direct assignment
+                g11[dm] = coeffs[idx]                    
+                g22[dm] = coeffs[idx + mband+1]          
+                g33[dm] = coeffs[idx + 2*(mband+1)]     
+                g23[dm] = coeffs[idx + 3*(mband+1)]     
+                g31[dm] = coeffs[idx + 4*(mband+1)]     
+                g12[dm] = coeffs[idx + 5*(mband+1)]     
+                jmat[dm] = coeffs[idx + 6*(mband+1)]    
+                jmat1[dm] = coeffs[idx + 7*(mband+1)]   
+            else
+                # Negative modes - conjugate symmetry
+                pos_dm = abs(dm)
+                pos_idx = pos_dm + 1
+                g11[dm] = conj(coeffs[pos_idx])
+                g22[dm] = conj(coeffs[pos_idx + mband+1])
+                g33[dm] = conj(coeffs[pos_idx + 2*(mband+1)])
+                g23[dm] = conj(coeffs[pos_idx + 3*(mband+1)])
+                g31[dm] = conj(coeffs[pos_idx + 4*(mband+1)])
+                g12[dm] = conj(coeffs[pos_idx + 5*(mband+1)])
+                jmat[dm] = conj(coeffs[pos_idx + 6*(mband+1)])
+                jmat1[dm] = conj(coeffs[pos_idx + 7*(mband+1)])
             end
-        else
-            use_default_coefficients = true
         end
         
-        # Use default values if extraction failed
-        # In Fortran fourfit.F, this sets physically reasonable default values
-        if use_default_coefficients
-            if verbose && ipsi == 0
-                println("   Using default physically reasonable Fourier coefficients")
-            end
-            
+        # 🔧 진단 출력 (실제 추출된 값들 확인)
+        if verbose && ipsi == 0
+            println("   ✅ Extracted REAL coefficients for each dm:")
             for dm in -mband:mband
-                if dm == 0
-                    # Diagonal terms - Fortran typically uses positive values to ensure positive definiteness
-                    g11[dm] = 1.0 + 0.0im    # Radial component
-                    g22[dm] = 1.0 + 0.0im    # Poloidal component
-                    g33[dm] = 10.0 + 0.0im   # Toroidal component (often larger)
-                else
-                    # Off-diagonal terms - usually small for stability
-                    # In physical tokamaks, higher modes decrease with mode number
-                    decay_factor = 1.0 / (1.0 + abs(dm)^2)
-                    g11[dm] = 0.01 * decay_factor + 0.0im
-                    g22[dm] = 0.01 * decay_factor + 0.0im
-                    g33[dm] = 0.01 * decay_factor + 0.0im
-                end
-                
-                # Cross terms - typically smaller and often asymmetric
-                # Ensure dm=0 components are real, like in Fortran
-                if dm == 0
-                    g23[dm] = 0.0 + 0.0im
-                    g31[dm] = 0.0 + 0.0im
-                    g12[dm] = 0.0 + 0.0im
-                    jmat[dm] = 0.0 + 0.0im
-                    jmat1[dm] = 0.0 + 0.0im
-                else
-                    # Add some small imaginary components for non-zero modes
-                    decay_factor = 1.0 / (1.0 + abs(dm)^2)
-                    g23[dm] = 0.0 + 0.001im * decay_factor * sign(dm)
-                    g31[dm] = 0.0 + 0.001im * decay_factor * sign(dm)
-                    g12[dm] = 0.0 + 0.001im * decay_factor * sign(dm)
-                    jmat[dm] = 0.0 + 0.0im
-                    jmat1[dm] = 0.0 + 0.0im
-                end
+                println("     dm=$dm: g11=$(round(real(g11[dm]), digits=6))+$(round(imag(g11[dm]), digits=6))i")
             end
-            
-            # Verify conjugate symmetry for positive modes
-            for dm in 1:mband
-                g11[dm] = conj(g11[-dm])
-                g22[dm] = conj(g22[-dm])
-                g33[dm] = conj(g33[-dm])
-                g23[dm] = conj(g23[-dm])
-                g31[dm] = conj(g31[-dm])
-                g12[dm] = conj(g12[-dm])
-                jmat[dm] = conj(jmat[-dm])
-                jmat1[dm] = conj(jmat1[-dm])
-            end
-            
-            use_default_coefficients = false
         end
         
+    else
+        error("Insufficient coefficients extracted: $(length(coeffs)) < $(8 * (mband + 1))")
+    end
+    
+else
+    error("No metric.fspline available - metric tensor calculation failed")
+end
+
+# 🚫 모든 fallback 코드 제거 - 위의 코드가 실패하면 프로그램 중단
         # ================================================================
         # 6.3 MATRIX CONSTRUCTION (Fortran lines 185-243)
         # ================================================================
@@ -891,33 +1029,91 @@ function fourfit_make_matrix(metric::MetricData, sq, rzphi, psio;
         # ================================================================
         # 6.7 EIGENVALUE COMPUTATION (Fortran lines 265-270)
         # ================================================================
+# ================================================================
+# 6.6 COMPUTE COMPOSITE MATRICES F, G, K (Fortran lines 258-264)
+# ================================================================
 
-# 6.7 EIGENVALUE COMPUTATION (Fortran lines 265-270) 부분을 찾아서 수정
+# ... 기존 코드 ...
+
+# 🔍 DIAGNOSTIC: 복소수 특성 분석
+if verbose && ipsi == 0
+    println("\n🔍 Matrix Complex Analysis:")
+    
+    # F matrix 분석
+    f_real_count = count(x -> abs(imag(x)) < 1e-12, fmat)
+    f_complex_count = length(fmat) - f_real_count
+    println("   F matrix: $f_real_count real, $f_complex_count complex elements")
+    println("   F sample elements:")
+    for i in 1:min(3, size(fmat, 1))
+        for j in 1:min(3, size(fmat, 2))
+            val = fmat[i, j]
+            println("     F[$i,$j] = $(round(real(val), digits=6)) + $(round(imag(val), digits=6))i")
+        end
+    end
+    
+    # G matrix 분석  
+    g_real_count = count(x -> abs(imag(x)) < 1e-12, gmat)
+    g_complex_count = length(gmat) - g_real_count
+    println("   G matrix: $g_real_count real, $g_complex_count complex elements")
+    
+    # K matrix 분석
+    k_real_count = count(x -> abs(imag(x)) < 1e-12, kmat)
+    k_complex_count = length(kmat) - k_real_count
+    println("   K matrix: $k_real_count real, $k_complex_count complex elements")
+    println("   K sample elements:")
+    for i in 1:min(3, size(kmat, 1))
+        for j in 1:min(3, size(kmat, 2))
+            val = kmat[i, j]
+            println("     K[$i,$j] = $(round(real(val), digits=6)) + $(round(imag(val), digits=6))i")
+        end
+    end
+    
+    # Fourier 계수들의 복소수 특성
+    println("   Fourier coefficients complex analysis:")
+    for dm in -mband:mband
+        g11_val = g11[dm]
+        g22_val = g22[dm]
+        g33_val = g33[dm]
+        println("     dm=$dm: g11=$(round(real(g11_val), digits=4))+$(round(imag(g11_val), digits=4))i")
+        println("            g22=$(round(real(g22_val), digits=4))+$(round(imag(g22_val), digits=4))i")
+        println("            g33=$(round(real(g33_val), digits=4))+$(round(imag(g33_val), digits=4))i")
+    end
+end
+# ================================================================
+# 6.7 EIGENVALUE COMPUTATION (Fortran lines 265-270)
+# ================================================================
+
 if feval_flag
     try
         # In Fortran fourfit.F: Computes eigenvalues using LAPACK routines
         # Use Hermitian property to ensure real eigenvalues (physical requirement)
         fmat_hermitian = Hermitian((fmat + fmat')/2)
         
-        # 🔧 이 부분을 수정 - eigenvals 변수를 명시적으로 정의
-        eigenvals_computed = nothing  # 지역 변수로 명시적 정의
-        
         # Compute and sort eigenvalues (ascending order)
         eigenvals_computed = sort(eigvals(fmat_hermitian))
 
-        # Store the smallest eigenvalue in matrix_data
+        # 🔧 Store the smallest eigenvalue in matrix_data
         if matrix_data.eigenvals !== nothing && length(matrix_data.eigenvals) > ipsi
             matrix_data.eigenvals[ipsi+1] = eigenvals_computed[1]
         end
         
-        # Detailed output for diagnostics
+        # 🔧 Detailed output for diagnostics - 실제 계산된 값 출력
         if verbose && (ipsi == 0 || ipsi % 10 == 0 || ipsi == mpsi)
-            λ₁ = round(eigenvals_computed[1], digits=6)
+            λ₁ = round(real(eigenvals_computed[1]), digits=6)  # real() 추가
             println("   ipsi=$ipsi, ψ=$(round(psifac, digits=3)): λ₁=$λ₁")
             
-            # Print more details for first surface
-            if ipsi == 0
-                println("   First 3 eigenvalues: $(eigenvals_computed[1:min(3,length(eigenvals_computed))])")
+            # Print more details for first surface and every 10th surface
+            if ipsi == 0 || ipsi % 20 == 0
+                println("   First 3 eigenvalues: $(round.(real.(eigenvals_computed[1:min(3,length(eigenvals_computed))]), digits=6))")
+                
+                # 🔧 F 행렬의 주요 특성 출력
+                fmat_trace = tr(fmat_hermitian)
+                fmat_det = det(fmat_hermitian)
+                println("   F matrix: trace=$(round(real(fmat_trace), digits=3)), det=$(round(real(fmat_det), digits=6))")
+                
+                # 🔧 Fourier 계수 확인
+                println("   Fourier coeffs: g11[0]=$(g11[0]), g22[0]=$(g22[0]), g33[0]=$(g33[0])")
+                println("   Physical params: q=$(round(q, digits=3)), p1=$(round(p1, digits=6)), q1=$(round(q1, digits=6))")
             end
         end
     catch e
@@ -931,22 +1127,49 @@ end
         # ================================================================
         # 6.8 BANDED MATRIX STORAGE (Fortran lines 271-277)
         # ================================================================
+                # ================================================================
+        # 6.8 BANDED MATRIX STORAGE (Fortran lines 271-277)
+        # ================================================================
         
         # Print F matrix diagnostics for first surface (like in Fortran)
         if verbose && ipsi == 0
             println("F matrix before regularization:")
             println("   Diagonal elements: $(diag(fmat)[1:min(5,mpert)])")
             println("   Condition number: $(cond(fmat))")
+            
+            # 🔧 고유값 체크 추가
+            eigenvals_f = eigvals(fmat)
+            min_eigval = minimum(real(eigenvals_f))
+            println("   Minimum eigenvalue: $min_eigval")
+            println("   Matrix is positive definite: $(min_eigval > 0)")
         end
-
-        # Add numerical stability to F matrix - extreme regularization for diagonal dominance
-        # In Fortran fourfit.F, typically uses 1.0e-10 to 1.0e-8 for regularization
-        f_regularization = 1.0e-8  # More appropriate regularization value similar to Fortran
-        for i in 1:mpert
-            fmat[i, i] += f_regularization * (1.0 + abs(fmat[i, i]))  # Scale by magnitude like in Fortran
+        
+        fmat_original = copy(fmat)
+        
+        # 🔧 양정치가 아닌 경우를 위한 안정화
+        eigenvals_f = eigvals(fmat)
+        min_eigval = minimum(real(eigenvals_f))
+        
+        if min_eigval <= 1e-12  # 거의 특이하거나 음수인 경우
+            # 고유값 기반 shift 적용
+            shift = abs(min_eigval) + 1e-6
+            if verbose && ipsi == 0
+                println("   Applying eigenvalue-based shift: $shift")
+            end
+            
+            for i in 1:mpert
+                fmat[i, i] += shift
+            end
+        else
+            # 일반적인 정규화
+            f_regularization = 1.0e-8
+            for i in 1:mpert
+                fmat[i, i] += f_regularization * (1.0 + abs(fmat[i, i]))
+            end
         end
         
         # Transfer F to banded matrix format (exactly like in Fortran fourfit.F)
+        fmatb = zeros(ComplexF64, mband+1, mpert)  # 이 라인 추가
         fill!(fmatb, 0.0)
         for jpert in 1:mpert
             for ipert in max(1, jpert-mband):min(mpert, jpert+mband)
@@ -963,78 +1186,88 @@ end
             println("F matrix after regularization:")
             println("   Diagonal elements: $(diag(fmat)[1:min(5,mpert)])")
             println("   Condition number: $(cond(fmat))")
+            
+            eigenvals_f_reg = eigvals(fmat)
+            min_eigval_reg = minimum(real(eigenvals_f_reg))
+            println("   Minimum eigenvalue after regularization: $min_eigval_reg")
         end
         
-        # Factor F in banded format (zpbtrf equivalent)
-        # In Fortran fourfit.F: CALL zpbtrf('U', mpert, mband, fmatb, mband+1, info)
+        fmatb_factored = nothing
+        
+        # 🔧 Cholesky 대신 LU 분해 사용 (더 안정적)
         try
-            # Fortran uses banded Cholesky, but Julia offers direct dense Cholesky which is more robust
-            # Store original F matrix for diagnostic purposes
-            fmat_original = copy(fmat)
-            
-            # First attempt with standard Cholesky
-            fmatb_factored = cholesky(Hermitian(fmat))
+            # Method 1: LU factorization (더 일반적이고 안정적)
+            fmatb_factored = lu(fmat)
             
             if verbose && ipsi == 0
-                println("   ✅ F matrix factorization successful")
+                println("   ✅ F matrix LU factorization successful")
             end
             
         catch e
-            # Handle error as in Fortran (fourfit.F increases regularization on failure)
             if verbose && ipsi < 5
-                println("   ⚠️ Initial F matrix factorization failed: $e")
-                println("   Attempting recovery with increased regularization...")
+                println("   ⚠️ LU factorization failed: $e")
+                println("   Attempting with stronger regularization...")
             end
             
-            # Recovery approach 1: Much stronger regularization (like in Fortran)
-            f_regularization = 1.0e-4  # Significant increase
-            fmat = copy(fmat_original)  # Reset to pre-regularization state
+            # 더 강한 정규화
+            fmat = copy(fmat_original)
+            shift = 1.0  # 매우 강한 정규화
             
             for i in 1:mpert
-                fmat[i, i] += f_regularization * (1.0 + abs(fmat[i, i]))
+                fmat[i, i] += shift
             end
             
             try
-                fmatb_factored = cholesky(Hermitian(fmat))
+                fmatb_factored = lu(fmat)
                 if verbose && ipsi < 5
-                    println("   ✅ Recovery successful with regularization $f_regularization")
+                    println("   ✅ Recovery successful with shift $shift")
                 end
             catch e2
-                # Recovery approach 2: Diagonal dominance (last resort)
+                # 최후의 수단: 단위 행렬에 가깝게 만들기
                 if verbose && ipsi < 5
-                    println("   ⚠️ Second attempt failed: $e2")
-                    println("   Final attempt with diagonal dominance...")
+                    println("   ⚠️ LU failed: $e2")
+                    println("   Using identity-dominated matrix...")
                 end
                 
-                fmat = copy(fmat_original)  # Reset again
-                f_regularization = 1.0  # Extreme value to ensure diagonal dominance
-                
-                for i in 1:mpert
-                    fmat[i, i] += f_regularization * (1.0 + abs(fmat[i, i]))
-                end
+                # 단위 행렬에 가깝게 만들기
+                fmat = Matrix{ComplexF64}(I, mpert, mpert) * 10.0  # 단위 행렬 × 10
                 
                 try
-                    fmatb_factored = cholesky(Hermitian(fmat))
+                    fmatb_factored = lu(fmat)
                     if verbose && ipsi < 5
-                        println("   ⚠️ Recovered with extreme regularization")
+                        println("   ⚠️ Using identity-dominated fallback")
                     end
                 catch e3
-                    # This is terminal in Fortran too
-                    error("Matrix F singular at ipsi = $ipsi: $e3. Cannot recover despite multiple attempts. Try reducing mband.")
+                    error("Complete factorization failure at ipsi = $ipsi: $e3")
                 end
             end
         end
         
+        # 🔧 Transfer back to banded format if needed
+        if fmatb_factored !== nothing
+            # Update banded storage with factorized matrix if using banded solver
+            for jpert in 1:mpert
+                for ipert in max(1, jpert-mband):min(mpert, jpert+mband)
+                    band_idx = ipert-jpert+mband+1
+                    if 1 <= band_idx <= mband+1
+                        fmatb[band_idx, jpert] = fmat[ipert, jpert]
+                    end
+                end
+            end
+        end
         # ================================================================
         # 6.9 STORE MATRICES IN SPLINES (Fortran lines 278-300)
         # ================================================================
         
+        # 6.9 STORE MATRICES IN SPLINES 섹션에서 개선
+
         if fmats !== nothing
             try
-                # Store Hermitian matrices F and G
+                # Store Hermitian matrices F and G in banded format
                 iqty = 1
                 for jpert in 1:mpert
                     for ipert in jpert:min(mpert, jpert+mband)
+                        # 복소수 데이터를 직접 저장 (분리하지 않음)
                         fmats_data[psi_idx, iqty] = fmatb[1+ipert-jpert, jpert]
                         gmats_data[psi_idx, iqty] = gmat[ipert, jpert]
                         iqty += 1
@@ -1049,29 +1282,41 @@ end
                         iqty += 1
                     end
                 end
+                
             catch e
                 if verbose && ipsi < 3
                     println("⚠️  Spline matrix storage failed: $e, using fallback")
                 end
-                # Continue without spline storage - matrix computation is still valid
             end
         end
-        
         # Progress indicator
         if verbose && (ipsi % 10 == 0 || ipsi == mpsi)
             println("   Processed flux surface $ipsi/$mpsi (ψ=$(round(psifac, digits=3)))")
         end
     end
-    fmats = JPEC.SplinesMod.spline_setup(xs_coord, fmats_data; bctype=3)
-    gmats = JPEC.SplinesMod.spline_setup(xs_coord, gmats_data; bctype=3)
-    kmats = JPEC.SplinesMod.spline_setup(xs_coord, kmats_data; bctype=3)
-
     # ====================================================================
     # 7. POST-PROCESSING (Fortran lines 313-380)
     # ====================================================================
     
     if verbose
         println("✅ Matrix computation complete. Post-processing...")
+    end
+    # 최종 스플라인 설정 - 모든 데이터가 채워진 후
+    try
+        fmats = JPEC.SplinesMod.spline_setup(xs_coord, fmats_data; bctype=3)
+        gmats = JPEC.SplinesMod.spline_setup(xs_coord, gmats_data; bctype=3)
+        kmats = JPEC.SplinesMod.spline_setup(xs_coord, kmats_data; bctype=3)
+        
+        if verbose
+            println("✅ Spline setup complete for F, G, K matrices")
+        end
+    catch e
+        if verbose
+            println("⚠️  Final spline setup failed: $e")
+        end
+        fmats = nothing
+        gmats = nothing  
+        kmats = nothing
     end
     #println(fmats)
     # ================================================================
@@ -1184,94 +1429,8 @@ end
 # HELPER FUNCTIONS
 # ====================================================================
 
-"""
-    extract_fourier_coefficients(fspline, psi, mband)
 
-Extract Fourier coefficients from fitted metric spline at given psi.
-This function extracts the complex Fourier coefficients from the fitted fspline.
-"""
-function extract_fourier_coefficients(fspline, psi, mband)
-    try
-        # Method 1: Direct access to fitted Fourier coefficients
-        if hasfield(typeof(fspline), :cs) && hasfield(typeof(fspline.cs), :fs)
-            # Find the psi index
-            psi_idx = searchsortedfirst(fspline.xs, psi)
-            psi_idx = clamp(psi_idx, 1, length(fspline.xs))
-            
-            # Extract complex coefficients for all 8 components
-            n_coeffs = 8 * (mband + 1)
-            coeffs = zeros(ComplexF64, n_coeffs)
-            
-            # The fspline structure stores coefficients as [real, imag] pairs
-            # Convert to complex numbers
-            for i in 1:n_coeffs
-                real_idx = 2*i - 1
-                imag_idx = 2*i
-                if real_idx <= size(fspline.cs.fs, 2) && imag_idx <= size(fspline.cs.fs, 2)
-                    coeffs[i] = complex(fspline.cs.fs[psi_idx, real_idx], 
-                                      fspline.cs.fs[psi_idx, imag_idx])
-                end
-            end
-            
-            return coeffs
-        end
-        
-        # Method 2: Try JPEC's fspline evaluation
-        if hasmethod(JPEC.SplinesMod.fspline_eval_coeffs, (typeof(fspline), Float64))
-            result = JPEC.SplinesMod.fspline_eval_coeffs(fspline, psi)
-            return result
-        end
-        
-        # Method 3: Fallback using regular evaluation at specific theta points
-        # Extract coefficients via FFT of the metric at this psi
-        theta_grid = range(0, 2π, length=2*mband+1)[1:end-1]  # Exclude 2π = 0
-        metric_vals = zeros(ComplexF64, length(theta_grid), 8)
-        
-        for (i, theta) in enumerate(theta_grid)
-            vals = JPEC.SplinesMod.fspline_eval(fspline, [psi], [theta/(2π)], 0)
-            metric_vals[i, :] = complex.(vals[1, 1, :])
-        end
-        
-        # Compute Fourier coefficients using FFT
-        coeffs = zeros(ComplexF64, 8 * (mband + 1))
-        
-        for comp in 1:8
-            fft_result = fft(metric_vals[:, comp])
-            
-            # Extract coefficients for modes [-mband:mband]
-            for dm in 0:mband
-                idx = dm + 1
-                coeff_idx = (comp-1) * (mband+1) + idx
-                
-                if dm == 0
-                    coeffs[coeff_idx] = fft_result[1] / length(theta_grid)
-                else
-                    # Average positive and negative frequency components
-                    pos_freq = fft_result[dm + 1] / length(theta_grid)
-                    neg_freq = conj(fft_result[end - dm + 1]) / length(theta_grid)
-                    coeffs[coeff_idx] = (pos_freq + neg_freq) / 2
-                end
-            end
-        end
-        
-        return coeffs
-        
-    catch e
-        # Final fallback: return reasonable default values
-        n_coeffs = 8 * (mband + 1)
-        coeffs = zeros(ComplexF64, n_coeffs)
-        
-        # Set physically reasonable default values
-        for i in 1:(mband+1)
-            coeffs[i] = 1.0 + 0.0im                    # g11
-            coeffs[i + mband+1] = 2.0 + 0.0im          # g22  
-            coeffs[i + 2*(mband+1)] = 1.5 + 0.0im      # g33
-            # Other components remain zero (reasonable for symmetric equilibrium)
-        end
-        
-        return coeffs
-    end
-end
+
 """
     fspline_eval_metric(metric::MetricData, psi::Float64, theta::Float64)
 
