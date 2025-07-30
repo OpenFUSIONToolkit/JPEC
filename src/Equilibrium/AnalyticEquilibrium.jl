@@ -291,7 +291,6 @@ function sol_run(
     sqfs[:, 3] .= 0.0
 
     sq_in = Spl.spline_setup(psis, sqfs; bctype=3)
-    sq_in = Spl.spline_setup(psis, sqfs; bctype=3)
     #-----------------------------------------------------------------------
     # compute 2D data
     #-----------------------------------------------------------------------

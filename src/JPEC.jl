@@ -8,7 +8,7 @@ import .SplinesMod as Spl
 export SplinesMod, Spl
 
 include("Equilibrium/Equilibrium.jl")
-import .EquilibriumMod as Equilibrium
+import .Equilibrium as Equilibrium
 export Equilibrium
 
 include("DCON/dcon_mod.jl")
