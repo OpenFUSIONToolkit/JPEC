@@ -107,7 +107,7 @@ function MainProgram(in_path::String)
       if ctrl.verbose
         println("Computing F, G, and K Matrices")
       end
-      matrix_result = fourfit_make_matrix(metric_result, equil.sq, equil.rzphi, 2π) #TODO: same as above
+      matrix_result = fourfit_make_matrix(metric_result, equil.sq, equil.rzphi, equil.psio) #TODO: same as above
       println("mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband), nn = $(ctrl.nn), sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
 
  #     if kin_flag

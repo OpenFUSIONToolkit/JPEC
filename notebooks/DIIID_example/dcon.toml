@@ -1,7 +1,7 @@
 [DCON_CONTROL]
 bal_flag = false              # Ideal MHD ballooning criterion for short wavelengths
 mat_flag = true               # Construct coefficient matrices for diagnostic purposes
-ode_flag = false              # Integrate ODE's for determining stability of internal long-wavelength mode (must be true for GPEC)
+ode_flag = true              # Integrate ODE's for determining stability of internal long-wavelength mode (must be true for GPEC)
 vac_flag = true               # Compute plasma, vacuum, and total energies for free-boundary modes
 mer_flag = true               # Evaluate the Mercier criterian
 

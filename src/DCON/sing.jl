@@ -63,30 +63,24 @@ is pushed to `sing_surf_data`.
 function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
 
     # Define functions to evaluate q and its first derivative
-    # TODO: confirm that this is the correct way to get spline data
     qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
     q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4] 
 
-    # TODO: not sure if equil has these yet - assume monotonic for now
-    qex = [qval(0.0), qval(1.0)]
-    psiex = [0.0, 1.0]
-    mex = 2
-
     # Loop over extrema of q, find all rational values in between
-    for iex in 2:mex
-        dq = qex[iex] - qex[iex-1]
-        m = floor(Int, ctrl.nn * qex[iex-1])
+    for iex in 2:equil.params.mextrema
+        dq = equil.params.qextrema_q[iex] - equil.params.qextrema_q[iex-1]
+        m = floor(Int, ctrl.nn * equil.params.qextrema_q[iex-1])
         if dq > 0
             m += 1
         end
         dm = Int(sign(dq * ctrl.nn))
 
         # Loop over possible m's in interval
-        while (m - ctrl.nn * qex[iex-1]) * (m - ctrl.nn * qex[iex]) <= 0
+        while (m - ctrl.nn * equil.params.qextrema_q[iex-1]) * (m - ctrl.nn * equil.params.qextrema_q[iex]) <= 0
             it = 0
-            psi0 = psiex[iex-1]
-            psi1 = psiex[iex]
-            psifac =  0.01 # TODO: JMH - replace with equil.psilow
+            psi0 = equil.params.qextrema_psi[iex-1]
+            psi1 = equil.params.qextrema_psi[iex]
+            psifac = nothing # will be found in bisection method
 
             # Bisection method to find singular surface
             while it < itmax
@@ -112,6 +106,7 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
                         q = m / ctrl.nn,
                         q1 = q1val(psifac),
                 ))
+                println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(q1val(psifac))")
             end
             m += dm
         end
@@ -132,16 +127,16 @@ Compute and set limiter values for the DCON analysis.
 Modifies fields in `intr` and `ctrl` to set limiter locations and related quantities.
 """
 # computes limiter values - function 3 from Fortran DCON
-function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, eqCtrl::JPEC.Equilibrium.EquilControl, eqPrm::JPEC.Equilibrium.EquilibriumParameters)
+function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium)
     #declarations 
     itmax = 50
     eps = 1e-10
 
     #TODO: where does qmax and psihigh come from? Is it equil like we have right now?
     #compute and modify the DconInternal struct 
-    intr.qlim   = min(eqPrm.qmax, ctrl.qhigh)
-    intr.q1lim  = equil.sq.fs1[mpsi, 4] #TODO: does equil.sq have a field fs1?
-    intr.psilim = eqCtrl.psihigh #TODO: do we need to deepcopy psihigh?
+    intr.qlim   = min(equil.params.qmax, ctrl.qhigh)
+    intr.q1lim  = equil.sq.fs1[equil.config.control.mpsi, 4] #TODO: does equil.sq have a field fs1?
+    intr.psilim = equil.config.control.psihigh #TODO: do we need to deepcopy psihigh?
 
     #normalize dmlim to interval [0,1)
     #TODO: This is supposed to be modifying dmlim from the DconControl struct
@@ -160,7 +155,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibriu
     end
 
     #use newton iteration to find psilim
-    if intr.qlim < eqPrm.qmax
+    if intr.qlim < equil.params.qmax
         # Find index jpsi that minimizes |equil.sq.fs[:,4] - qlim|
         diffs = abs.(equil.sq.fs[:,4] .- intr.qlim) #broadcaasting, subtracts qlim from each element in equil.sq.fs[:,4]
         jpsi = argmin(diffs)
