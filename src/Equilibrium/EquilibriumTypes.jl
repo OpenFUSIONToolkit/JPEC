@@ -312,6 +312,7 @@ end
     q95::Union{Nothing, Float64} = nothing # Safety factor at 95% flux surface
     qextrema_psi::Union{Nothing, Vector{Float64}} = nothing # Normalized poloidal flux values where q has extrema
     qextrema_q::Union{Nothing, Vector{Float64}} = nothing # Safety factor values at the extrema points
+    mextrama::Union{Nothing, Int} = nothing # Number of extrema points in the q-profile
     psi_norm::Union{Nothing, Float64} = nothing # Normalized poloidal flux at the axis
     b_norm::Union{Nothing, Float64} = nothing # Normalized total magnetic field strength at the axis
     psi_axis::Union{Nothing, Float64} = nothing # Normalized poloidal flux at the axis

@@ -226,7 +226,7 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
 
     equil.params.qextrema_psi = psiexl
     equil.params.qextrema_q = qexl
-
+    equil.params.mextrama = length(psiexl)
     # Compute derived q-values
     q0 = sq.fs[1, 4] - sq.fs1[1, 4] * sq.xs[1]
     qmax_edge = sq.fs[end, 4]
@@ -239,7 +239,7 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
 
 
     # Print and store
-    println("q0: $q0, qmin: $qmin, qmax: $qmax, qa: $qa, q95: $q95, qmax_edge: $qmax_edge")
+    println("q0: $q0, qmin: $qmin, qmax: $qmax, qa: $qa, q95: $q95, qmax_edge: $qmax_edge, ")
 
     equil.params.q0   = q0
     equil.params.qmin = qmin
