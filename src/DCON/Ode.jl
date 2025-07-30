@@ -16,7 +16,6 @@ using JPEC
 # plasma_eq = JPEC.Equilibrium.setup_equilibrium(equil_input)
 # sq = plasma_eq.sq
 
-const diagnose_ca = false
 const eps = 1e-10
 
 """
@@ -55,7 +54,7 @@ OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
 
 function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal)
     # Initialization
-    odet = init_ode_state(intr.mpert, intr.mpert)
+    odet = OdeState(intr.mpert, intr.mpert)
 
     if ctrl.sing_start <= 0
         ode_axis_init(ctrl, equil, intr, odet)
@@ -64,10 +63,6 @@ function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, i
         # ode_sing_init()
     else
         error("Invalid value for sing_start: $(ctrl.sing_start) > msing = $(intr.msing)")
-    end
-    #ode_output_open() # TODO: have to handle io
-    if diagnose_ca
-        ascii_open(ca_unit, "ca.out", "UNKNOWN")
     end
 
     # Integration loop
@@ -106,11 +101,6 @@ function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, i
         end
     end
 
-    # Finalize
-    ode_output_close()
-    if diagnose_ca
-        ascii_close(ca_unit)
-    end
 end
 
 
@@ -151,7 +141,6 @@ Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are
 
 """
 
-#function ode_axis_init(sing_surf_data, plasma_eq; nn = 1, ψlim=0.9936, ψlow = 0.01, mlow = -12, mhigh = 20, singfac_min = 1e-5, qlow = 0.0, sort_type = "absm")
 function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState)
 
     # This might be wrong - double check once equil is more defined. 
@@ -159,7 +148,7 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
     q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     # Preliminary computations
-    psifac = equil.psilow  # TODO: this was Fortran sq%xs(0)? - confirm this is psilow? Don't know how to access xs 
+    psifac = equil.sq.xs[1]  
 
     # Use Newton iteration to find starting psi if qlow is above q0
     # TODO: add this. For now, assume qlow = 0.0 and start at the first singular surface
@@ -212,7 +201,7 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
     else
         while true
             ising += 1
-            if ising > intr.msing || psilim < intr.sing[min(ising, msing)].psifac
+            if ising > intr.msing || intr.psilim < intr.sing[min(ising, msing)].psifac
                 break
             end
             q = intr.sing[ising].q
@@ -220,17 +209,17 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
                 break
             end
         end
-        if ising > intr.msing || psilim < intr.sing[min(ising, intr.msing)].psifac || ctrl.singfac_min == 0
+        if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac || ctrl.singfac_min == 0
             psimax = psilim * (1 - eps)
-            next = "finish"
+            odet.next = "finish"
         else
             psimax = intr.sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
-            next = "cross"
+            odet.next = "cross"
         end
     end
 
     # Allocate and sort solutions by increasing value of |m-ms1|
-    m = intr.mlow - 1 .+ index
+    m = intr.mlow - 1 .+ odet.index
     if ctrl.sort_type == "absm"
         key = abs.(m)
     elseif ctrl.sort_type == "sing"
@@ -242,15 +231,15 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
     else
         error("Cannot recognize sort_type = $ctrl.sort_type")
     end
-    bubble!(key, index, 1, intr.mpert) # in original Fortran: bubble(key, index, 1, mpert)
+    bubble!(key, odet.index, 1, intr.mpert) # in original Fortran: bubble(key, index, 1, mpert)
 
     # Initialize solutions
-    for ipert = 1:mpert
+    for ipert = 1:intr.mpert
         odet.u[index[ipert], ipert, 2] = 1
     end
     odet.msol = intr.mpert
-    odet.neq = 4 * intr.mpert * msol
-    odet.u_save .= u
+    odet.neq = 4 * intr.mpert * odet.msol
+    odet.u_save .= odet.u
     odet.psi_save = psifac
 
     # Compute conditions at next singular surface
@@ -263,9 +252,9 @@ function ode_axis_init(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibr
         # end
     else
         if intr.msing > 0
-            m1 = round(Int, ctrl.nn * intr.sing[ising].q)
+            odet.m1 = round(Int, ctrl.nn * intr.sing[ising].q)
         else
-            m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * q1val[end])
+            odet.m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * q1val[end])
         end
     end
     odet.singfac = abs(m1 - ctrl.nn * q)
@@ -442,7 +431,6 @@ function ode_ideal_cross()
         write(crit_bin_unit)
     end
 
-    # ...existing code...
 end
 
 # Example stub for kinetic crossing

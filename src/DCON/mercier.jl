@@ -114,5 +114,3 @@ function mercier_scan(plasma_eq)
     
     return locstab
 end
-
-end
