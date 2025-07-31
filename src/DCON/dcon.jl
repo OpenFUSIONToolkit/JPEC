@@ -31,16 +31,12 @@ function MainProgram(in_path::String)
 # -----------------------------------------------------------------------
     equil = setup_equilibrium(in_path*"/equil.toml")
 
-#  -----------------------------------------------------------------------
-#  TODO:     optionally reform the eq splines to concentrate at true truncation (EQUIL TEAM)
-#  -----------------------------------------------------------------------
-    #sing_lim!(intr, ctrl, equil)  # determine if qhigh is truncating before psihigh
-#. This needs to be handled
-#    IF(psilim /= psihigh .AND. reform_eq_with_psilim)THEN
-#      CALL equil_read(out_unit, psilim) # this needs to be like plasma_eq = LoadEquilibrium(psilim) 
-#      CALL equil_out_global
-#      CALL equil_out_qfind
-#    ENDIF
+    # todo: call sing_lim and then try this
+    # if psilim != psihigh && reform_eq_with_psilim
+    #   eqconfig = equil.config
+    #   eqconfig.psilhigh = psilim
+    #   equil = setup_equilibrium(eqconfig)
+    # end
 
 # -----------------------------------------------------------------------
 # TODO:    record the equilibrium properties (EQUIL TEAM)
