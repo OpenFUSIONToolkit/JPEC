@@ -150,7 +150,6 @@ function MainProgram(in_path::String)
 #  TODO     integrate main ODE's.
 # -----------------------------------------------------------------------
 
-    ud = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
     if ctrl.ode_flag
       if ctrl.verbose
         println("Starting integration of ODE's")

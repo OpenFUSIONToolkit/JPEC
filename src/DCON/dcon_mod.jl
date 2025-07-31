@@ -9,6 +9,8 @@ using FFTW
 using DifferentialEquations
 using ..Equilibrium
 
+#TODO: seems like we can import ..Spl to shorten spline calls? 
+
 # Include all necessary files
 include("dcon_structs.jl")
 include("dcon.jl")

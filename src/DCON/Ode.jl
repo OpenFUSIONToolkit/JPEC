@@ -39,6 +39,7 @@ including solution vectors, tolerances, and flags for the integration process.
     nzero::Int = 0              # count of zero crossings detected
     m1::Int = 0                 # poloidal mode number for the first singular surface (?)
     q::Float64 = 0.0            # q value at the surface
+    psimax::Float64 = 0.0         # maximum psi value for the integrator (TODO: is this correct?)
 end
 
 OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
@@ -49,7 +50,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
     odet = OdeState(intr.mpert, intr.mpert)
 
     if ctrl.sing_start <= 0
-        ode_axis_init!(ising, ctrl, equil, intr, odet)
+        ising = ode_axis_init!(ctrl, equil, intr, odet)
     elseif ctrl.sing_start <= intr.msing
         error("sing_start > 0 not implemented yet!")
         # ode_sing_init()
@@ -107,51 +108,40 @@ the relevant singular surfaces in the plasma equilibrium based on input data,
 and sets integration boundaries and normalization factors for subsequent ODE integration
 through singularities.
 
-# Arguments
-- `sing_surf_data`: Array of structures, each containing information about singular surfaces,
-    including fields like `.ψfac`, `.q`, and `.q1`. Filled from sing_find function
-- `sq`: Spline object controlling the equilibrium safety factor profile (typically contains equilibrium profile splines).
-
-# Keyword Arguments (these are likely to be replaced by the user input file structure)
-- `nn`: Integer. Toroidal mode number.
-- `ψlim`: Float. Upper bound for normalized flux coordinate ψ.
-- `ψlow`: Float. Lower bound for normalized flux coordinate ψ.
-- `mlow`: Integer. Lowest poloidal mode number to consider.
-- `mhigh`: Integer. Highest poloidal mode number to consider.
-- `singfac_min`: Float. Minimum separation from a singular surface.
-- `qlow`: Float. Lower bound for safety factor q. (Currently not implemented if > 0.)
-- `sort_type`: String. Sorting criteria for mode numbers (`"absm"` for |m|, or
-    `"sing"` for proximity to the first singular surface's m).
-
-# Details
-This function does the following:
-- Determines relevant singular surfaces from the provided equilibrium/singularity data.
-- Sets up arrays for the ODE solution and related workspaces for all poloidal harmonics in the range [`mlow`, `mhigh`].
-- Sorts the initial harmonics according to the specified `sort_type`.
-- Initializes normalization factors and solution arrays for use in the ODE integrator.
-- Computes the initial offset (`singfac`) from the next singular surface.
-
 Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are noted but not yet implemented.
 
 """
 
-function ode_axis_init(ising::Int, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState)
+function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState; itmax = 50)
 
-    # This might be wrong - double check once equil is more defined. 
-    qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
-    q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
+    # Shorthand to evaluate q/q1 inside newton iteration
+    qval = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
+    q1val = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     # Preliminary computations
     odet.psifac = equil.sq.xs[1]  
 
     # Use Newton iteration to find starting psi if qlow is above q0
-    # TODO: add this. For now, assume qlow = 0.0 and start at the first singular surface
-    if ctrl.qlow > 0.0
-        @warn "qlow > 0.0 is not implemented in ode_axis_init yet"
+    if ctrl.qlow > equil.sq.fs[1, 4]
+        # Start check from the edge for robustness in reverse shear cores
+        for jpsi = equil.sq.mx:-1:2  # avoid starting iteration on endpoints
+            if equil.sq.fs[jpsi - 1, 4] < ctrl.qlow
+                odet.psifac = equil.sq.xs[jpsi]
+                break
+            end
+        end
+        it = 0
+        while it ≤ itmax
+            it += 1
+            dpsi = (ctrl.qlow - qval(odet.psifac)) / q1val(odet.psifac)
+            odet.psifac += dpsi
+            if abs(dpsi) < eps * abs(odet.psifac)
+                break
+            end
+        end
     end
 
     # Find inner singular surface
-    ising = 0
     if false #(TODO: kin_flag)
         # for ising = 1:kmsing
         #     if kinsing[ising].psifac > psifac
@@ -159,13 +149,14 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::Equilibrium.PlasmaE
         #     end
         # end
     else
-        for ising in 1:intr.msing
-            if intr.sing[ising].psifac > odet.psifac
+        ising = 0
+        for i in 1:intr.msing
+            if intr.sing[i].psifac > odet.psifac
+                ising = max(0, i - 1)
                 break
             end
         end
     end
-    ising = max(0, ising - 1)
 
     # Find next singular surface
     if false # TODO: (kin_flag)
@@ -195,7 +186,7 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::Equilibrium.PlasmaE
     else
         while true
             ising += 1
-            if ising > intr.msing || intr.psilim < intr.sing[min(ising, msing)].psifac
+            if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac
                 break
             end
             odet.q = intr.sing[ising].q
@@ -204,10 +195,10 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::Equilibrium.PlasmaE
             end
         end
         if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac || ctrl.singfac_min == 0
-            psimax = psilim * (1 - eps)
+            odet.psimax = intr.psilim * (1 - eps)
             odet.next = "finish"
         else
-            psimax = intr.sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
+            odet.psimax = intr.sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
             odet.next = "cross"
         end
     end
@@ -223,13 +214,13 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::Equilibrium.PlasmaE
         end
         key = -abs.(key)
     else
-        error("Cannot recognize sort_type = $ctrl.sort_type")
+        error("Cannot recognize sort_type = $(ctrl.sort_type)")
     end
     odet.index = sortperm(key, rev = true) # in original Fortran: bubble(key, index, 1, mpert)
 
     # Initialize solutions
     for ipert = 1:intr.mpert
-        odet.u[index[ipert], ipert, 2] = 1
+        odet.u[odet.index[ipert], ipert, 2] = 1
     end
     odet.msol = intr.mpert
     odet.neq = 4 * intr.mpert * odet.msol
@@ -237,7 +228,6 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::Equilibrium.PlasmaE
     odet.psi_save = odet.psifac
 
     # Compute conditions at next singular surface
-    q = qval(equil.psilow) # Fortran: q=sq%fs(0,4) # IS THIS RIGHT? 
     if false #TODO: (kin_flag)
         # if kmsing > 0
         #     m1 = round(Int, nn * kinsing[ising].q)
@@ -248,10 +238,12 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::Equilibrium.PlasmaE
         if intr.msing > 0
             odet.m1 = round(Int, ctrl.nn * intr.sing[ising].q)
         else
-            odet.m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * q1val[end])
+            odet.m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * equil.sq.fs1[end, 4])
         end
     end
-    odet.singfac = abs(odet.m1 - ctrl.nn * odet.q)
+    odet.singfac = abs(odet.m1 - ctrl.nn * equil.sq.fs[1, 4]) # Fortran: q=sq%fs(0,4)
+
+    return ising
 end
 
 # TODO: NOT IMPLEMENTED YET!
@@ -482,10 +474,10 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
             ix += 1
         end
         psiout = equil.sq.xs[ix]
-        psiout = min(psiout, intr.psimax)
+        psiout = min(psiout, odet.psimax)
         rwork[1] = psiout
     else
-        psiout = intr.psimax
+        psiout = odet.psimax
     end
 
     # Advance differential equations

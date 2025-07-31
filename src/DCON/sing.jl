@@ -80,6 +80,7 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
                         q = m / ctrl.nn,
                         q1 = JPEC.SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4],
                 ))
+                intr.msing += 1
                 if ctrl.verbose
                     println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(JPEC.SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4])")
                 end
@@ -104,6 +105,10 @@ truncates before the last singular surface.
 # an issue in the spline evals, or a bug here. However, the differences in the main internal parameters are small
 # so ignoring for now, can address in a unit test later.
 function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium; itmax=50, eps=1e-10)
+
+    # Shorthand to evaluate q/q1 inside newton iteration
+    qval = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
+    q1val = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     #compute and modify the DconInternal struct 
     intr.qlim   = min(equil.params.qmax, ctrl.qhigh)
@@ -134,15 +139,11 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibriu
         it = 0
         while it < itmax
             it += 1
-
-            # Can these be accessed in a better way? (need EQUIL TEAM advice)
-            q  = JPEC.SplinesMod.spline_eval(equil.sq, intr.psilim, 0)[4]
-            q1 = JPEC.SplinesMod.spline_eval(equil.sq, intr.psilim, 1)[2][4]
-            dpsi = (intr.qlim - q) / q1
+            dpsi = (intr.qlim - qval(intr.psilim)) / q1val(intr.psilim)
             intr.psilim += dpsi
 
             if abs(dpsi) < eps * abs(intr.psilim)
-                intr.q1lim = q1
+                intr.q1lim = q1val(intr.psilim)
                 break
             end
         end
