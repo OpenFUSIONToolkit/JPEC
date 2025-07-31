@@ -342,7 +342,6 @@ c-----------------------------------------------------------------------
       mthin2 = mthin + 2
       mdiv   = 2
       idgt = 0
-      nosurf = ( mp - 1 ) * mdiv + 1
       n1surf = 4
       npsurf = 6
       dpsi   = one / mdiv / m

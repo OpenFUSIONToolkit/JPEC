@@ -41,7 +41,7 @@ c-----------------------------------------------------------------------
      $     iovac,ipshp,ladj,ldcon,leqarcw,lfele,lfour,lgato,lj,
      $     lkplt,lnsav,lrgato,lspark,lxsav,lzio,m,mdiv,mfel,mj,mp,mp0,
      $     mp1,mth,mth1,mth2,mthin,mthin1,mthin2,ndfel,neigvc,neigvl,
-     $     nj,nosurf,nunst,nx,nz,nzd1,nzd2,idgt,idot,ieig,ieps,ishape,
+     $     nj,nunst,nx,nz,nzd1,nzd2,idgt,idot,ieig,ieps,ishape,
      $     ismth,lff,lmax1,lpsub,lwrt11,mphi,mx,mz,nloop,nloopr,nminus,
      $     noutv,nph,nphil,nphse,nplus,nsing,ntloop,cdfid,nd1,nd2,nd12,
      $     neqv2,neqv3,neqv4,neqv5,nfmsq,ndimlp,
@@ -74,7 +74,7 @@ c-----------------------------------------------------------------------
       REAL(r8), DIMENSION(9) :: xiin=(/0,0,0,0,0,0,0,1,0/)
       REAL(r8), DIMENSION(100) :: eigval
       REAL(r8), DIMENSION(:), POINTER :: xirc,xirs,xiic,xiis,
-     $     grpssq,xsq,gpsdth,xsqdth,xjacob,delta,xjdtxj,xsdtxs,
+     $     grpssq,xsq,gpsdth,xsqdth,delta,xjdtxj,xsdtxs,
      $     gpdtgp,slngth,xinf,zinf,xplap,zplap,fv,val0,
      $     xobp,zobp,xloop,zloop
       REAL(r8), DIMENSION(:,:), POINTER :: vacmat,vacmatu,vacmtiu,vals
@@ -115,6 +115,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     define derived sizes.
 c-----------------------------------------------------------------------
+      WRITE(*,*) "m at beginning of global_alloc = ", m
       ntsin=ntsin0+5
       nsf=nsf0+1
       nfe=1+nsf/2
@@ -140,7 +141,7 @@ c-----------------------------------------------------------------------
       ALLOCATE(lmax(nfe),lmin(nfe))
       ALLOCATE(xirc(nfm),xirs(nfm),xiic(nfm),xiis(nfm),fv(nfm))
       ALLOCATE(grpssq(nths),xsq(nths),gpsdth(nths),xsqdth(nths),
-     $     xjacob(nths),delta(nths),xjdtxj(nths),xsdtxs(nths),
+     $     delta(nths),xjdtxj(nths),xsdtxs(nths),
      $     gpdtgp(nths),slngth(nths),xinf(nths),zinf(nths),xplap(nths),
      $     zplap(nths))
       ALLOCATE(vacmat(nfm,nfm),vacmatu(nfm,nfm),vacmtiu(nfm,nfm))
@@ -179,7 +180,6 @@ c-----------------------------------------------------------------------
       xsq=0
       gpsdth=0
       xsqdth=0
-      xjacob=0
       delta=0
       xjdtxj=0
       xsdtxs=0
@@ -262,7 +262,7 @@ c     deallocate arrays.
 c-----------------------------------------------------------------------
       DEALLOCATE(lmax,lmin)
       DEALLOCATE(xirc,xirs,xiic,xiis,fv)
-      DEALLOCATE(grpssq,xsq,gpsdth,xsqdth,xjacob,delta,xjdtxj,xsdtxs,
+      DEALLOCATE(grpssq,xsq,gpsdth,xsqdth,delta,xjdtxj,xsdtxs,
      $     gpdtgp,slngth,xplap,zplap,xinf,zinf)
       DEALLOCATE(vacmat,vacmatu,vacmtiu)
       DEALLOCATE(val0,vals)

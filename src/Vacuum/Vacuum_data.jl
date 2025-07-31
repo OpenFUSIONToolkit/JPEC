@@ -53,7 +53,6 @@ immutable/thread-safe for the duration of a run. Anything set directly by user i
 - `mth2`: `mth + 2` (theta grid plus periodic and one extra point).
 - `nfm`: Number of Fourier modes (often equals `mpert` from settings).
 - `mtot`: Total number of modes (may be equal to `nfm`).
-- `nosurf`: Number of surface points, typically `(mp-1)*mdiv+1`.
 
 ## Mode Indices (Lagrange/Fourier Basis)
 - `lmin`: Lower indices for basis modes (length `jmax1`).
@@ -89,7 +88,6 @@ immutable/thread-safe for the duration of a run. Anything set directly by user i
     mth2::Int
     nfm::Int
     mtot::Int
-    nosurf::Int
 
     lmin::Vector{Int}
     lmax::Vector{Int}

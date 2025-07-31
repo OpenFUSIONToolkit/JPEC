@@ -368,40 +368,6 @@ c-----------------------------------------------------------------------
          call foranv ( grri,aii, snlth, 0,jmax1 )
          call foranv ( grri,ari, snlth, 0,0 )
          call foranv ( grri,air, cslth, 0,jmax1 )
-         if ( lnova ) then
-            do l1 = 1, jmax1
-               ll1 = l1 - 1 + lmin(1)
-               al1nq = ll1 - nq
-               do l2 = 1, jmax1
-                  ll = l2 - 1 + lmin(1)
-                  al2nq = ll - nq
-                  do i = 1, mth
-                     theta = (i-1)*dth
-                     ar = ( xjdtxj(i)*grri(i,l1)-
-     $                    al2nq*grri(i,jmax1+l1) ) * factpi
-                     ai = ( xjdtxj(i)*grri(i,jmax1+l1)+
-     $                    al2nq*grri(i,l1) ) * factpi
-                     ar1 = (ai*cslth(i,l2)-ar*snlth(i,l2))
-     $                    /xjacob(i)
-                     ai1 = -(ar*cslth(i,l2)+ai*snlth(i,l2))
-     $                    /xjacob(i)
-                     rmatr(l2,l1) = rmatr(l2,l1)
-     $                    + ar1
-                     rmati(l2,l1) = rmati(l2,l1)
-     $                    + ai1
-                     el1l2t = ( ll1-ll ) * theta
-                     ajll(l2,l1) = ajll(l2,l1)
-     $                    + cos(el1l2t)
-     $                    / (twopi*xjacob(i))
-                  enddo
-                  ajll(l2,l1) = dth * ajll(l2,l1)
-                  rmatr(l2,l1) = rmatr(l2,l1)
-     $                 * dth*al1nq/twopi2
-                  rmati(l2,l1) = rmati(l2,l1)
-     $                 * dth*al1nq/twopi2
-               enddo
-            enddo
-         endif
          do j1 = 1, jmax1
             do j2 = 1, jmax1
                vacmat(j1,j2) = arr(j1,j2) + aii(j1,j2)
@@ -1040,6 +1006,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     another big do loop.
 c-----------------------------------------------------------------------
+      WRITE(*,*) "Arrays: mth1, jmax1 = ", mth1, jmax1
       do is = 1, mth1
          theta = (is-1) * dth
          znqd = nq*delta(is)
