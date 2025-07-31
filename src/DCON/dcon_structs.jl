@@ -110,7 +110,7 @@ end
     lim_flag::Bool = false
     sas_flag::Bool = false
     sing_order::Int = 0
-    sort_type::Int = 0
+    sort_type::String = "absm"
     termbycross_flag::Bool = false
     qhigh::Float64 = 1e3
     kin_flag::Bool = false
