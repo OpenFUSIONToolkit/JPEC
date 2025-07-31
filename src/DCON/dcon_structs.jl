@@ -24,10 +24,10 @@ end
     q::Float64 = 0.0
     q1::Float64 = 0.0
     di::Float64 = 0.0
-    alpha::Complex{Float64} = 0.0 + 0.0im
-    power::Union{Nothing, Vector{Complex{Float64}}} = nothing
-    vmat::Union{Nothing, Array{Complex{Float64},4}} = nothing
-    mmat::Union{Nothing, Array{Complex{Float64},4}} = nothing
+    alpha::Complex64 = 0.0 + 0.0im
+    power::Union{Nothing, Vector{Complex64}} = nothing
+    vmat::Union{Nothing, Array{Complex64,4}} = nothing
+    mmat::Union{Nothing, Array{Complex64,4}} = nothing
     restype::ResistType = ResistType()
 end
 
@@ -75,7 +75,7 @@ end
     i_edge::Int = 1
     q_edge::Union{Nothing, Vector{Float64}} = nothing
     psi_edge::Union{Nothing, Vector{Float64}} = nothing
-    dw_edge::Union{Nothing, Vector{Complex{Float64}}} = nothing
+    dw_edge::Union{Nothing, Vector{Complex64}} = nothing
     ud::Union{Nothing, Array{Float64,3} } = nothing #storage for u-derivative and xss # JMH - is there overlap with OdeState here? 
     # JMH - changed previous line from Matrix to Array due to error - might have to modify depending on what ud looks like
 end

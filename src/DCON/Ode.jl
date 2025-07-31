@@ -53,7 +53,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
         ising = ode_axis_init!(ctrl, equil, intr, odet)
     elseif ctrl.sing_start <= intr.msing
         error("sing_start > 0 not implemented yet!")
-        # ode_sing_init()
+        # ising = ode_sing_init!(ctrl, equil, intr, odet)
     else
         error("Invalid value for sing_start: $(ctrl.sing_start) > msing = $(intr.msing)")
     end
@@ -100,16 +100,16 @@ end
 
 
 """
-    ode_axis_init(sing_surf_data, sq; nn = 1, ψlim = 0.9936, ψlow = 0.01, mlow = -12, mhigh = 20, singfac_min = 1e-5, qlow = 0.0, sort_type = "absm")
+    ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium,
+                   intr::DconInternal, odet::OdeState; itmax = 50) -> Int
 
-Initializes the ODE system near the magnetic axis for MHD or kinetic-MHD stability
-analysis. This routine prepares solution vectors and sorting indices, locates
-the relevant singular surfaces in the plasma equilibrium based on input data,
-and sets integration boundaries and normalization factors for subsequent ODE integration
-through singularities.
+Initialize the ODE state for the case of sing_start = 0.
 
-Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are noted but not yet implemented.
+Finds the starting flux surface where `q = qlow` using Newton iteration, locates
+nearby singular surfaces, and sets integration bounds. Sorts mode indices and 
+initializes solution arrays for perturbation equations.
 
+Returns the index of the next relevant singular surface.
 """
 
 function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState; itmax = 50)
@@ -210,9 +210,9 @@ function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium,
     elseif ctrl.sort_type == "sing"
         key = m
         if intr.msing > 0
-            key = key .- intr.sing[1].m
+            key .-= intr.sing[1].m
         end
-        key = -abs.(key)
+        @. key = -abs(key)
     else
         error("Cannot recognize sort_type = $(ctrl.sort_type)")
     end
@@ -235,10 +235,11 @@ function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium,
         #     m1 = round(Int, nn * qlim) + sign(one, nn * sq.fs1[mpsi, 5])
         # end
     else
+        # note: Julia's default round does Banker's rounding, to match NINT in fortran we need to specify RoundFromZero
         if intr.msing > 0
-            odet.m1 = round(Int, ctrl.nn * intr.sing[ising].q)
+            odet.m1 = round(Int, ctrl.nn * intr.sing[ising].q, RoundFromZero)
         else
-            odet.m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * equil.sq.fs1[end, 4])
+            odet.m1 = round(Int, ctrl.nn * intr.qlim, RoundFromZero) + sign(ctrl.nn * equil.sq.fs1[end, 4])
         end
     end
     odet.singfac = abs(odet.m1 - ctrl.nn * equil.sq.fs[1, 4]) # Fortran: q=sq%fs(0,4)
@@ -246,7 +247,7 @@ function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium,
     return ising
 end
 
-# TODO: NOT IMPLEMENTED YET!
+# TODO: NOT IMPLEMENTED YET! (low priority, just make sure sing_start = 0 in dcon.toml)
 function ode_sing_init()
     return
 end
