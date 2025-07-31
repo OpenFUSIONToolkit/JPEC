@@ -203,6 +203,8 @@ end
 Plasma and wall geometric parameters. (Paper Table: "shape")
 
 - `ipshp`: 0 gets the plasma boundary and safety factor, qedge, etc. from input files. 1 ignores input data files, sets qedge = qain. Shape of plasma is dee-shaped centered at `xpl`, radius `apl`, elongation `bpl`, and triangularity `dpl`. The straight-line coordinate variable delta(theta) is set to zero.
+- `isph` : 0 all vacuum R values are positive, 1 is not.
+- `inside` : 
 - `xpl`: Plasma center R coordinate.
 - `apl`: Plasma minor radius.
 - `bpl`: Plasma elongation.
@@ -214,9 +216,12 @@ Plasma and wall geometric parameters. (Paper Table: "shape")
 - `abulg` (a_b): The size of the bulge along the major radius, normalized to the mean plasma radius.
 - `bbulg` (beta_b): Subtending half-angle of the extent of the bulge.
 - `tbulg` (tau_b): Inverse roundedness of the bulge corners.
+- `xma` : shifting major radius point. for example 
 """
 @kwdef struct Shape
     ipshp::Int = 0
+    isph::Int = 0
+    inside::Int = 0
     xpl::Float64 = 100.0
     apl::Float64 = 1.0
     a::Float64 = 20.0
@@ -228,6 +233,8 @@ Plasma and wall geometric parameters. (Paper Table: "shape")
     bbulg::Float64 = 17.0
     tbulg::Float64 = 0.02
     qain::Float64 = 2.5
+    xma::Float64 = 1.0
+    zma::Float64 = 0.0
 end
 
 """
