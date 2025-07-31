@@ -55,7 +55,7 @@ them into a `DirectRunInput` object.
 ## Returns:
 - A `DirectRunInput` object ready for the direct solver.
 """
-function read_efit(config::EquilConfig)
+function read_efit(config::EquilibriumConfig)
     println("--> Processing EFIT g-file: $(config.control.eq_filename)")
     lines = readlines(config.control.eq_filename)
 
@@ -137,8 +137,7 @@ them into a `InverseRunInput` object.
 ## Returns:
 - A `InverseRunInput` object ready for the inverse solver.
 """
-
-function read_chease2(config::EquilConfig)
+function read_chease2(config::EquilibriumConfig)
     println("--> Reading CHEASE file: $(config.control.eq_filename)")
     lines = readlines(config.control.eq_filename)
 

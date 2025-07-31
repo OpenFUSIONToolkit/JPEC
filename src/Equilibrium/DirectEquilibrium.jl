@@ -504,12 +504,12 @@ function equilibrium_solver(raw_profile::DirectRunInput)
         #[5]: ∫(jac*dl/Bp) 
 
         # b. Process integration results into a temporary periodic spline `ff(θ_new)`
-        theta_new_nodes = y_out[:, 2] ./ y_out[end, 2] #SFL angle θ_new
+        theta_new_nodes = y_out[:, 5] ./ y_out[end, 5] #SFL angle θ_new
         ff_fs_nodes = hcat(
             y_out[:, 3].^2,                                            # 1: rfac²
             y_out[:, 1] / (2*pi) .- theta_new_nodes,                   # 2: η/(2π) - θ_new
             bf_start.f * (y_out[:, 4] .- theta_new_nodes .* y_out[end, 4]), # 3: Toroidal stream function term (term for calculate q)
-            y_out[:, 5] ./ y_out[end, 5] .- theta_new_nodes            # 4: Jacobian-related term
+            y_out[:, 2] ./ y_out[end, 2] .- theta_new_nodes            # 4: Jacobian-related term
         )
         ff = Spl.spline_setup(theta_new_nodes, ff_fs_nodes, bctype="periodic")
 
@@ -525,7 +525,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
             f, f1 = Spl.spline_eval(ff, theta_val, 1)
 
             rzphi_fs_nodes[ipsi, itheta, 1:3] = f[1:3]
-            jac_term = (1.0 + f1[4]) * y_out[end, 5] * psio
+            jac_term = (1.0 + f1[4]) * y_out[end, 2] * (2*pi) * psio
             rzphi_fs_nodes[ipsi, itheta, 4] = jac_term
         end
 
@@ -624,6 +624,6 @@ function equilibrium_solver(raw_profile::DirectRunInput)
 
     println("--- Direct Equilibrium Processing Finished ---")
 
-    return PlasmaEquilibrium(raw_profile.config, sq, rzphi, eqfun, ro, zo, psio)
+    return PlasmaEquilibrium(raw_profile.config,EquilibriumParameters(), sq, rzphi, eqfun, ro, zo, psio)
 end
 

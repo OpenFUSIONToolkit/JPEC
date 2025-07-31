@@ -104,7 +104,7 @@ defined by `lar_input`, and returns the full solution table including derived qu
  - working on it not yet implemented
 """
 
-function lar_run(equil_input::EquilConfig, lar_input::LargeAspectRatioConfig)
+function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConfig)
     rmin = 1e-4
     lar_a = lar_input.lar_a
     lar_r0 = lar_input.lar_r0
@@ -229,7 +229,7 @@ This is a Julia version of the Fortran code in sol.f, implementing Soloviev's an
 - `plasma_eq`: PlasmaEquilibrium object
 """
 function sol_run(
-                 equil_inputs::EquilConfig,
+                 equil_inputs::EquilibriumConfig,
                  sol_inputs::SolevevConfig
                 )
 
@@ -290,7 +290,6 @@ function sol_run(
     sqfs[:, 2] = pfac .* (1 * p0fac .- psis)
     sqfs[:, 3] .= 0.0
 
-    sq_in = Spl.spline_setup(psis, sqfs; bctype=3)
     sq_in = Spl.spline_setup(psis, sqfs; bctype=3)
     #-----------------------------------------------------------------------
     # compute 2D data
