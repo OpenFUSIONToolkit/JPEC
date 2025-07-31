@@ -37,14 +37,13 @@ Locate singular rational q-surfaces (q = m/nn) using a bisection method between 
 # JMH - I confirmed this function outputs the same sing struct as fortran dcon for DIII_Ideal
 function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
 
-    # Define functions to evaluate q and its first derivative (need EQUIL TEAM advice)
-    qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
-    q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4] 
+    # Shorthand to evaluate q inside bisection search
+    qval = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
 
     # Loop over extrema of q, find all rational values in between
     for iex in 2:equil.params.mextrema
         dq = equil.params.qextrema_q[iex] - equil.params.qextrema_q[iex-1]
-        m = floor(Int, ctrl.nn * equil.params.qextrema_q[iex-1])
+        m = trunc(Int, ctrl.nn * equil.params.qextrema_q[iex-1])
         if dq > 0
             m += 1
         end
@@ -55,7 +54,7 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
             it = 0
             psi0 = equil.params.qextrema_psi[iex-1]
             psi1 = equil.params.qextrema_psi[iex]
-            psifac = nothing # will be found in bisection method
+            psifac = (psi0 + psi1)/2 # initial guess for bisection
 
             # Bisection method to find singular surface
             while it < itmax
@@ -72,16 +71,18 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
             end
             
             if it == itmax
-                @warn "Bisection did not converge for m = $m"
+                error("Bisection did not converge for m = $m")
             else
                 push!(intr.sing, SingType(
                         m = m,
                         psifac = psifac,
                         rho = sqrt(psifac),
                         q = m / ctrl.nn,
-                        q1 = q1val(psifac),
+                        q1 = JPEC.SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4],
                 ))
-                println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(q1val(psifac))")
+                if ctrl.verbose
+                    println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(JPEC.SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4])")
+                end
             end
             m += dm
         end
@@ -117,7 +118,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibriu
             ctrl.dmlim += 1.0
         end
         #compute qlim
-        intr.qlim = (floor(Int, ctrl.nn * intr.qlim) + ctrl.dmlim) / ctrl.nn
+        intr.qlim = (trunc(Int, ctrl.nn * intr.qlim) + ctrl.dmlim) / ctrl.nn
         while intr.qlim > equil.params.qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
             intr.qlim -= 1.0 / ctrl.nn
         end
@@ -159,7 +160,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibriu
 
     #set up record for determining the peak in dW near the boundary.
     if ctrl.psiedge < intr.psilim
-        qedgestart = floor(Int, JPEC.SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
+        qedgestart = trunc(Int, JPEC.SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
         intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * ctrl.nn * ctrl.nperq_edge)
 
         intr.dw_edge  = fill(-typemax(Float64) * (1 + im), intr.size_edge)
@@ -169,7 +170,6 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibriu
         # monitor some deeper points for an informative profile
         intr.pre_edge = 1
         for i in 1:intr.size_edge
-        #TODO: do I have to keep calling spline eval? Can this be replaced with equil.sq.fs[4]? (EQUIL TEAM advice needed)
             if intr.q_edge[i] < JPEC.SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4] 
                 intr.pre_edge += 1
             end

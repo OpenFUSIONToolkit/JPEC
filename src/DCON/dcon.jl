@@ -1,9 +1,7 @@
 function MainProgram(in_path::String)
-  if ctrl.verbose
-    println("DCON START -> v$(Version)")
-    println("----------------------------------")
-    timer_start()   # Timer stub
-  end
+  println("DCON START -> v$(Version)")
+  println("----------------------------------")
+  timer_start()   # Timer stub
 
 # -----------------------------------------------------------------------
 #      read input data and set up data structures
@@ -82,14 +80,14 @@ function MainProgram(in_path::String)
       intr.mhigh = ctrl.delta_mhigh
     elseif ctrl.sing_start == 0
       intr.mlow = min(ctrl.nn * equil.params.qmin, 0) - 4 - ctrl.delta_mlow
-      intr.mhigh = ctrl.nn * equil.params.qmax + ctrl.delta_mhigh
+      intr.mhigh =  trunc(Int, ctrl.nn * equil.params.qmax) + ctrl.delta_mhigh
     else
       intr.mmin = typemax(typeof(sing[1].m))  # HUGE in Fortran
       for ising in Int(ctrl.sing_start):intr.msing
         intr.mmin = min(intr.mmin, sing[ising].m)
       end
       intr.mlow = intr.mmin - ctrl.delta_mlow
-      intr.mhigh = intr.nn * equil.qmax + ctrl.delta_mhigh
+      intr.mhigh = trunc(Int, intr.nn * equil.qmax) + ctrl.delta_mhigh
     end
     intr.mpert = intr.mhigh - intr.mlow + 1
     intr.mband = intr.mpert - 1 - ctrl.delta_mband

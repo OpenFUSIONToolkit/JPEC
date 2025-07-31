@@ -7,6 +7,7 @@ using LinearAlgebra.LAPACK #required for banded matrix operations
 using TOML
 using FFTW
 using DifferentialEquations
+using ..Equilibrium
 
 # Include all necessary files
 include("dcon_structs.jl")
