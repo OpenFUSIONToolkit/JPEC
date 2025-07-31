@@ -9,11 +9,6 @@
     sing_scan!(odet::OdeState, intr::DconInternal)
 
 Scan all singular surfaces and print information about them.
-
-- `odet`: ODE integration state (mutable, will be updated)
-- `intr`: DCON internal state (contains singularity data, mpert, msing, etc.)
-
-Prints a summary table of singular surfaces.
 """
 function sing_scan!(odet::OdeState, intr::DconInternal)
     #mpert and msing  come from DconInternal struct

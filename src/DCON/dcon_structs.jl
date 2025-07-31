@@ -31,6 +31,8 @@ end
     restype::ResistType = ResistType()
 end
 
+#TODO: I am assuming this will change - needs discussion of what output files should be
+# we should have a working base case first
 @kwdef mutable struct DconFileNames
     out_bal1_unit::String = "bal1.out"
     out_bal2_unit::String = "bal2.out"
