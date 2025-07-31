@@ -14,7 +14,7 @@ A mutable struct to hold the state of the ODE solver for DCON.
 This struct contains all necessary fields to manage the ODE integration process,
 including solution vectors, tolerances, and flags for the integration process.
 """
-#TODO: variable description review by DCON
+#TODO: variable description review by DCON expert (once finished)
 @kwdef mutable struct OdeState
     mpert::Int                  # poloidal mode number count
     msol::Int                   # number of solutions
@@ -45,7 +45,15 @@ end
 
 OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
 
+"""
+    `ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)`
+    
+Main driver for integrating plasma equilibrium and detecting singular surfaces.
 
+Initializes state and iterates through flux surfaces, calling appropriate update
+routines and recording output. Terminates when a target singularity is reached
+or integration ends. Support for `res_flag` and `kin_flag` is not yet implemented.
+"""
 function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
     # Initialization
     odet = OdeState(intr.mpert, intr.mpert)
@@ -74,29 +82,29 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
             test = ode_test(odet, intr, ctrl, ising)
             force_output = first || test
             ode_output_step(unorm, intr, ctrl, DconFileNames(), equil; op_force=force_output)
-            ode_record_edge()
+            ode_record_edge!()
             test && break # break out of loop if ode_test returns true
             ode_step(ising, ctrl, equil, intr, odet)
             first = false
         end
 
         # Re-initialize
-        if ising == ksing
-            break
-        end
+        ising == ctrl.ksing && break
         if next == "cross"
-            if res_flag
-                ode_resist_cross()
-            elseif kin_flag
-                ode_kin_cross()
+            if ctrl.res_flag
+                error("res_flag = true not implemented yet!")
+                #ode_resist_cross()
+            elseif ctrl.kin_flag
+                error("kin_flag = true not implemented yet!")
+                #ode_kin_cross()
             else
                 ode_ideal_cross!(ising, ctrl, equil, intr, odet)
             end
         else
             break
         end
+        odet.flag_count = 0
     end
-
 end
 
 
@@ -685,9 +693,8 @@ function ode_test(odet::OdeState, intr::DconInternal, ctrl::DconControl, ising::
     end
     powmax = maximum(power)
 
-    global flag_count
-    flag_count += 1
-    if flag_count < 3
+    odet.flag_count += 1
+    if odet.flag_count < 3
         return flag
     end
     flag = flag || ((singfac < singfac_max) && (powmax > powmax_old))
