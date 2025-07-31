@@ -1,50 +1,42 @@
-
-using LinearAlgebra
-using TOML
-using ..Equilibrium
-
-# --- Placeholder for global variables, modules and utilities --- #
-# using Equil, ODE, Ball, Mercier, FreeBoundary, Resist, Pentrc
-# (Define your global variables/constants and include relevant physics/data modules)
-
-#= Core Control Flow =#
-
 function MainProgram(in_path::String)
-    println("DCON START -> v$(Version)")
-    timer_start()   # Timer stub
+  println("DCON START -> v$(Version)")
+  println("----------------------------------")
+  timer_start()   # Timer stub
 
 # -----------------------------------------------------------------------
-#      read input data.
+#      read input data and set up data structures
 # -----------------------------------------------------------------------
     inputs = TOML.parsefile(in_path*"/dcon.toml")
     ctrl = DconControl(; (Symbol(k)=>v for (k,v) in inputs["DCON_CONTROL"])...)
     outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
     intr = DconInternal() 
+    equil = setup_equilibrium(in_path*"/equil.toml")
 
 # -----------------------------------------------------------------------
 #     set up variables
 # -----------------------------------------------------------------------
+    # dcon_kin_threads logic? 
     ctrl.delta_mhigh *= 2   # for consistency with Fortran DCON
 
-# -----------------------------------------------------------------------
-#     set up equilibrium structures
-# -----------------------------------------------------------------------
-    equil = setup_equilibrium(in_path*"/equil.toml")
+#  -----------------------------------------------------------------------
+#  optional: reform the eq splines to concentrate at true truncation
+#  -----------------------------------------------------------------------
+    sing_lim!(intr, ctrl, equil)  # determine if qhigh is truncating before psihigh
+    if intr.psilim != equil.config.control.psihigh && ctrl.reform_eq_with_psilim
+      @warn "psilim != psihigh not implemented yet, skipping reforming equilibrium splines"
+      # JMH - Nik please put the logic we discussed here
+      # something like ?
+      # equil.config.control.psihigh = intr.psilim
+      # equil = set_up_equilibrium(equil.config)
+    end
 
-    # todo: call sing_lim and then try this
-    # if psilim != psihigh && reform_eq_with_psilim
-    #   eqconfig = equil.config
-    #   eqconfig.psilhigh = psilim
-    #   equil = setup_equilibrium(eqconfig)
-    # end
-
 # -----------------------------------------------------------------------
-# TODO:    record the equilibrium properties (EQUIL TEAM)
+#  record the equilibrium properties (EQUIL TEAM)
+#  #TODO: is any of this necessary with the new equilibrium setup? 
 # -----------------------------------------------------------------------
 #      CALL equil_out_diagnose(.FALSE.,out_unit)
 #      CALL equil_out_write_2d
 #      IF(dump_flag .AND. eq_type /= "dump")CALL equil_out_dump
-
 
 # -----------------------------------------------------------------------
 # TODO:    prepare local stability criteria.
@@ -61,7 +53,23 @@ function MainProgram(in_path::String)
 # -----------------------------------------------------------------------
 # TODO:    output surface quantities.
 # -----------------------------------------------------------------------
-
+#  TODO: what files do we want to put these in? 
+    #   DO ipsi=0,mpsi
+    #      WRITE(out_unit,20)ipsi,sq%xs(ipsi),sq%fs(ipsi,1)/twopi,
+    #  $        sq%fs(ipsi,2),sq%fs(ipsi,3),sq%fs(ipsi,4),
+    #  $        locstab%fs(ipsi,1)/sq%xs(ipsi),
+    #  $        locstab%fs(ipsi,2)/sq%xs(ipsi),locstab%fs(ipsi,4)
+    #      WRITE(bin_unit)
+    #  $        REAL(sq%xs(ipsi),4),
+    #  $        REAL(SQRT(sq%xs(ipsi)),4),
+    #  $        REAL(sq%fs(ipsi,1)/twopi,4),
+    #  $        REAL(sq%fs(ipsi,2),4),
+    #  $        REAL(sq%fs(ipsi,4),4),
+    #  $        REAL(asinh(locstab%fs(ipsi,1)/sq%xs(ipsi)),4),
+    #  $        REAL(asinh(locstab%fs(ipsi,2)/sq%xs(ipsi)),4),
+    #  $        REAL(asinh(locstab%fs(ipsi,3)),4),
+    #  $        REAL(asinh(locstab%fs(ipsi,4)),4)
+    #   ENDDO
 
 # -----------------------------------------------------------------------
 #      define poloidal mode numbers.
@@ -71,17 +79,16 @@ function MainProgram(in_path::String)
       intr.mlow = ctrl.delta_mlow
       intr.mhigh = ctrl.delta_mhigh
     elseif ctrl.sing_start == 0
-      intr.mlow = -4 - ctrl.delta_mlow # TODO: remove this once equil.qmin is added min(ctrl.nn * equil.qmin, zero) - 4 - ctrl.delta_mlow
-      intr.mhigh = 20 # TODO: same as above # ctrl.nn * equil.qmax + ctrl.delta_mhigh
+      intr.mlow = min(ctrl.nn * equil.params.qmin, 0) - 4 - ctrl.delta_mlow
+      intr.mhigh =  trunc(Int, ctrl.nn * equil.params.qmax) + ctrl.delta_mhigh
     else
       intr.mmin = typemax(typeof(sing[1].m))  # HUGE in Fortran
       for ising in Int(ctrl.sing_start):intr.msing
         intr.mmin = min(intr.mmin, sing[ising].m)
       end
       intr.mlow = intr.mmin - ctrl.delta_mlow
-      intr.mhigh = intr.nn * equil.qmax + ctrl.delta_mhigh
+      intr.mhigh = trunc(Int, intr.nn * equil.qmax) + ctrl.delta_mhigh
     end
-
     intr.mpert = intr.mhigh - intr.mlow + 1
     intr.mband = intr.mpert - 1 - ctrl.delta_mband
     intr.mband = min(max(intr.mband, 0), intr.mpert - 1)
@@ -91,13 +98,13 @@ function MainProgram(in_path::String)
 # TODO: need to tie in the equilibrium quantities.
 # -----------------------------------------------------------------------
     if ctrl.mat_flag || ctrl.ode_flag
-      # if ctrl.verbose # TODO: add back in once equil params are here
-      #   println("   q0 = $(equil.q0), qmin = $(equil.qmin), qmax = $(equil.qmax), q95 = $(equil.q95)")
-      #   println("   sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
-      #   println("   betat = $(equil.betat), betan = $(equil.betan), betap1 = $(equil.betap1)")
-      #   println("   nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
-      #   println(" Fourier analysis of metric tensor components")
-      # end
+      if ctrl.verbose
+        println("   q0 = $(equil.params.q0), qmin = $(equil.params.qmin), qmax = $(equil.params.qmax), q95 = $(equil.params.q95)")
+        println("   sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
+        println("   betat = $(equil.params.betat), betan = $(equil.params.betan), betap1 = $(equil.params.betap1)")
+        println("   nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
+        println(" Fourier analysis of metric tensor components")
+      end
 
       metric_result = fourfit_make_metric(equil.rzphi, equil.sq) #TODO: replace this with structures once fourfit.jl fucntion is reworked
       if ctrl.verbose
@@ -143,7 +150,6 @@ function MainProgram(in_path::String)
 #  TODO     integrate main ODE's.
 # -----------------------------------------------------------------------
 
-    ud = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
     if ctrl.ode_flag
       if ctrl.verbose
         println("Starting integration of ODE's")

@@ -1,7 +1,3 @@
-
-
-using LinearAlgebra
-
 # Placeholder for dependencies
 # using Fourfit
 # using OdeOutput
@@ -9,12 +5,7 @@ using LinearAlgebra
 # using Free
 # using DifferentialEquations
 
-# For now, we set up the equilibrium spline locally, but this should be replaced with a proper import
-# JMH - removed this because it through an error due to undefined equil_input at precompilation
-# plasma_eq = JPEC.Equilibrium.setup_equilibrium(equil_input)
-# sq = plasma_eq.sq
-
-const eps = 1e-10
+const eps = 1e-10 # TODO: this shouldn't be here, right? 
 
 """
 OdeState
@@ -30,7 +21,7 @@ including solution vectors, tolerances, and flags for the integration process.
     istep::Int= 0               # integration step count
     ix::Int= 0                  # index for psiout in spline
     atol0::Float64 = 1e-10       # absolute tolerance
-    atol::Array{ComplexF64,2} = zeros(ComplexF64, msol, msol)       #  tolerance 
+    atol::Array{Float64,2} = zeros(Float64, msol, msol)       #  tolerance 
     singfac::Float64 = 0.0      # separation from singular surface
     psifac::Float64 = 0.0       # normalized flux coordinate
     neq::Int = 0                # number of equations
@@ -47,17 +38,19 @@ including solution vectors, tolerances, and flags for the integration process.
     crit_save::Float64 = 0.0    # saved critical value for zero crossing detection
     nzero::Int = 0              # count of zero crossings detected
     m1::Int = 0                 # poloidal mode number for the first singular surface (?)
+    q::Float64 = 0.0            # q value at the surface
+    psimax::Float64 = 0.0         # maximum psi value for the integrator (TODO: is this correct?)
 end
 
 OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
 
 
-function ode_run(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
     # Initialization
     odet = OdeState(intr.mpert, intr.mpert)
 
     if ctrl.sing_start <= 0
-        ode_axis_init!(ising, ctrl, equil, intr, odet)
+        ising = ode_axis_init!(ctrl, equil, intr, odet)
     elseif ctrl.sing_start <= intr.msing
         error("sing_start > 0 not implemented yet!")
         # ode_sing_init()
@@ -115,51 +108,40 @@ the relevant singular surfaces in the plasma equilibrium based on input data,
 and sets integration boundaries and normalization factors for subsequent ODE integration
 through singularities.
 
-# Arguments
-- `sing_surf_data`: Array of structures, each containing information about singular surfaces,
-    including fields like `.ψfac`, `.q`, and `.q1`. Filled from sing_find function
-- `sq`: Spline object controlling the equilibrium safety factor profile (typically contains equilibrium profile splines).
-
-# Keyword Arguments (these are likely to be replaced by the user input file structure)
-- `nn`: Integer. Toroidal mode number.
-- `ψlim`: Float. Upper bound for normalized flux coordinate ψ.
-- `ψlow`: Float. Lower bound for normalized flux coordinate ψ.
-- `mlow`: Integer. Lowest poloidal mode number to consider.
-- `mhigh`: Integer. Highest poloidal mode number to consider.
-- `singfac_min`: Float. Minimum separation from a singular surface.
-- `qlow`: Float. Lower bound for safety factor q. (Currently not implemented if > 0.)
-- `sort_type`: String. Sorting criteria for mode numbers (`"absm"` for |m|, or
-    `"sing"` for proximity to the first singular surface's m).
-
-# Details
-This function does the following:
-- Determines relevant singular surfaces from the provided equilibrium/singularity data.
-- Sets up arrays for the ODE solution and related workspaces for all poloidal harmonics in the range [`mlow`, `mhigh`].
-- Sorts the initial harmonics according to the specified `sort_type`.
-- Initializes normalization factors and solution arrays for use in the ODE integrator.
-- Computes the initial offset (`singfac`) from the next singular surface.
-
 Several features for kinetic MHD (indicated by `kin_flag`) or for `qlow > 0` are noted but not yet implemented.
 
 """
 
-function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState)
+function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState; itmax = 50)
 
-    # This might be wrong - double check once equil is more defined. 
-    qval(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
-    q1val(psi) = JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
+    # Shorthand to evaluate q/q1 inside newton iteration
+    qval = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
+    q1val = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     # Preliminary computations
     odet.psifac = equil.sq.xs[1]  
 
     # Use Newton iteration to find starting psi if qlow is above q0
-    # TODO: add this. For now, assume qlow = 0.0 and start at the first singular surface
-    if ctrl.qlow > 0.0
-        @warn "qlow > 0.0 is not implemented in ode_axis_init yet"
+    if ctrl.qlow > equil.sq.fs[1, 4]
+        # Start check from the edge for robustness in reverse shear cores
+        for jpsi = equil.sq.mx:-1:2  # avoid starting iteration on endpoints
+            if equil.sq.fs[jpsi - 1, 4] < ctrl.qlow
+                odet.psifac = equil.sq.xs[jpsi]
+                break
+            end
+        end
+        it = 0
+        while it ≤ itmax
+            it += 1
+            dpsi = (ctrl.qlow - qval(odet.psifac)) / q1val(odet.psifac)
+            odet.psifac += dpsi
+            if abs(dpsi) < eps * abs(odet.psifac)
+                break
+            end
+        end
     end
 
     # Find inner singular surface
-    ising = 0
     if false #(TODO: kin_flag)
         # for ising = 1:kmsing
         #     if kinsing[ising].psifac > psifac
@@ -167,13 +149,14 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.Pl
         #     end
         # end
     else
-        for ising in 1:intr.msing
-            if intr.sing[ising].psifac > odet.psifac
+        ising = 0
+        for i in 1:intr.msing
+            if intr.sing[i].psifac > odet.psifac
+                ising = max(0, i - 1)
                 break
             end
         end
     end
-    ising = max(0, ising - 1)
 
     # Find next singular surface
     if false # TODO: (kin_flag)
@@ -185,8 +168,8 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.Pl
         #     if psilim < kinsing[ising].psifac
         #         break
         #     end
-        #     q = kinsing[ising].q
-        #     if mlow <= nn * q && mhigh >= nn * q
+        #     odet.q = kinsing[ising].q
+        #     if mlow <= nn * odet.q && mhigh >= nn * odet.q
         #         break
         #     end
         # end
@@ -203,19 +186,19 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.Pl
     else
         while true
             ising += 1
-            if ising > intr.msing || intr.psilim < intr.sing[min(ising, msing)].psifac
+            if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac
                 break
             end
-            q = intr.sing[ising].q
-            if intr.mlow <= ctrl.nn * q && intr.mhigh >= ctrl.nn * q
+            odet.q = intr.sing[ising].q
+            if intr.mlow <= ctrl.nn * odet.q && intr.mhigh >= ctrl.nn * odet.q
                 break
             end
         end
         if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac || ctrl.singfac_min == 0
-            psimax = psilim * (1 - eps)
+            odet.psimax = intr.psilim * (1 - eps)
             odet.next = "finish"
         else
-            psimax = intr.sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
+            odet.psimax = intr.sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
             odet.next = "cross"
         end
     end
@@ -226,18 +209,18 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.Pl
         key = abs.(m)
     elseif ctrl.sort_type == "sing"
         key = m
-        if msing > 0
-            key = key .- sing[1].m
+        if intr.msing > 0
+            key = key .- intr.sing[1].m
         end
         key = -abs.(key)
     else
-        error("Cannot recognize sort_type = $ctrl.sort_type")
+        error("Cannot recognize sort_type = $(ctrl.sort_type)")
     end
     odet.index = sortperm(key, rev = true) # in original Fortran: bubble(key, index, 1, mpert)
 
     # Initialize solutions
     for ipert = 1:intr.mpert
-        odet.u[index[ipert], ipert, 2] = 1
+        odet.u[odet.index[ipert], ipert, 2] = 1
     end
     odet.msol = intr.mpert
     odet.neq = 4 * intr.mpert * odet.msol
@@ -245,7 +228,6 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.Pl
     odet.psi_save = odet.psifac
 
     # Compute conditions at next singular surface
-    q = qval(equil.psilow) # Fortran: q=sq%fs(0,4) # IS THIS RIGHT? 
     if false #TODO: (kin_flag)
         # if kmsing > 0
         #     m1 = round(Int, nn * kinsing[ising].q)
@@ -256,10 +238,12 @@ function ode_axis_init(ising::Int, ctrl::DconControl, equil::JPEC.Equilibrium.Pl
         if intr.msing > 0
             odet.m1 = round(Int, ctrl.nn * intr.sing[ising].q)
         else
-            odet.m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * q1val[end])
+            odet.m1 = round(Int, ctrl.nn * intr.qlim) + sign(ctrl.nn * equil.sq.fs1[end, 4])
         end
     end
-    odet.singfac = abs(m1 - ctrl.nn * q)
+    odet.singfac = abs(odet.m1 - ctrl.nn * equil.sq.fs[1, 4]) # Fortran: q=sq%fs(0,4)
+
+    return ising
 end
 
 # TODO: NOT IMPLEMENTED YET!
@@ -276,7 +260,7 @@ end
 #     ising = sing_start
 #     dpsi = singfac_min/abs(nn*sing[ising].q1)*10
 #     odet.psifac = sing[ising].psifac + dpsi
-#     q = sing[ising].q + dpsi*sing[ising].q1
+#     odet.q = sing[ising].q + dpsi*sing[ising].q1
 
 #     # Allocate and initialize solution arrays
 #     u      = zeros(Complex{r8}, mpert, mpert, 2)
@@ -309,14 +293,14 @@ end
 #         if ising > msing || psilim < sing[ising ≤ msing ? ising : msing].psifac
 #             break
 #         end
-#         q = sing[ising].q
+#         odet.q = sing[ising].q
 #         if mlow ≤ nn*q && mhigh ≥ nn*q
 #             break
 #         end
 #     end
-
+# This needs to be fixed up
 #     if ising > msing || psilim < sing[ising ≤ msing ? ising : msing].psifac
-#         m1 = round(Int, nn*qlim) + round(Int, sign(one, nn*sq.fs1[mpsi, 4]))
+#         m1 = round(Int, ctrl.nn*intr.qlim) + round(Int, sign(one, ctrl.nn*equil.sq.fs1[mpsi, 4]))
 #         psimax = psilim * (1-eps)
 #         next_ = "finish"
 #     else
@@ -349,7 +333,7 @@ end
 #     return nothing  # or could return a struct with all these values, for a more Julian approach
 # end
 
-function ode_ideal_cross(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
+function ode_ideal_cross(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
     # ...existing code...
 
     # Fixup solution at singular surface
@@ -411,7 +395,7 @@ function ode_ideal_cross(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.Pla
     # Compute conditions at next singular surface
     if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac
         psimax = intr.psilim * (1 - eps)
-        m1 = round(Int, ctrl.nn * intr.qlim) + intr.sign(one, ctrl.nn * equil.sq.fs1[mpsi, 4])
+        m1 = round(Int, ctrl.nn * intr.qlim) + sign(one, ctrl.nn * equil.sq.fs1[mpsi, 4])
         next = "finish"
     else
         psimax = sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
@@ -447,7 +431,7 @@ function ode_resist_cross()
     return
 end
 
-function ode_step(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
+function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
     # ODE integrator step
     # Compute relative tolerances
     singfac_local = typemax(Float64)
@@ -463,7 +447,7 @@ function ode_step(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEqui
  #       end
     else
         if ising <= intr.msing
-            singfac_local = abs(intr.sing[ising].m - ctrl.nn * q)
+            singfac_local = abs(intr.sing[ising].m - ctrl.nn * odet.q)
         end
         if ising > 1
             singfac_local = min(
@@ -485,15 +469,15 @@ function ode_step(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEqui
     end
 
     # Choose psiout
-    if node_flag
-        while odet.psifac < sq.xs[ix]
+    if ctrl.node_flag
+        while odet.psifac < equil.sq.xs[ix]
             ix += 1
         end
-        psiout = sq.xs[ix]
-        psiout = min(psiout, psimax)
+        psiout = equil.sq.xs[ix]
+        psiout = min(psiout, odet.psimax)
         rwork[1] = psiout
     else
-        psiout = psimax
+        psiout = odet.psimax
     end
 
     # Advance differential equations
@@ -525,24 +509,24 @@ function ode_step(ising::Int, odet::OdeState, equil::JPEC.Equilibrium.PlasmaEqui
 
 end
 
-function ode_unorm(sing_flag::Bool)
+function ode_unorm(intr::DconInternal, odet::OdeState, dout::DconOutput, fNames::DconFileNames, sing_flag::Bool)
     # Compute norms of first solution vectors, abort if any are zero
-    unorm[1:mpert] .= sqrt.(sum(abs.(u[:, 1:mpert, 1]).^2, dims=1)[:])
-    unorm[mpert+1:msol] .= sqrt.(sum(abs.(u[:, mpert+1:msol, 2]).^2, dims=1)[:])
-    if minimum(unorm[1:msol]) == 0
-        jmax = argmin(unorm[1:msol])
+    odet.unorm[1:intr.mpert] .= sqrt.(sum(abs.(u[:, 1:intr.mpert, 1]).^2, dims=1)[:])
+    odet.unorm[intr.mpert+1:odet.msol] .= sqrt.(sum(abs.(u[:, intr.mpert+1:odet.msol, 2]).^2, dims=1)[:])
+    if minimum(odet.unorm[1:odet.msol]) == 0
+        jmax = argmin(odet.unorm[1:odet.msol])
         error("One of the first solution vector norms unorm(1,$jmax) = 0")
     end
 
     # Normalize unorm and perform Gaussian reduction if required
     if new
         new = false
-        unorm0[1:msol] .= unorm[1:msol]
+        odet.unorm0[1:odet.msol] .= odet.unorm[1:odet.msol]
     else
-        unorm[1:msol] .= unorm[1:msol] ./ unorm0[1:msol]
-        uratio = maximum(unorm[1:msol]) / minimum(unorm[1:msol])
-        if uratio > ucrit || sing_flag
-            ode_fixup(sing_flag, false)
+        odet.unorm[1:odet.msol] .= odet.unorm[1:odet.msol] ./ odet.unorm0[1:odet.msol]
+        uratio = maximum(odet.unorm[1:odet.msol]) / minimum(odet.unorm[1:odet.msol])
+        if uratio > ctrl.ucrit || sing_flag
+            ode_fixup(intr, odet, dout, fNames, sing_flag, false)
             new = true
         end
     end
@@ -550,17 +534,17 @@ function ode_unorm(sing_flag::Bool)
     return
 end
 
-function ode_fixup(sing_flag::Bool, test::Bool)
-    # ...existing code...
-
+function ode_fixup(intr::DconInternal, odet::OdeState, dout::DconOutput, fNames::DconFileNames, sing_flag::Bool, test::Bool)
+    # ...existing code... --> diagnose stuff would go here
+    
     secondary = false
-    mask = trues(2, msol)
+    mask = trues(2, odet.msol)
     jmax = zeros(Int, 1)
 
     # Initial output
-    println(crit_out_unit, "Gaussian Reduction at istep = $istep, psi = $psifac, q = $q")
+    println(fNames.crit_out_unit, "Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $q")
     if !sing_flag
-        println(crit_out_unit, "Gaussian Reduction at istep = $istep, psi = $psifac, q = $q")
+        println(fNames.crit_out_unit, "Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $q")
     end
     istate = 1
     flag_count = 0
@@ -568,53 +552,54 @@ function ode_fixup(sing_flag::Bool, test::Bool)
     # Initialize fixfac
     if !test
         fixfac .= 0
-        for isol in 1:msol
+        for isol in 1:odet.msol
             fixfac[isol, isol] = 1
         end
         # Sort unorm
-        index[1:msol] .= collect(1:msol)
-        index[1:mpert] .= sortperm_subrange(unorm, 1:mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
-        index[mpert+1:msol] .= sortperm_subrange(unorm, mpert+1:msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
+        index[1:odet.msol] .= collect(1:odet.msol)
+        index[1:intr.mpert] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
+        index[intr.mpert+1:odet.msol] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
     end
 
     # Triangularize primary solutions
     mask .= true
-    for isol in 1:mpert
+    for isol in 1:intr.mpert
         ksol = index[isol]
         mask[2, ksol] = false
         if !test
             # Find max location
             absvals = abs.(u[:, ksol, 1])
-            masked = absvals .* mask[1, 1:mpert]
+            masked = absvals .* mask[1, 1:intr.mpert]
             kpert = argmax(masked)
+            #kpert = findmax(abs.(odet.u[:, ksol, 1]) .* (mask[1, 1:intr.mpert] .|> Int))[2] #TODO: ChatGPT suggests this might be better than the above three lines
             mask[1, kpert] = false
         end
-        for jsol in 1:msol
+        for jsol in 1:odet.msol
             if mask[2, jsol]
                 if !test
-                    fixfac[ksol, jsol] = -u[kpert, jsol, 1] / u[kpert, ksol, 1]
+                    fixfac[ksol, jsol] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
                 end
-                u[:, jsol, :] .= u[:, jsol, :] .+ u[:, ksol, :] .* fixfac[ksol, jsol]
+                odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* fixfac[ksol, jsol]
                 if !test
-                    u[kpert, jsol, 1] = 0
+                    odet.u[kpert, jsol, 1] = 0
                 end
             end
         end
     end
 
     # Triangularize secondary solutions
-    if msol > mpert && secondary
+    if odet.msol > intr.mpert && secondary
         mask .= true
-        for isol in mpert + 1:msol
+        for isol in intr.mpert + 1:odet.msol
             ksol = index[isol]
             mask[2, ksol] = false
             if !test
                 absvals = abs.(u[:, ksol, 2])
-                masked = absvals .* mask[1, 1:mpert]
+                masked = absvals .* mask[1, 1:intr.mpert]
                 kpert = argmax(masked)
                 mask[1, kpert] = false
             end
-            for jsol in mpert + 1:msol
+            for jsol in intr.mpert + 1:odet.msol
                 if mask[2, jsol]
                     if !test
                         fixfac[ksol, jsol] = -u[kpert, jsol, 2] / u[kpert, ksol, 2]
@@ -629,13 +614,13 @@ function ode_fixup(sing_flag::Bool, test::Bool)
     end
 
     # Save fixfac to file
-    if bin_euler && !test
-        write(euler_bin_unit, 2)
-        write(euler_bin_unit, sing_flag, msol)
-        write(euler_bin_unit, fixfac, index[1:msol])
+    if dout.bin_euler && !test
+        write(dout.euler_bin_unit, 2)
+        write(fNames.euler_bin_unit, sing_flag, msol)
+        write(fNames.euler_bin_unit, fixfac, index[1:msol])
     end
 
-    # ...existing code...
+    # ...existing code... --> diagnose stuff would go here
     return
 end
 

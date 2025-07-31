@@ -1,7 +1,7 @@
 using LinearAlgebra
 using Printf
 
-function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, odet::OdeState, equil::JPEC::JPEC.Equilibrium.PlasmaEquilibrium; op_force::Union{Bool,Nothing}=nothing)
+function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, odet::OdeState, equil::JPEC::Equilibrium.PlasmaEquilibrium; op_force::Union{Bool,Nothing}=nothing)
     # Set optional parameters
     force = false
     if op_force !== nothing
@@ -35,10 +35,10 @@ function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconC
 end
 
 
-function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium, odet::OdeState)
+function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::Equilibrium.PlasmaEquilibrium, odet::OdeState)
     # Access all variables from structs, not globals.
     # Pretty much just giving them all aliases so we don't have to type `intr.` and `ctrl.` every time.
-    u = intr.ud #TODO: is ud the same as u
+    u = odet.u #TODO: is ud the same as u
     mpert = intr.mpert
     out_evals = dout.out_evals
     bin_evals = dout.bin_evals
@@ -106,13 +106,13 @@ function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconO
     return
 end
 
-function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::JPEC.Equilibrium.PlasmaEquilibrium)#, sVars::SingVars)
+function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::Equilibrium.PlasmaEquilibrium)#, sVars::SingVars)
     mpert = intr.mpert
     nn = intr.nn
     crit_out_unit = fNames.crit_out_unit
     crit_bin_unit = fNames.crit_bin_unit
     termbycross_flag = ctrl.termbycross_flag
-    u = intr.ud # Assuming ud is the same as u
+    u = odet.u
     sq = equil.sq
     psifac = intr.sing.psifac #TODO: Is this the right thing
     q = equil.sq.f[4]

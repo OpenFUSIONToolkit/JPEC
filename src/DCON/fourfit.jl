@@ -11,9 +11,6 @@ This module provides functions to:
 """
 
 # module FourfitMetric
-using LinearAlgebra
-using FFTW
-using JPEC
 
 global amats_data = nothing
 global bmats_data = nothing 

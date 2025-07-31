@@ -1,5 +1,4 @@
-using TOML
-
+#TODO: add descriptions of what all variables are and/or explanation of defaults
 @kwdef mutable struct ResistType
     e::Float64 = 0.0
     f::Float64 = 0.0
@@ -111,7 +110,7 @@ end
     lim_flag::Bool = false
     sas_flag::Bool = false
     sing_order::Int = 0
-    sort_type::Int = 0
+    sort_type::String = "absm"
     termbycross_flag::Bool = false
     qhigh::Float64 = 1e3
     kin_flag::Bool = false
@@ -132,8 +131,8 @@ end
     psiedge::Float64 = 1.0
     nperq_edge::Int = 20
     wv_farwall_flag::Bool = false
-    dcon_kin_threads::Int = 0
-    parallel_threads::Int = 0
+    dcon_kin_threads::Int = 1
+    parallel_threads::Int = 1
     diagnose::Bool = false
     diagnose_ca::Bool = false
 end

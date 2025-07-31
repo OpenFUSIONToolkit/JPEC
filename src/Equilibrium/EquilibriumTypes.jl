@@ -16,7 +16,7 @@ end
 # --- Main Structures for the Equilibrium Code ---
 
 
-@kwdef mutable struct EquilControl
+@kwdef mutable struct EquilibriumControl
     eq_type::String = "efit"
     eq_filename::String = "mypath"
 
@@ -41,7 +41,7 @@ end
     """
     Modified internal constructor that enforces self consistency within the inputs
     """
-    function EquilControl(eq_type, eq_filename, jac_type, power_bp, power_b, power_r,
+    function EquilibriumControl(eq_type, eq_filename, jac_type, power_bp, power_b, power_r,
         grid_type, psilow, psihigh, mpsi, mtheta, newq0, etol, use_classic_splines,
         input_only, use_galgrid)
         if jac_type == "hamada"
@@ -99,7 +99,7 @@ A container struct that bundles all necessary configuration settings originally 
     fortran namelsits.
 """
 @kwdef mutable struct EquilibriumConfig
-    control::EquilControl = EquilControl()
+    control::EquilibriumControl = EquilibriumControl()
     output::EquilibriumOutput = EquilibriumOutput()
 end
 #
@@ -109,7 +109,7 @@ Constructor that allows users to form a EquilibriumConfig struct from dictionari
     for convinience when most of the defaults are fine.
 """
 function EquilibriumConfig(control::Dict, output::Dict)
-    construct = EquilControl(; control...)
+    construct = EquilibriumControl(; control...)
     outstruct = EquilibriumOutput(; output...)
     return EquilibriumConfig(control=construct, output=outstruct)
 end
@@ -135,7 +135,7 @@ function EquilibriumConfig(path::String)
     end
 
     # Construct validated structs
-    control = EquilControl(; symbolize_keys(control_data)...)
+    control = EquilibriumControl(; symbolize_keys(control_data)...)
     if !isabspath(control.eq_filename)
         control.eq_filename = normpath(joinpath(dirname(path), control.eq_filename))
     end
