@@ -163,6 +163,89 @@ c-----------------------------------------------------------------------
       END SUBROUTINE test_mscvac
 c-----------------------------------------------------------------------
 
+c-----------------------------------------------------------------------
+c     Test 4: test vaccal from vacuum_vac.f
+c-----------------------------------------------------------------------
+      SUBROUTINE test_vaccal
+      USE vglobal_mod
+      USE vacuum_mod
+      IMPLICIT NONE
+
+      INTEGER :: mtheta, mthvac, mpert
+      REAL(r8), DIMENSION(:,:), ALLOCATABLE :: gil, gll, cs
+      REAL(r8), DIMENSION(:,:), ALLOCATABLE :: gij
+      INTEGER :: i, j
+
+      mtheta = 200
+      mthvac = 900
+      mpert  = 20
+
+      ! Initialize global sizes
+      kernelsign = 1
+      ntsin0 = mtheta + 1
+      nths0  = mthvac
+      nfm    = mpert
+      mtot   = mpert
+      CALL global_alloc(nths0, nfm, mtot, ntsin0)
+      CALL defglo(mthvac)
+
+      ! Example lmin/lmax for Fourier indices
+      lmin(1) = 1
+      lmax(1) = nfm
+
+      ! Update nths/nfm (consistent with above)
+      nths  = mthvac + 5
+      nths2 = 2 * nths
+      nfm2  = 2 * nfm
+
+      ! Allocate working arrays
+      ALLOCATE(gij(nths, nths))
+      ALLOCATE(gil(nths2, nfm2))
+      ALLOCATE(cs(nths, nfm))
+      ALLOCATE(gll(nfm, nfm))
+
+      gij = 0.0_r8
+      gil = 0.0_r8
+      cs  = 0.0_r8
+      gll = 0.0_r8
+
+      ! Example test input data for gij/cs
+      DO i = 1, nths
+         DO j = 1, nths
+            gij(i,j) = SIN(REAL(i+j, r8) * 0.01_r8)
+         END DO
+         DO j = 1, nfm
+            cs(i,j) = COS(REAL(i*j, r8) * 0.01_r8)
+         END DO
+      END DO
+
+      check1 = .TRUE.
+      farwal = .FALSE.
+
+      PRINT *, 'Check gij(1:3,1:3):'
+      DO i = 1,3
+         WRITE(*,'(3(F12.6,2X))') (gij(i,j), j=1,3)
+      END DO
+
+      PRINT *, 'Check cs(1:3,1:3):'
+      DO i = 1,3
+         WRITE(*,'(3(F12.6,2X))') (cs(i,j), j=1,3)
+      END DO
+
+      PRINT *, 'Calling vaccal...'
+      CALL vaccal()
+      PRINT *, 'vaccal completed successfully'
+
+      ! Dump a small part of arrays to check Julia port
+      WRITE(*,*) 'gil(1:3,1:3):'
+      DO i=1,3
+         WRITE(*,'(3(F12.6,2X))') (gil(i,j), j=1,3)
+      END DO
+
+      END SUBROUTINE test_vaccal
+
+c-----------------------------------------------------------------------
+
       END MODULE TESTVAC_MOD
 
 c-----------------------------------------------------------------------
@@ -185,6 +268,9 @@ c-----------------------------------------------------------------------
       WRITE(*,*) "-----------------------------------"
       WRITE(*,*) "Test 3: MSCVAC"
       CALL test_mscvac
+      WRITE(*,*) "-----------------------------------"
+      WRITE(*,*) "Test 4: Vaccal"
+      CALL test_vaccal
 
       WRITE(*,*) "-----------------------------------"
       WRITE(*,*) "All tests completed successfully."
