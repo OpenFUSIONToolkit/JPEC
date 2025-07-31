@@ -47,7 +47,7 @@ OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
 
 """
     `ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)`
-    
+
 Main driver for integrating plasma equilibrium and detecting singular surfaces.
 
 Initializes state and iterates through flux surfaces, calling appropriate update
@@ -69,7 +69,8 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
 
     # Integration loop
     if ctrl.verbose # mimicing an output from ode_output_open
-        println("Starting integration: ψ=$(odet.psifac), q=$(odet.q)")
+        println("   ψ=$(odet.psifac), q=$(JPEC.SplinesMod.spline_eval(equil.sq, odet.psifac, 0)[4])")
+    end
     while true
         first = true
         while true
@@ -82,7 +83,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
             test = ode_test(odet, intr, ctrl, ising)
             force_output = first || test
             ode_output_step(unorm, intr, ctrl, DconFileNames(), equil; op_force=force_output)
-            ode_record_edge!()
+            ode_record_edge!(intr, odet, ctrl, equil)
             test && break # break out of loop if ode_test returns true
             ode_step(ising, ctrl, equil, intr, odet)
             first = false
@@ -426,7 +427,6 @@ function ode_ideal_cross(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEq
     if crit_break
         write(crit_bin_unit)
     end
-
 end
 
 # Example stub for kinetic crossing
@@ -516,7 +516,6 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     # Update u and psifac with the solution at the end of the interval
     u .= sol.u[end]
     odet.psifac = sol.t[end]
-
 end
 
 """
@@ -551,8 +550,6 @@ function ode_unorm!(odet::OdeState, intr::DconInternal,  sing_flag::Bool)
             odet.new = true
         end
     end
-
-    return
 end
 
 """
