@@ -28,11 +28,12 @@ all : $(OUTLIB)
 
 $(OUTLIB): $(OBJS)
 	$(FC) $(LDFLAGS) -o $@ $^ $(LIBS)
-	mv $(OUTLIB) ../../../deps/
+	$(MKDIR) $(DEPSDIR)
+	$(MV) $(OUTLIB) $(DEPSDIR)
 
 clean:
-	rm -f *.o *.mod *.original *.dylib
-	
+	$(RM) *.o *.mod *.original *.dylib *.so *.dll
+
 # 5. dependencies
 spline.o: defs.o
 cspline.o: defs.o spline.o
