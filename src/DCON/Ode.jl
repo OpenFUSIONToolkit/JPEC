@@ -5,7 +5,7 @@
 # using Free
 # using DifferentialEquations
 
-const eps = 1e-10 # TODO: this shouldn't be here, right? 
+const eps = 1e-10 # TODO: this shouldn't be here, right?
 
 """
 OdeState
@@ -22,7 +22,7 @@ including solution vectors, tolerances, and flags for the integration process.
     istep::Int= 0               # integration step count
     ix::Int= 0                  # index for psiout in spline
     atol0::Float64 = 1e-10       # absolute tolerance
-    atol::Array{Float64,2} = zeros(Float64, msol, msol)       #  tolerance 
+    atol::Array{Float64,2} = zeros(Float64, msol, msol)       #  tolerance
     singfac::Float64 = 0.0      # separation from singular surface
     psifac::Float64 = 0.0       # normalized flux coordinate
     neq::Int = 0                # number of equations
@@ -30,7 +30,7 @@ including solution vectors, tolerances, and flags for the integration process.
     flag_count::Int = 0         # count of flags raised
     new::Bool = true            # flag for new solution
     u::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)            # solution vectors
-    du::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)           # derivative vectors 
+    du::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)           # derivative vectors
     u_save::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)       # saved solution vectors
     index::Vector{Int} = collect(1:mpert)                                   # indices for sorting solutions
     unorm::Vector{Float64} = zeros(Float64, 2*mpert)                        # norms of solution vectors
@@ -47,7 +47,7 @@ OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
 
 """
     `ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)`
-    
+
 Main driver for integrating plasma equilibrium and detecting singular surfaces.
 
 Initializes state and iterates through flux surfaces, calling appropriate update
@@ -70,6 +70,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
     # Integration loop
     if ctrl.verbose # mimicing an output from ode_output_open
         println("Starting integration: ψ=$(odet.psifac), q=$(odet.q)")
+    end
     while true
         first = true
         while true
@@ -115,7 +116,7 @@ end
 Initialize the ODE state for the case of sing_start = 0.
 
 Finds the starting flux surface where `q = qlow` using Newton iteration, locates
-nearby singular surfaces, and sets integration bounds. Sorts mode indices and 
+nearby singular surfaces, and sets integration bounds. Sorts mode indices and
 initializes solution arrays for perturbation equations.
 
 Returns the index of the next relevant singular surface.
@@ -128,7 +129,7 @@ function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium,
     q1val = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     # Preliminary computations
-    odet.psifac = equil.sq.xs[1]  
+    odet.psifac = equil.sq.xs[1]
 
     # Use Newton iteration to find starting psi if qlow is above q0
     if ctrl.qlow > equil.sq.fs[1, 4]
@@ -350,7 +351,7 @@ function ode_ideal_cross(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEq
     if ctrl.verbose
         println("psi = $(intr.sing[ising].psifac), q = $(intr.sing[ising].q)")
     end
-    ode_unorm(true)    
+    ode_unorm(true)
 
     # Write asymptotic coefficients before reinit
     if ctrl.bin_euler
@@ -494,7 +495,7 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     odet.istep += 1
 
     # Use DifferentialEquations.jl for general ODE solving in Julia
-    # 
+    #
 
     # Define the ODE function in the DifferentialEquations.jl format
     function ode_func!(du, u, p, t)
@@ -568,8 +569,8 @@ Behavior can be suppressed for testing via the `test` flag.
 
 #function ode_fixup(intr::DconInternal, odet::OdeState, dout::DconOutput, fNames::DconFileNames, sing_flag::Bool, test::Bool)
 #TODO: I think sing_flag is only needed for writing to binary in fortran DCON, might be able to remove
-function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::Bool) 
-    
+function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::Bool)
+
     # TODO: seems like secondary is always false in fortran DCON (unless manually changed). is this needed?
     secondary = false
 
@@ -659,7 +660,7 @@ Checks whether integration should terminate based on step count,
 singularity index, or diagnostic thresholds.
 
 Returns `true` if integration is complete or if any stopping criteria
-are met. 
+are met.
 If `res_flag` is enabled, also computes changes in mode structure
 and evaluates a power growth metric to trigger early stopping (TODO: not sure if this is true).
 """
@@ -725,7 +726,7 @@ function ode_record_edge!(intr::DconInternal, odet::OdeState, ctrl::DconControl,
 
     q_psifac = JPEC.SplinesMod.spline_eval(equil.sq, odet.psifac, 0)
     if size_edge > 0
-        #TODO: WTH? fortran has both a psiedge and psi_edge and they appear to be different. 
+        #TODO: WTH? fortran has both a psiedge and psi_edge and they appear to be different.
         # someone smarter than me please double check this
         if q_psifac >= q_edge[intr.i_edge] && odet.psifac >= ctrl.psiedge
             @error "Vacuum code not yet integrated. This run has size_edge = $(size_edge) > 0 and integrator passed psiedge/q_edge"
