@@ -176,51 +176,50 @@ end
     out_ahg2msc::Bool = true
 end
 
-# JMH - what is a CsplineType? Can't find it anywhere. Commenting out so it will compile
-# @kwdef struct FourFitVars
+@kwdef struct FourFitVars
 
-#     # Spline matrices
-#     amats::CsplineType
-#     bmats::CsplineType
-#     cmats::CsplineType
-#     dmats::CsplineType
-#     emats::CsplineType
-#     hmats::CsplineType
-#     dbats::CsplineType
-#     ebats::CsplineType
-#     fbats::CsplineType
-#     fmats::CsplineType
-#     kmats::CsplineType
-#     gmats::CsplineType
-#     kaats::CsplineType
-#     gaats::CsplineType
-#     f0mats::CsplineType
-#     pmats::CsplineType
-#     paats::CsplineType
-#     kkmats::CsplineType
-#     kkaats::CsplineType
-#     r1mats::CsplineType
-#     r2mats::CsplineType
-#     r3mats::CsplineType
-#     akmats::CsplineType
-#     bkmats::CsplineType
-#     ckmats::CsplineType
+    # Spline matrices
+    amats::JPEC.SplinesMod.ComplexSplineType
+    bmats::JPEC.SplinesMod.ComplexSplineType
+    cmats::JPEC.SplinesMod.ComplexSplineType
+    dmats::JPEC.SplinesMod.ComplexSplineType
+    emats::JPEC.SplinesMod.ComplexSplineType
+    hmats::JPEC.SplinesMod.ComplexSplineType
+    dbats::JPEC.SplinesMod.ComplexSplineType
+    ebats::JPEC.SplinesMod.ComplexSplineType
+    fbats::JPEC.SplinesMod.ComplexSplineType
+    fmats::JPEC.SplinesMod.ComplexSplineType
+    kmats::JPEC.SplinesMod.ComplexSplineType
+    gmats::JPEC.SplinesMod.ComplexSplineType
+    kaats::JPEC.SplinesMod.ComplexSplineType
+    gaats::JPEC.SplinesMod.ComplexSplineType
+    f0mats::JPEC.SplinesMod.ComplexSplineType
+    pmats::JPEC.SplinesMod.ComplexSplineType
+    paats::JPEC.SplinesMod.ComplexSplineType
+    kkmats::JPEC.SplinesMod.ComplexSplineType
+    kkaats::JPEC.SplinesMod.ComplexSplineType
+    r1mats::JPEC.SplinesMod.ComplexSplineType
+    r2mats::JPEC.SplinesMod.ComplexSplineType
+    r3mats::JPEC.SplinesMod.ComplexSplineType
+    akmats::JPEC.SplinesMod.ComplexSplineType
+    bkmats::JPEC.SplinesMod.ComplexSplineType
+    ckmats::JPEC.SplinesMod.ComplexSplineType
 
-#     k0s::SplineType
+    # k0s::JPEC.SplinesMod.SplineType
 
-#     ipiva::Vector{Int}
-#     asmat::Array{ComplexF64,2}
-#     bsmat::Array{ComplexF64,2}
-#     csmat::Array{ComplexF64,2}
-#     jmat::Vector{ComplexF64}
+    ipiva::Vector{Int}
+    asmat::Array{ComplexF64,2}
+    bsmat::Array{ComplexF64,2}
+    csmat::Array{ComplexF64,2}
+    jmat::Vector{ComplexF64}
 
-#     parallel_threads::Int = 0
-#     dcon_kin_threads::Int = 0
+    parallel_threads::Int = 0
+    dcon_kin_threads::Int = 0
 
-#     # kinetic ABCDEH mats for sing_mod
-#     kwmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
-#     ktmats::Vector{CsplineType} = [CsplineType() for _ in 1:6]
-# end
+    # kinetic ABCDEH mats for sing_mod
+    # kwmats::Vector{JPEC.SplinesMod.ComplexSplineType} = [JPEC.SplinesMod.ComplexSplineType() for _ in 1:6]
+    # ktmats::Vector{JPEC.SplinesMod.ComplexSplineType} = [JPEC.SplinesMod.ComplexSplineType() for _ in 1:6]
+end
 
 @kwdef mutable struct SingVars
 
