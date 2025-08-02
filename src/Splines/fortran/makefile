@@ -27,8 +27,7 @@ all: $(OUTLIB)
 
 $(OUTLIB): $(OBJS)
 	$(FC) $(LDFLAGS) -o $@ $^ $(LIBS)
-	@mkdir -p $(DEPSDIR)
-	mv -f $(OUTLIB)  $(DEPSDIR)
+	mv $(OUTLIB) ../../../deps/
 
 clean:
 	rm -f *.o *.mod *.original *.dylib *.dll *.so
