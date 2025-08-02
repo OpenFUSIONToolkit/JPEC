@@ -43,7 +43,7 @@ struct FieldLineDerivParams
     ro::Float64
     zo::Float64
     psi_in::Spl.BicubicSplineType
-    sq_in::Spl.CubicSplineType
+    sq_in::Spl.CubicSpline
     psio::Float64
     power_bp::Int
     power_b::Int
@@ -79,7 +79,7 @@ function direct_get_bfield!(
     r::Float64,
     z::Float64,
     psi_in::Spl.BicubicSplineType,
-    sq_in::Spl.CubicSplineType,
+    sq_in::Spl.CubicSpline,
     psio::Float64;
     derivs::Int=0
 )
@@ -153,7 +153,7 @@ and the inboard/outboard separatrix crossings on the midplane.
 """
 function direct_position(
     psi_in::Spl.BicubicSplineType,
-    sq_in::Spl.CubicSplineType,
+    sq_in::Spl.CubicSpline,
     psio::Float64,
     ro_guess::Float64,
     zo_guess::Float64,
