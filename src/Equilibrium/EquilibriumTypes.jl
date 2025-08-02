@@ -1,11 +1,11 @@
 #=
-This file is the one stop shop for all the fundemental structures used in 
+This file is the one stop shop for all the fundemental structures used in
     creating equilibrium descriptions for the DCON ODE to use.
 =#
 
 using Base: @kwdef
 
-# --- Helper function --- 
+# --- Helper function ---
 
 
 function symbolize_keys(dict::Dict{String,Any})
@@ -115,7 +115,7 @@ function EquilibriumConfig(control::Dict, output::Dict)
 end
 
 """
-Outer constructor for EquilibriumConfig that enables a toml file 
+Outer constructor for EquilibriumConfig that enables a toml file
     interface for specifying the configuration settings
 """
 # if this also have default, then conflicts with @kwdef mutable struct EquilibriumConfig.
@@ -147,7 +147,7 @@ end
 
 
 """
-    LargeAspectRatioConfig(...)  
+    LargeAspectRatioConfig(...)
 
 A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equilibrium model.
 
@@ -183,7 +183,7 @@ A mutable struct holding parameters for the Large Aspect Ratio (LAR) plasma equi
 end
 
 """
-Outer constructor for LargeAspectRatioConfig that enables a toml file 
+Outer constructor for LargeAspectRatioConfig that enables a toml file
     interface for specifying the configuration settings
 """
 function LargeAspectRatioConfig(path::String)
@@ -195,7 +195,7 @@ end
 
 
 """
-    SolevevConfig(...)  
+    SolevevConfig(...)
 
 A mutable struct holding parameters for the Solev'ev (SOL) plasma equilibrium model.
 
@@ -227,7 +227,7 @@ A mutable struct holding parameters for the Solev'ev (SOL) plasma equilibrium mo
 end
 
 """
-Outer constructor for LarConfig that enables a toml file 
+Outer constructor for LarConfig that enables a toml file
     interface for specifying the configuration settings
 """
 function SolevevConfig(path::String) # if we use @kwdef, it generates SolevevConfig() so it conflicts with this line.
@@ -250,7 +250,7 @@ and preparing the initial splines.
         # x value: psin
         # Quantity 1: F = R*Bt  [m T]
         # Quantity 2: mu0 * Pressure (non-negative) [nt^2 / m^2 * mu0 = T^2]
-        # Quantity 3: q-profile 
+        # Quantity 3: q-profile
         # Quantity 4: sqrt(psi_norm)
 - `psi_in`:
         # x, y value: R, Z [m]
@@ -265,7 +265,7 @@ and preparing the initial splines.
 """
 mutable struct DirectRunInput
     config::EquilibriumConfig
-    sq_in::Any       # 1D profile spline (CubicSplineType)
+    sq_in::Any       # 1D profile spline (CubicSpline)
     psi_in::Any      # 2D flux spline (BicubicSplineType)
     rmin::Float64    # Minimum R-coordinate of the computational grid [m].
     rmax::Float64    # Maximum R-coordinate of the computational grid [m].
@@ -330,7 +330,7 @@ end
     delta2::Union{Nothing,Float64} = nothing # Triangularity of the plasma cross-section (lower triangularity)
     bt0::Union{Nothing,Float64} = nothing # Toroidal magnetic field at the axis [T]
     crnt::Union{Nothing,Float64} = nothing # Plasma current at the axis [A]
-    bwall::Union{Nothing,Float64} = nothing # Toroidal magnetic field at the wall [T] 
+    bwall::Union{Nothing,Float64} = nothing # Toroidal magnetic field at the wall [T]
     verbose::Bool = false # Whether to print verbose output
     diagnose_src::Bool = false # Whether to diagnose source data
     diagnose_maxima::Bool = false # Whether to diagnose maxima in the equilibrium
@@ -386,7 +386,7 @@ provides a complete representation of the processed plasma equilibrium in flux c
 mutable struct PlasmaEquilibrium
     config::EquilibriumConfig
     params::EquilibriumParameters           # Parameters for the equilibrium
-    sq::Spl.CubicSplineType                 # Final 1D profile spline
+    sq::Spl.CubicSpline                     # Final 1D profile spline
     rzphi::Spl.BicubicSplineType            # Final 2D coordinate mapping spline
     eqfun::Spl.BicubicSplineType
     ro::Float64

@@ -1,496 +1,248 @@
-#=
-This contains the logic for transforming an 'inverse' equilibrium
-representation into a straight-fieldline coordinate system and associated quantities.
-It uses bicubic splines for the geometry and supports several surface grid types.
-=#
-
-
-# --- Lagrange Polynomial Extrapolation ---
 """
-    inverse_extrap(xx, ff, x)
-
-Multi-point polynomial extrapolation of function values `ff` at `xx` to value at `x`.
-Equivalent to Fortran's Lagrange extrapolation in inverse_extrap().
-Assumes `xx` and `ff` are matrices with the first dimension being control points.
-
-Returns a vector.
-"""
-function inverse_extrap(xx::AbstractMatrix, ff::AbstractMatrix, x::Number)
-    m = size(xx,1)
-    n = size(ff,2)
-    f = zeros(eltype(ff), n)
-    for i in 1:m
-        term = view(ff, i, :)
-        result = copy(term)
-        for j in 1:m
-            if j == i; continue; end
-            denom = xx[i,:] .- xx[j,:]
-            result .= result .* (x .- xx[j,:]) ./ denom
-        end
-        f .+= result
-    end
-    return f
-end
-
-# --- Diagnostics/Output Stubs (to be implemented) ---
-function inverse_output(;diagnostics=false)
-    # Add ASCII/Binary output, diagnostics etc. here if needed
-    @info "inverse_output called (output stubs not implemented)"
-end
-
-
-function update_rz_in_from_sq_in(rz_in::Spl.BicubicSplineType, sq_in::Spl.RealSplineType, ntheta::Int)
-    # Create a new BicubicSplineType copying all fields, 
-    # but replace _xs and _ys with updated arrays
-    return Spl.BicubicSplineType(
-        rz_in.handle,
-        copy(sq_in._xs),                           # Replace _xs with copy from sq_in
-        collect(range(0.0, stop=1.0, length=ntheta)),  # Replace _ys with range vector
-        copy(rz_in._fs),                          # Copy fs arrays as needed
-        rz_in.mx,
-        ntheta,
-        rz_in.nqty,
-        rz_in.bctypex,
-        rz_in.bctypey,
-        copy(rz_in._fsx),
-        copy(rz_in._fsy),
-        copy(rz_in._fsxy)
-    )
-end
-
-
-function bicube_fit!(
-    bcs::Spl.BicubicSplineType,
-    endmode1::String,
-    endmode2::String;
-    xperiodic::Bool = (endmode1 == "periodic"),
-    yperiodic::Bool = (endmode2 == "periodic")
-)
-    fs = bcs._fs
-    fsx = bcs._fsx
-    fsy = bcs._fsy
-    fsxy = bcs._fsxy
-
-    mx, my, nqty = bcs.mx, bcs.my, bcs.nqty
-
-    # --- Apply periodicity (boundary copy)
-    if xperiodic
-        fs[mx, :, :] .= fs[1, :, :]
-    end
-    if yperiodic
-        fs[:, my, :] .= fs[:, 1, :]
-    end
-
-    # --- Y-derivatives
-    spl = Spl.RealSplineType(
-    Ptr{Cvoid}(0),
-    Float64[],                # _xs
-    zeros(0, 0),              # _fs
-    0,                        # mx
-    0,                        # nqty
-    0,                        # bctype
-    zeros(0, 0),              # _fsi
-    zeros(0, 0)               # _fs1
-)
-
-    spline_alloc!(spl, my, mx + 1)
-    spl._xs = bcs._ys
-    for iqty in 1:nqty
-        spl._fs .= transpose(fs[:, :, iqty])
-        spline_fit!(spl, endmode2)
-        fsy[:, :, iqty] .= transpose(spl._fs1)
-    end
-    spline_dealloc!(spl)
-
-    # --- X-derivatives
-    spline_alloc!(spl, mx, my + 1)
-    spl._xs = bcs._xs
-    for iqty in 1:nqty
-        spl._fs .= fs[:, :, iqty]
-        spline_fit!(spl, endmode1)
-        fsx[:, :, iqty] .= spl._fs1
-    end
-
-    # --- Mixed derivatives
-    for iqty in 1:nqty
-        spl._fs .= fsy[:, :, iqty]
-        spline_fit!(spl, endmode1)
-        fsxy[:, :, iqty] .= spl._fs1
-    end
-    spline_dealloc!(spl)
-
-    return nothing
-end
-
-
-
-
-
-# """
-#     equilibrium_solver(input::InverseRunInput)
-
-# Main routine for inverse equilibrium analysis.
-
-# Arguments:
-#     - input: InverseRunInput struct containing all splines and parameters.
-
-# Returns:
-#     - PlasmaEquilibrium object (as in direct_run).
-# """
-
-# function inverse_run(input::InverseRunInput)
-#     equil_params = deepcopy(input.equil_input)
-#     sq_in = deepcopy(input.sq_in)
-#     println(sq_in)
-#     rz_in = deepcopy(input.rz_in)
-#     ro = input.ro
-#     zo = input.zo
-#     psio = input.psio
-
-#     mpsi    = equil_params.mpsi
-#     psihigh = equil_params.psihigh
-#     psilow  = equil_params.psilow
-#     mtheta  = equil_params.mtheta
-#     grid_type = equil_params.grid_type
-#     power_bp = equil_params.power_bp
-#     power_b  = equil_params.power_b
-#     power_r  = equil_params.power_r
-
-#     # ---- Spline Preprocessing ----
-#     # Here you may want to perform operations on sq_in.fs or related,
-#     # but you must do so by creating new instances or mutating arrays inside fields
-#     # (assuming arrays inside fields are mutable).
-#     # For example, to replace sq_in._fs[:,4] with sqrt(sq_in._xs):
-#     # sq_in._fs[:,4] .= sqrt.(sq_in._xs)
-
-#     for name in fieldnames(typeof(sq_in))
-#         println("sq_in.$name = ", getfield(sq_in, name))
-#     end    
-
-#     # Prepare rz_in grid with updated _xs and _ys arrays:
-#     ntheta = size(rz_in._fs, 2)
-#     rz_in = update_rz_in_from_sq_in(rz_in, sq_in, ntheta)
-
-#     # rz_in.name = "  rz  "
-#     # rz_in.xtitle = "psifac"
-#     # rz_in.ytitle = "theta "
-#     # rz_in.title = ["  r   ", "  z   "]
-
-#     inverse_output()  # Diagnostics (by default does nothing)
-
-#     println("rz_in._fs size = ", size(rz_in._fs))
-#     (npsi, ntheta, _) = size(rz_in._fs)
-#     if size(rz_in._fs, 3) < 2
-#         rz_in._fs = zeros(npsi, ntheta, 2)
-#     end
-
-#     # Compute Cartesian coordinates relative to axis
-#     x = rz_in._fs[:,:,1] .- ro   # This currently might be zeros, so maybe you want original R data here?
-#     y = rz_in._fs[:,:,2] .- zo   # Same as above
-#     r2 = x.^2 .+ y.^2
-
-#     deta = zeros(size(r2))
-#     for ipsi in 1:npsi, itheta in 1:ntheta
-#         if r2[ipsi, itheta] == 0.0
-#             deta[ipsi, itheta] = 0.0
-#         else
-#             deta[ipsi, itheta] = atan(y[ipsi, itheta], x[ipsi, itheta]) / (2π)
-#         end
-#     end
-
-#     # Unwrapping and further deta corrections here...
-
-#     # Now store back into rz_in._fs
-#     rz_in._fs[:,:,1] .= r2
-#     rz_in._fs[:,:,2] .= deta
-
-
-#     # Unwrap deta to avoid discontinuities
-#     for ipsi in 1:size(deta, 1)
-#         for itheta in 2:size(deta, 2)
-#             diff = deta[ipsi, itheta] - deta[ipsi, itheta-1]
-#             if diff > 0.5
-#                 deta[ipsi, itheta] -= 1.0
-#             elseif diff < -0.5
-#                 deta[ipsi, itheta] += 1.0
-#             end
-#         end
-#         for itheta in 1:size(deta, 2)
-#             if r2[ipsi, itheta] > 0
-#                 deta[ipsi, itheta] -= rz_in._ys[itheta]
-#             end
-#         end
-#     end
-
-#     # Extrapolate deta at origin from next rows
-#     me = 3
-#     if size(deta, 1) >= me+1
-#         deta[1, :] .= inverse_extrap(r2[2:me+1, :], deta[2:me+1, :], 0.0)
-#     end
-
-#     # Store new coordinates back into rz_in for next phase
-#     rz_in._fs[:,:,1] .= r2
-#     rz_in._fs[:,:,2] .= deta
-
-#     bicube_fit!(rz_in, "extrap", "periodic")
-
-#     # ---- Set up Output Surface Grid ----
-#     sq_nodes = zeros(mpsi+1)
-#     if grid_type == "ldp"
-#         for i in 0:mpsi
-#             x_param = Float64(i) / mpsi
-#             sq_nodes[i+1] = psilow + (psihigh - psilow) * sin(x_param * π/2)^2
-#         end
-#     else
-#         error("Unsupported grid_type: $grid_type")
-#     end
-
-#     # Allocate output arrays
-#     if mtheta == 0; mtheta = ntheta; end
-#     rzphi_fs_nodes = zeros(mpsi+1, mtheta+1, 4)
-#     eqfun_fs_nodes = zeros(mpsi+1, mtheta+1, 3)
-#     sq_fs_nodes = zeros(mpsi+1, 4)
-
-#     rzphi_y_nodes = range(0.0, 1.0, length=mtheta+1)
-#     rzphi_x_nodes = sq_nodes
-
-#     # Local spline
-#     spl = Spl.alloc_spline(mtheta+1, 5)
-
-#     # ---- Loop Over Surfaces ----
-#     for ipsi in 1:(mpsi+1)
-#         psifac = rzphi_x_nodes[ipsi]
-#         Spl.spline_eval!(sq_in, psifac, 0)
-#         spl.xs .= rzphi_y_nodes
-
-#         # Interpolate rz_in and fill spl.fs
-#         for itheta in 1:(mtheta+1)
-#             theta = rzphi_y_nodes[itheta]
-#             Spl.bicube_eval!(rz_in, psifac, theta, 1)
-#             Spl.spline_eval!(sq_in, psifac, 0)
-#             if rz_in.f[1] < 0
-#                 error("Invalid extrapolation near axis, rerun with larger psilow")
-#             end
-#             rfac = sqrt(rz_in.f[1])
-#             η = 2π * (theta + rz_in.f[2])
-#             r = ro + rfac * cos(η)
-#             jacfac = rz_in.fx[1] * (1+rz_in.fy[2]) - rz_in.fy[1]*rz_in.fx[2]
-#             w11 = (1+rz_in.fy[2]) * (2π)^2 * rfac / jacfac
-#             w12 = -rz_in.fy[1] * π / (rfac * jacfac)
-#             bp = psio * sqrt(w11^2 + w12^2) / r
-#             bt = sq_in.f[1] / r
-#             b = sqrt(bp^2 + bt^2)
-#             spl.fs[itheta, 1] = rz_in.f[1]
-#             spl.fs[itheta, 2] = rz_in.f[2]
-#             spl.fs[itheta, 3] = r * jacfac
-#             spl.fs[itheta, 4] = spl.fs[itheta,3] / (r*r)
-#             spl.fs[itheta, 5] = spl.fs[itheta,3] * bp^power_bp * b^power_b / r^power_r
-#         end
-
-#         Spl.spline_fit!(spl, "periodic")
-#         Spl.spline_int!(spl)
-
-#         # Normalize arc length and adjust
-#         spl.xs .= spl.fsi[:,5] ./ spl.fsi[end,5]
-#         spl.fs[:,2] .= spl.fs[:,2] .+ rzphi_y_nodes .- spl.xs
-#         spl.fs[:,4] .= (spl.fs[:,3] ./ spl.fsi[end,3]) ./ (spl.fs[:,5]./spl.fsi[end,5]) .* spl.fsi[end,3]*2π*π
-#         spl.fs[:,3] .= sq_in.f[1] * π / psio .* (spl.fsi[:,4] .- spl.fsi[end,4] .* spl.xs)
-#         Spl.spline_fit!(spl, "periodic")
-
-#         for itheta in 1:(mtheta+1)
-#             theta = rzphi_y_nodes[itheta]
-#             Spl.spline_eval!(spl, theta, 0)
-#             rzphi_fs_nodes[ipsi, itheta, :] .= spl.f[1:4]
-#         end
-
-#         sq_fs_nodes[ipsi,1] = sq_in.f[1] * 2π
-#         sq_fs_nodes[ipsi,2] = sq_in.f[2]
-#         sq_fs_nodes[ipsi,3] = spl.fsi[end,3] * 2π * π
-#         sq_fs_nodes[ipsi,4] = spl.fsi[end,4] * sq_fs_nodes[ipsi,1] / (2*2π*psio)
-#     end
-
-#     # Fit output spline(s)
-#     sq = Spl.spline_setup(sq_nodes, sq_fs_nodes, bctype=4)
-#     Spl.spline_fit!(sq, "extrap")
-
-#     # Q profile revision
-#     f = Spl.spline_eval(sq, 0.0, 0)
-#     q0 = f[4]
-#     if equil_params.newq0 == -1.0; equil_params.newq0 = -q0; end
-#     if equil_params.newq0 != 0.0
-#         f0 = f[1]
-#         f0_fac_sq = f0^2 * ((equil_params.newq0 / q0)^2 - 1.0)
-#         for i in 1:(mpsi+1)
-#             ffac = sqrt(1 + f0_fac_sq / sq_fs_nodes[i,1]^2) * sign(equil_params.newq0)
-#             sq_fs_nodes[i,1] *= ffac
-#             sq_fs_nodes[i,4] *= ffac
-#             rzphi_fs_nodes[i, :, 3] .*= ffac
-#         end
-#         sq = Spl.spline_setup(sq_nodes, sq_fs_nodes, bctype=4)
-#         Spl.spline_fit!(sq, "extrap")
-#     end
-
-#     rzphi = Spl.bicube_setup(rzphi_x_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
-#     Spl.bicube_fit!(rzphi, "extrap", "periodic")
-
-#     # --- Compute eqfun (final physics quantities etc.) ---
-#     v = zeros(3,3)
-#     for ipsi in 1:(mpsi+1), itheta in 1:(mtheta+1)
-#         psi_norm = rzphi_x_nodes[ipsi]
-#         theta_new = rzphi_y_nodes[itheta]
-#         f = Spl.spline_eval(sq, psi_norm, 0)
-#         q = f[4]
-#         f, fx, fy = Spl.bicube_eval(rzphi, psi_norm, theta_new, 1)
-#         rfac = sqrt(f[1])
-#         eta = 2π * (theta_new + f[2])
-#         r = ro + rfac * cos(eta)
-#         jacfac = f[4]
-#         v[1,1] = fx[1]/(2*rfac)
-#         v[1,2] = fx[2]*2π*rfac
-#         v[1,3] = fx[3]*r
-#         v[2,1] = fy[1]/(2*rfac)
-#         v[2,2] = (1+fy[2])*2π*rfac
-#         v[2,3] = fy[3]*r
-#         v[3,3] = 2π*r
-#         w11 = (1+fy[2])*(2π)^2 * rfac * r / jacfac
-#         w12 = -fy[1]*π*r / (rfac*jacfac)
-#         delpsi = sqrt(w11^2 + w12^2)
-#         eqfun_fs_nodes[ipsi,itheta,1] = sqrt(((2π*psio*delpsi)^2 + f[1]^2)/(2π*r)^2)
-#         eqfun_fs_nodes[ipsi,itheta,2] = (dot(v[1,:], v[2,:]) + q*v[3,3]*v[1,3]) / (jacfac*eqfun_fs_nodes[ipsi,itheta,1]^2)
-#         eqfun_fs_nodes[ipsi,itheta,3] = (v[2,3]*v[3,3] + q*v[3,3]*v[3,3]) / (jacfac*eqfun_fs_nodes[ipsi,itheta,1]^2)
-#     end
-
-#     eqfun = Spl.bicube_setup(rzphi_x_nodes, collect(rzphi_y_nodes), eqfun_fs_nodes, bctypex=4, bctypey=2)
-#     Spl.bicube_fit!(eqfun, "extrap", "periodic")
-
-#     return PlasmaEquilibrium(equil_params, sq, rzphi, eqfun, ro, zo, psio)
-# end
-
+Converts inverse equilibrium to straight-fieldline coordinates. Based on inverse.f
+Of the entries we need to return: PlasmaEquilibrium(equil_params, sq_out, rzphi_out, eqfun_out, ro, zo, psio),
+we only need to generate: sq_out, rzphi_out, eqfun_out. This is because we pass in InverseRunInput(equil_in, 
+sq_in, rz_in, ro, zo, psio).
 
 """
-    equilibrium_solver(raw_profile::InverseRunInput) -> PlasmaEquilibrium
 
-Reconstructs a magnetic equilibrium from a CHEASE2 inverse input profile.
-This routine fits input data to splines, performs transformation to
-straight-fieldline coordinates, and evaluates magnetic field metrics
-on the prescribed flux grid.
+# sq_in # spline_type object, sq_in.xs # 1D array: radial coordinate (normalized poloidal flux), sq_in.fs,
+# 2D array: profiles vs. radius (F-function, pressure, q-profile), rz_in, # bicube_type object, rz_in.fs,
+# 3D array: R and Z coordinates on the input grid, rz_in.mx, # Integer: Number of radial points in the input grid,
+# rz_in.my, # Integer: Number of poloidal points in the input grid
 
-# Arguments
-- `raw_profile::InverseRunInput`: Parsed input from CHEASE2 equilibrium file.
-
-# Returns
-- `PlasmaEquilibrium`: A fully processed equilibrium structure for simulation.
-"""
-function equilibrium_solver(raw_profile::InverseRunInput)::PlasmaEquilibrium
+function equilibrium_solver(raw_profile::InverseRunInput)
     println("--- Starting Inverse Equilibrium Processing ---")
 
-    # --- Unpack input
-    rz_in, sq_in, equil_params = raw_profile.rz_in, raw_profile.sq_in, raw_profile.params
-    mpsi, mtheta = equil_params.mpsi, equil_params.mtheta
-    psilow, psihigh = equil_params.psilow, equil_params.psihigh
+    # 1.1 Unpack initial data
+    equil_params = raw_profile.config.control # EquilInput object
+    sq_in = raw_profile.sq_in # 1D spline input profile (e.g. F*Bt, Pressure, q)
+    rz_in = raw_profile.rz_in # 2D bicubic spline input for (R,Z) geometry
+    ro = raw_profile.ro # R magnetic axis location
+    zo = raw_profile.zo # Z magnetic axis location
+    psio = raw_profile.psio # Total flux difference |psi_axis - psi_boundary|
+    newq0 = equil_params.newq0 # New target on-axis safety factor (q0)
+    power_bp = equil_params.power_bp # Exponent for poloidal field weighting
+    power_b = equil_params.power_b # Exponent for total magnetic field weighting
+    power_r = equil_params.power_r # Exponent for major radius weighting
 
-    # --- Prepare normalized psi grid
-    psi_norm_grid = range(0.0, 1.0; length=mpsi + 1)
-    psi_grid = psilow .+ psi_norm_grid .* (psihigh - psilow)
+    # 1.2 Set flags
+    power_flag = false #equil_params.power_flag
+    direct_flag = false #equil_params.direct_flag
+    out_eq_1d = false # Enable ASCII output for 1D input data
+    bin_eq_1d = false # Enable binary output for 1D input data
+    out_eq_2d = false # Enable ASCII output for 2D input data
+    bin_eq_2d = false # Enable binary output for 2D input data
+    input_only = false # If true, stop after writing input data
+    interp = false # If true, interpolate data before writing output
 
-    # --- Fit splines to input profiles
-    println("--> Fitting 1D splines from CHEASE profiles...")
-    bctype = 4  # Not-a-Knot
-    sq_fs_nodes = zeros(mpsi + 1, 5)
-    for i in 1:5
-        sq_fs_nodes[:, i] .= sq_in.fs[:, i]
-    end
-    sq_in = Spl.spline_setup(collect(psi_grid), sq_fs_nodes, bctype=bctype)
+    # 1.3 Other unimplemented parameters
+    sp_pfac = 1 # (NEEDS IMPLEMENTATION) Packing factor for "mypack" grid_type
+    jaceq = 1 # (NEEDS IMPLEMENTATION), DIMENSION(:,:), INTENT(IN): Jacobian from CHEASE, for inverse_chease4_run(jaceq)
 
-    # --- Prepare rzphi grid and transform rz_in to straight-fieldline
-    println("--> Transforming rz_in to straight-fieldline coordinates...")
-    rzphi_fs_nodes = zeros(mpsi + 1, mtheta + 1, 3)
-    deta = zeros(mpsi + 1, mtheta + 1)
+    # 2. Setup the new output radial grid (`ψ_norm`)
+    mtheta = equil_params.mtheta # Number of poloidal grid points
+    grid_type = equil_params.grid_type # New radial grid type
+    mpsi = equil_params.mpsi # Number of radial grid points
+    psilow = equil_params.psilow # Lower bound of normalized poloidal flux for the new grid
+    psihigh = equil_params.psihigh # Upper bound of normalized poloidal flux for the new grid
 
-    for ipsi in 0:mpsi
-        for itheta in 0:mtheta
-            rzphi_fs_nodes[ipsi + 1, itheta + 1, 1] = rz_in.fs[ipsi + 1, itheta + 1, 1]
-            rzphi_fs_nodes[ipsi + 1, itheta + 1, 2] = rz_in.fs[ipsi + 1, itheta + 1, 2]
-            rzphi_fs_nodes[ipsi + 1, itheta + 1, 3] = rz_in.fs[ipsi + 1, itheta + 1, 3]
-            deta[ipsi + 1, itheta + 1] = rz_in.fs[ipsi + 1, itheta + 1, 3] / (2π)
+    sq_x_nodes = zeros(Float64, mpsi + 1)
+
+    if grid_type == "ldp"
+        for i in 0:mpsi
+            x_param = Float64(i) / mpsi
+            sq_x_nodes[i+1] = psilow + (psihigh - psilow) * sin(x_param * pi / 2.0)^2
         end
+    else
+        error("Unsupported grid_type: $(equil_params.grid_type)")
     end
+    # need to add more grid type
 
-    # Handle 2π wrapping in deta
-    for ipsi in 1:(mpsi + 1)
-        for itheta in 2:(mtheta + 1)
-            if deta[ipsi, itheta] - deta[ipsi, itheta - 1] > 0.5
-                deta[ipsi, itheta] -= 1.0
+    #2pi*F, mu0P, dvdpsi, q
+    sq_fs_nodes = zeros(Float64, mpsi + 1, 4)
+
+    # (Should make this function so both inverse and direct can use it instead of copy-pasting)
+    # Helper function for robust Newton-Raphson search with restarts
+    max_newton_iter = 200
+    function find_separatrix_crossing(start_r, end_r, label)
+        println("Finding $label separatrix crossing...")
+        local r_sol::Float64
+        found = false
+        for ird in 0:5 # 6 restart attempts
+            r_sep = (start_r * (3.0 - 0.5 * ird) + end_r) / (4.0 - 0.5 * ird)
+            @printf "  Restart attempt %d/6 with initial R = %.6f\n" (ird + 1) r_sep
+            for _ in 1:max_newton_iter
+                
+                direct_get_bfield!(bf_temp, r_sep, zo, psi_in_new, sq_in, psio, derivs=1)
+                if abs(bf_temp.psir) < 1e-14; @warn "d(psi)/dr is near zero."; break; end
+                dr = -bf_temp.psi / bf_temp.psir
+                r_sep += dr
+                if abs(dr) <= 1e-12 * abs(r_sep); r_sol = r_sep; found = true; break; end
             end
+            if found; break; end
         end
+        !found && error("Could not find $label separatrix after all attempts.")
+        println("$label separatrix found at R=$(r_sol).")
+        return r_sol
     end
 
-    # Replace phi in rzphi with unwrapped theta
-    for ipsi in 0:mpsi
-        for itheta in 0:mtheta
-            rzphi_fs_nodes[ipsi + 1, itheta + 1, 3] = 2π * deta[ipsi + 1, itheta + 1]
-        end
-    end
-
-    # --- Fit bicubic spline to rzphi
-    rzphi = Spl.bicube_setup(
-        rzphi_fs_nodes,
-        psi_norm_grid,
-        range(0.0, 2π; length=mtheta + 1),
-        bctypex=4,
-        bctypey=1,
-        extrap="extrap",
-        periodic="periodic",
+    #rs1 = find_separatrix_crossing(ro, minimum(rz_in.fs[:, :, 1]), "inboard")
+    #rs2 = find_separatrix_crossing(ro, maximum(rz_in.fs[:, :, 1]), "outboard")                            
+                                
+    normalized_profile = InverseRunInput(
+        raw_profile.config,
+        raw_profile.sq_in,
+        raw_profile.rz_in,
+        ro,
+        zo,
+        psio
     )
 
-    # --- Evaluate and normalize quantities
-    println("--> Evaluating magnetic field and geometric metrics...")
-    eqfun_fs_nodes = zeros(mpsi + 1, mtheta + 1, 4)
-    ro = 0.0
-    zo = 0.0
-    psio = 1.0
+    # 3. Main integration loop over flux surfaces
+    local rzphi::Spl.BicubicSplineType
+    local eqfun::Spl.BicubicSplineType
+    local rzphi_fs_nodes 
 
-    for ipsi in 0:mpsi
-        psi_norm = psi_norm_grid[ipsi + 1]
-        for itheta in 0:mtheta
-            theta_val = 2π * itheta / mtheta
+    println("Starting loop over flux surfaces...")
+    # Loop from edge inwards (index mpsi+1 down to 1)
+    # for ipsi in (mpsi+1):-1:1
+    #     psi_norm_surf = sq_x_nodes[ipsi]
+    #     @printf "--> Processing surface ipsi = %d / %d (ψ_norm = %.4f)\n" (ipsi-1) mpsi psi_norm_surf
 
-            r, dr_dpsi, dr_dtheta = Spl.bicube_eval(rzphi, psi_norm, theta_val, 1)
-            z, dz_dpsi, dz_dtheta = Spl.bicube_eval(rzphi, psi_norm, theta_val, 2)
-            phi, dphi_dpsi, dphi_dtheta = Spl.bicube_eval(rzphi, psi_norm, theta_val, 3)
+    #     # a. Integrate along the field line for this surface
+    #     y_out, bf_start = direct_fl_int(ipsi, psi_norm_surf, normalized_profile, ro, zo, rs2)
+    #     #y_out
+    #     #[1]: eta
+    #     #[2]:∫(dl/Bp)
+    #     #[3]: rfac (radial distance from magnetic axis)
+    #     #[4]: ∫(dl/(R²Bp)) 
+    #     #[5]: ∫(jac*dl/Bp) 
 
-            # Covariant basis vectors
-            a = [dr_dpsi, dz_dpsi, dphi_dpsi]
-            b = [dr_dtheta, dz_dtheta, dphi_dtheta]
+    #     # b. Process integration results into a temporary periodic spline `ff(θ_new)`
+    #     theta_new_nodes = y_out[:, 2] ./ y_out[end, 2] #SFL angle θ_new
+    #     ff_fs_nodes = hcat(
+    #         y_out[:, 3].^2,                                            # 1: rfac²
+    #         y_out[:, 1] / (2*pi) .- theta_new_nodes,                   # 2: η/(2π) - θ_new
+    #         bf_start.f * (y_out[:, 4] .- theta_new_nodes .* y_out[end, 4]), # 3: Toroidal stream function term (term for calculate q)
+    #         y_out[:, 5] ./ y_out[end, 5] .- theta_new_nodes            # 4: Jacobian-related term
+    #     )
+    #     ff = Spl.spline_setup(theta_new_nodes, ff_fs_nodes, bctype="periodic")
 
-            cross_ab = [
-                a[2]*b[3] - a[3]*b[2],
-                a[3]*b[1] - a[1]*b[3],
-                a[1]*b[2] - a[2]*b[1],
-            ]
-            jac = dot([r, 0.0, 0.0], cross_ab)
-            b_sq = sq_in(psi_grid[ipsi + 1], 2)^2 / r^2 + jac^2 / r^2
+    #     # c. On first iteration, allocate the main output data array
+    #     if ipsi == (mpsi+1)
+    #         rzphi_fs_nodes = zeros(Float64, mpsi + 1, mtheta + 1, 4)
+    #     end
 
-            # Metric terms
-            eqfun_fs_nodes[ipsi + 1, itheta + 1, 1] = b_sq
-            eqfun_fs_nodes[ipsi + 1, itheta + 1, 2] = cross_ab[1]
-            eqfun_fs_nodes[ipsi + 1, itheta + 1, 3] = cross_ab[2]
-            eqfun_fs_nodes[ipsi + 1, itheta + 1, 4] = cross_ab[3]
+    #     # d. Interpolate `ff` onto the uniform `theta` grid for `rzphi`
+    #     rzphi_y_nodes = range(0.0, 1.0, length=mtheta + 1)
+    #     for itheta in 1:(mtheta + 1)
+    #         theta_val = rzphi_y_nodes[itheta]
+    #         f, f1 = Spl.spline_eval(ff, theta_val, 1)
+
+    #         rzphi_fs_nodes[ipsi, itheta, 1:3] = f[1:3]
+    #         jac_term = (1.0 + f1[4]) * y_out[end, 5] * psio
+    #         rzphi_fs_nodes[ipsi, itheta, 4] = jac_term
+    #     end
+
+    #     # e. Store surface-averaged quantities for the `sq` spline
+    #     sq_fs_nodes[ipsi, 1] = bf_start.f * (2pi) # 2pi*F
+    #     sq_fs_nodes[ipsi, 2] = bf_start.p
+    #     sq_fs_nodes[ipsi, 3] = y_out[end, 5] * (2pi) *psio # dV/d(psi)
+    #     sq_fs_nodes[ipsi, 4] = y_out[end, 4] * bf_start.f / (2pi) # q-profile
+    # end
+    # println("...Loop over flux surfaces finished.")
+
+
+    # This is temporary code to replace the above loop (needs proper inverse implementation)
+    rzphi_fs_nodes = zeros(Float64, mpsi + 1, mtheta + 1, 4) 
+    # 5. Finalize splines and perform q-profile revision if needed
+    sq = Spl.spline_setup(sq_x_nodes, sq_fs_nodes, bctype=4)
+
+    if equil_params.newq0 != 0.0
+        println("Revising q-profile for newq0 = $(equil_params.newq0)...")
+        f = Spl.spline_eval(sq, 0.0, 0)
+        # q0_old = q(psi=0) = f[4] at x=0
+        # f0_old = f[1] at x=0
+        q0_old = f[4]
+        f0_old = f[1]
+
+        f0_fac_sq = f0_old^2 * ((equil_params.newq0 / q0_old)^2 - 1.0)
+
+        for i in 1:(mpsi+1)
+            f_current_sq = sq_fs_nodes[i, 1]^2
+            ffac = sqrt(max(0.0, 1.0 + f0_fac_sq / f_current_sq)) * sign(equil_params.newq0/q0_old)
+            sq_fs_nodes[i, 1] *= ffac      # F
+            sq_fs_nodes[i, 4] *= ffac      # q
+            rzphi_fs_nodes[i, :, 3] .*= ffac # Toroidal stream function
         end
+        # Re-create the spline with the revised data
+        sq = Spl.spline_setup(sq_x_nodes, sq_fs_nodes, bctype=4)
+        println("...q-profile revision complete.")
     end
 
-    # Fit final spline to metric functions
-    eqfun = Spl.bicube_setup(
-        eqfun_fs_nodes,
-        psi_norm_grid,
-        range(0.0, 2π; length=mtheta + 1),
-        bctypex=4,
-        bctypey=1,
-        extrap="extrap",
-        periodic="periodic",
-    )
+    # Create the final geometric spline `rzphi`. Periodic in theta (y-dimension)
+    rzphi_y_nodes = range(0.0, 1.0, length=mtheta + 1)
+    rzphi = Spl.bicube_setup(sq_x_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
+    println("Final geometric spline 'rzphi' is fitted.")
 
-    # --- Return final equilibrium
-    println("--- Inverse reconstruction complete ---")
-    return PlasmaEquilibrium(equil_params, sq_in, rzphi, eqfun, ro, zo, psio)
+    # 6. Calculate final physics quantities (B-field, metric components, etc.)
+    println("Calculating final physics quantities (B, g_ij)...")
+    eqfun_fs_nodes = zeros(Float64, mpsi + 1, mtheta + 1, 3)
+    v = zeros(Float64, 2, 3)
+
+    for ipsi in 1:(mpsi+1), itheta in 1:(mtheta+1)
+        psi_norm = sq_x_nodes[ipsi]
+        theta_new = rzphi_y_nodes[itheta]
+
+        f = Spl.spline_eval(sq, psi_norm, 0)
+        q = f[4]
+        f_val = f[1] 
+
+        f, fx, fy = Spl.bicube_eval(rzphi, psi_norm, theta_new, 1)
+        rfac_sq = max(0.0, f[1])
+        rfac = sqrt(rfac_sq)
+        eta = 2.0 * pi * (theta_new + f[2])
+        r_coord = ro + rfac * cos(eta)
+        jacfac = f[4]
+
+
+        v[1,1] = (rfac > 0) ? fx[1] / (2.0 * rfac) : 0.0       # 1/(2rfac) * d(rfac)/d(psi_norm)
+        v[1,2] = fx[2] * 2.0 * pi * rfac                       # 2pi*rfac * d(eta)/d(psi_norm)
+        v[1,3] = fx[3] * r_coord                               # r_coord * d(phi_s)/d(psi_norm) 
+        v[2,1] = (rfac > 0) ? fy[1] / (2.0 * rfac) : 0.0       # 1/(2rfac) d(rfac)/d(theta_new)
+        v[2,2] = (1.0 + fy[2]) * 2.0 * pi * rfac               # 2pi*rfac * d(eta)/d(theta_new) 
+        v[2,3] = fy[3] * r_coord                               # r_coord * d(phi_s)/d(theta_new)
+        v33 = 2.0 * pi * r_coord                               # 2pi * r_coord 
+
+
+        w11 = (1.0 + fy[2]) * (2.0*pi)^2 * rfac * r_coord / jacfac
+        w12 = (jacfac*rfac != 0) ? -fy[1] * pi * r_coord / (rfac * jacfac) : 0.0
+        delpsi_norm = sqrt(w11^2 + w12^2)
+
+        b_sq = ((psio *2pi *delpsi_norm)^2 + (f_val/(2pi*r_coord))^2)
+        eqfun_fs_nodes[ipsi, itheta, 1] = b_sq # B_total
+
+        denom = jacfac * b_sq
+        if abs(denom) > 1e-20
+            # 2. Gyrokinetic coefficient C1 
+            numerator_2 = dot(v[1,:], v[2,:]) + q * v33 * v[1,3] 
+            eqfun_fs_nodes[ipsi, itheta, 2] = numerator_2 / denom
+
+            # 3. Gyrokinetic coefficient C2 
+            numerator_3 = v[2,3] * v33 + q * v33^2 
+            eqfun_fs_nodes[ipsi, itheta, 3] = numerator_3 / denom
+        else
+            eqfun_fs_nodes[ipsi, itheta, 2] = 0.0
+            eqfun_fs_nodes[ipsi, itheta, 3] = 0.0
+        end
+    end
+    println("...done.")
+
+    eqfun = Spl.bicube_setup(sq_x_nodes, collect(rzphi_y_nodes), eqfun_fs_nodes, bctypex=4, bctypey=2)
+
+    println("--- Inverse Equilibrium Processing Complete ---")
+
+    return PlasmaEquilibrium(raw_profile.config, sq, rzphi, eqfun, ro, zo, psio)
+
 end
