@@ -619,8 +619,8 @@ function fourfit_make_matrix(
         ipert = 0
         for m1 in mlow:mhigh
             ipert += 1
-            singfac1 = m1 - nq
-            
+            singfac1 = m1 - nq 
+
             for dm in max(1 - ipert, -mband):min(mpert - ipert, mband)
                 m2 = m1 + dm
                 singfac2 = m2 - nq
@@ -644,16 +644,39 @@ function fourfit_make_matrix(
                                     (nn * g22[dm_idx] +
                                      (m1 + nq) * g23[dm_idx] +
                                      m1 * q * g33[dm_idx])
-                
+
                 cmat[ipert, jpert] = twopi * ifac *
                                     (twopi * ifac * chi1 * singfac2 *
                                      (nn * g12[dm_idx] + m1 * g31[dm_idx]) -
                                      q1 * chi1 * (nn * g23[dm_idx] + m1 * g33[dm_idx])) -
                                     twopi * ifac * (jtheta * singfac1 * imat[dm_idx] +
                                                    nn * p1 / chi1 * jmat[dm_idx])
-                
+                if ipsi == mpsi && verbose && false
+                    println("---- DEBUG: ipsi=$(ipsi), cmat calculation ----")
+                    println("  ipert = $ipert, jpert = $jpert, m1 = $m1, m2 = $m2, dm = $dm")
+                    println("  singfac1 = $singfac1, singfac2 = $singfac2")
+                    println("  dm_idx = $dm_idx")
+                    println("  g12[$dm_idx] = $(g12[dm_idx])")
+                    println("  g31[$dm_idx] = $(g31[dm_idx])")
+                    println("  g23[$dm_idx] = $(g23[dm_idx])")
+                    println("  g33[$dm_idx] = $(g33[dm_idx])")
+                    println("  q1 = $q1, chi1 = $chi1, q = $q")
+                    println("  jtheta = $jtheta, imat[$dm_idx] = $(imat[dm_idx])")
+                    println("  p1 = $p1, jmat[$dm_idx] = $(jmat[dm_idx])")
+                    println("  cmat[$ipert, $jpert] = $(cmat[ipert, jpert])")
+                end
                 dmat[ipert, jpert] = twopi * chi1 * (g23[dm_idx] + g33[dm_idx] * m1 / nn)
-                
+                if ipsi == mpsi/2 && verbose && true
+                    println("---- DEBUG: ipsi=$(ipsi), dmat calculation ----")
+                    println("  ipert = $ipert, jpert = $jpert, m1 = $m1, m2 = $m2, dm = $dm")
+                    println("  chi1 = $chi1, twopi = $twopi")
+                    println("  dm_idx = $dm_idx")
+                    println("  g23[$dm_idx] = $(g23[dm_idx])")
+                    println("  g33[$dm_idx] = $(g33[dm_idx])")
+                    println("  m1 = $m1, nn = $nn")
+                    println("  dmat[$ipert, $jpert] = $(dmat[ipert, jpert])")
+                    println("  최종 계산식: dmat[$ipert, $jpert] = twopi * chi1 * (g23[$dm_idx] + g33[$dm_idx] * m1 / nn)")
+                end
                 emat[ipert, jpert] = -chi1 / nn * (q1 * chi1 * g33[dm_idx] -
                                                   twopi * ifac * chi1 * g31[dm_idx] * singfac2 +
                                                   jtheta * imat[dm_idx])
