@@ -4,6 +4,7 @@ module DconMod
 using JPEC 
 using LinearAlgebra
 using LinearAlgebra.LAPACK #required for banded matrix operations
+using BandedMatrices #for banded matrix operations
 using TOML
 using FFTW
 using DifferentialEquations

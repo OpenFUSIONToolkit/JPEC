@@ -468,15 +468,15 @@ function sing_der(neq::Int,
 
         #TODO: is this right? ChatGPT says it is equivalent so that is probably true
         F = cholesky(Hermitian(amat, :L))  # factorization using the lower triangle
-        bmat_sol = F \ bmat
-        cmat_sol = F \ cmat
+        bmat .= F \ bmat 
+        cmat .= F \ cmat
 
         # copy ideal Hermitian matrices F and G
         fill!(fmatb, 0.0 + 0.0im)
         fill!(gmatb, 0.0 + 0.0im)
         iqty = 1
-        @inbounds for jpert in 1:mpert
-            for ipert in jpert:min(mpert, jpert + mband)
+        @inbounds for jpert in 1:intr.mpert
+            for ipert in jpert:min(intr.mpert, jpert + mband)
                 fmatb[1 + ipert - jpert, jpert] = fmats.f[iqty]
                 gmatb[1 + ipert - jpert, jpert] = gmats.f[iqty]
                 iqty += 1
@@ -486,13 +486,13 @@ function sing_der(neq::Int,
         #copy ideal non-Hermitian banded matrix K
         fill!(kmatb, 0.0 + 0.0im)
         iqty = 1
-        @inbounds for jpert in 1:mpert
-            for ipert in max(1, jpert - mband):min(mpert, jpert + mband)
+        @inbounds for jpert in 1:intr.mpert
+            for ipert in max(1, jpert - mband):min(intr.mpert, jpert + mband)
                 kmatb[1 + mband + ipert - jpert, jpert] = kmats.f[iqty]
                 iqty += 1
             end
         end
-    #end #this is the end of the IFElse for when we re-implement kinetic stuff
+    #end #this is the end of the IfElse for when we re-implement kinetic stuff
 
     # Compute du1 and du2
     du .= 0
@@ -510,52 +510,25 @@ function sing_der(neq::Int,
         # end
     else =#
         for isol in 1:msol
-            du[:,isol,1] .= u[:,isol,2] .* singfac
-            # du[:,isol,1] .+= -kmatb * u[:,isol,1] (banded matvec)
+            # du(:, isol, 1) = u(:, isol, 2)*singfac - kmatb * u(:, isol, 1)
+            du[:, isol, 1] .= u[:, isol, 2] .* singfac
+            mul!(du[:, isol, 1], BandedMatrix(kmatb, (mband, mband)), u[:, isol, 1], -1.0, 1.0)
         end
-        # Solve fmatb * du = du (banded Hermitian solve)
-        # for isol in 1:msol
-        #     du[:,isol,2] .+= gmatb * u[:,isol,1] + kmatb' * du[:,isol,1]
-        #     du[:,isol,1] .*= singfac
-        # end
+
+        # Solve fmatb * du = du
+        F = cholesky(Hermitian(BandedMatrix(fmatb, (mband, 0)), :L))
+        for isol in 1:msol
+            du[:, isol, 1] .= F \ du[:, isol, 1]
+        end
+
+        #TODO: Apparently this can run into issues if gmat has complex diagonal entries
+        for isol in 1:msol
+            # du(:, isol, 2) += gmatb * u(:, isol, 1) + kmatb' * du(:, isol, 1)
+            mul!(du[:, isol, 2], BandedMatrix(gmatb, (mband, 0)), u[:, isol, 1], 1.0, 1.0)
+            mul!(du[:, isol, 2], BandedMatrix(kmatb, (mband, mband))', du[:, isol, 1], 1.0, 1.0)
+            du[:, isol, 1] .*= singfac
+        end
     #end
-
-    # assuming all arrays are appropriately defined and typed,
-# and that zgbmv, zgbtrf, zgbtrs are available wrappers for LAPACK
-
-    du .= 0  # du = 0
-    #=
-    if kin_flag
-        for isol in 1:msol
-            du[:, isol, 1] .= u[:, isol, 2]
-            zgbmv('N', mpert, mpert, mband, mband, -one, kmatb,
-                  2*mband + 1, u[:, isol, 1], 1, one, du[:, isol, 1], 1)
-        end
-
-        info = Ref{Int32}()
-        ipiv = zeros(Int32, mpert)  # assuming pivot array
-        fmatlu .= 0
-
-        zgbtrf(mpert, mpert, mband, mband, fmatlu, 3*mband + 1, ipiv, info)
-        if info[] != 0
-            message = "zgbtrf: fmat singular at psifac = $psifac, ipert = $(info[]), reduce delta_mband"
-            error(message)
-        end
-
-        zgbtrs("N", mpert, mband, mband, msol, fmatlu, 3*mband + 1, ipiv, du, mpert, info)
-    
-        for isol in 1:msol
-            zgbmv('N', mpert, mpert, mband, mband, one, gaatb,
-                  2*mband + 1, du[:, isol, 1], 1, zero(one), du[:, isol, 2], 1)
-        end
-        =#
-    #else #else for if kin_flag -> we are ignore kinetic rn
-        for isol in 1:msol
-            du[:, isol, 1] .= u[:, isol, 2]
-            du[:, isol, 2] .= -amat \ u[:, isol, 1]  # solve Hermitian system
-        end
-    #end #end for if kin_flag -> we are ignore kinetic rn
-
 
     # Store u-derivative and xss
     intr.ud[:,:,1] = du[:,:,1]
