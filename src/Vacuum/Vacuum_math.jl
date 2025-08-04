@@ -212,10 +212,10 @@ end
 """
     search(xbar, x::AbstractVector{<:Real})
 
-정렬된 배열 x에서 xbar가 속하는 구간의 인덱스(1-based)를 반환.
-- xbar < x[1]이면 0 반환
-- xbar ≥ x[end]이면 length(x)-1 반환
-- 그 외: x[i] ≤ xbar < x[i+1]를 만족하는 i 반환
+Returns the 1-based index of the interval in the sorted array `x` to which `xbar` belongs.
+- Returns 0 if xbar < x[1].
+- Returns length(x)-1 if xbar ≥ x[end].
+- Otherwise, returns i such that x[i] ≤ xbar < x[i+1].
 """
 function search(xbar, x::AbstractVector{<:Real})
     n = length(x)
@@ -268,16 +268,49 @@ function P1_minus_half_wrong(s)
 end
 
 # Polynomial elliptical integrals from original Chance code
-function ellipewrong(m1)
-    # This is a placeholder for the polynomial ellipe used by chance.
-    # Not yet implemented, error.
-    error("ellipewrong is not implemented yet.")
+function ellipewrong(x1)
+
+    ae1=0.44325141463
+    ae2=0.0626060122
+    ae3=0.04757383546
+    ae4=0.01736506451
+    be1=0.2499836831
+    be2=0.09200180037
+    be3=0.04069697526
+    be4=0.00526449639
+
+    p = @evalpoly(x1, 1.0, ae1, ae2, ae3, ae4)
+    q = @evalpoly(x1, 0.0, be1, be2, be3, be4)
+
+    ellipe = p - q * log_m1
+    return ellipe
+
 end
 
 function ellipkwrong(m1)
-    # This is a placeholder for the polynomial ellipk used by chance.
-    # Not yet implemented, error.
-    error("ellipkwrong is not implemented yet.")
+
+    if m1 < 0.0 || m1 > 1.0
+        throw(DomainError(m1, "Input `m1` must be in the range (0, 1]."))
+    end
+
+    log_m1 = log(m1)
+
+    ak0 = 1.38629436112
+    ak1 = 0.09666344259
+    ak2 = 0.03590092383
+    ak3 = 0.03742563713
+    ak4 = 0.01451196    
+    bk0 = 0.5
+    bk1 = 0.12498593597
+    bk2 = 0.06880248576
+    bk3 = 0.03328355346
+    bk4 = 0.00441787012
+
+    p = @evalpoly(m1, ak0, ak1, ak2, ak3, ak4)
+    q = @evalpoly(m1, bk0, bk1, bk2, bk3, bk4)
+
+    ellipk = p - q * log_m1
+    return ellipk
 end
 
 """
@@ -353,13 +386,13 @@ end
 """
     green(xs, zs, xt, zt, n)
 
-입력:
+input:
 - xs, zs: observation points
 - xt, zt: source points
 - xtp, ztp : ∂X'/∂θ, ∂Z'/∂θ
 - n: mode number
 
-반환:
+return:
 - G :   2π𝒢ⁿ(θ,θ')
 - aval :    𝒥 ∇'𝒢ⁿ∇'ℒ
 - aval0:    𝒥 ∇'𝒢⁰∇'ℒ
