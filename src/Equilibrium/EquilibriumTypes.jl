@@ -266,7 +266,7 @@ and preparing the initial splines.
 mutable struct DirectRunInput
     config::EquilibriumConfig
     sq_in::Any       # 1D profile spline (CubicSpline)
-    psi_in::Any      # 2D flux spline (BicubicSplineType)
+    psi_in::Any      # 2D flux spline (BicubicSpline)
     rmin::Float64    # Minimum R-coordinate of the computational grid [m].
     rmax::Float64    # Maximum R-coordinate of the computational grid [m].
     zmin::Float64    # Minimum Z-coordinate of the computational grid [m].
@@ -364,7 +364,7 @@ provides a complete representation of the processed plasma equilibrium in flux c
         # Quantity 2: Pressure * μ₀, `P * μ₀`.
         # Quantity 3: dVdpsi
         # Quantity 4: q
-- `rzphi`: The final 2D flux-coordinate mapping spline (`BicubicSplineType`).
+- `rzphi`: The final 2D flux-coordinate mapping spline (`BicubicSpline`).
         # x value: normlized psi
         # y value: SFL poloidal angle [0,1]
         # Quantity 1: r_coord² = (R - ro)² + (Z - zo)²
@@ -387,8 +387,8 @@ mutable struct PlasmaEquilibrium
     config::EquilibriumConfig
     params::EquilibriumParameters           # Parameters for the equilibrium
     sq::Spl.CubicSpline                     # Final 1D profile spline
-    rzphi::Spl.BicubicSplineType            # Final 2D coordinate mapping spline
-    eqfun::Spl.BicubicSplineType
+    rzphi::Spl.BicubicSpline            # Final 2D coordinate mapping spline
+    eqfun::Spl.BicubicSpline
     ro::Float64
     zo::Float64
     psio::Float64

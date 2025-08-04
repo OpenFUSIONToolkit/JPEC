@@ -42,7 +42,7 @@ easily accessible within the derivative function `direct_fl_der!`.
 struct FieldLineDerivParams
     ro::Float64
     zo::Float64
-    psi_in::Spl.BicubicSplineType
+    psi_in::Spl.BicubicSpline
     sq_in::Spl.CubicSpline
     psio::Float64
     power_bp::Int
@@ -78,7 +78,7 @@ function direct_get_bfield!(
     bf_out::DirectBField,
     r::Float64,
     z::Float64,
-    psi_in::Spl.BicubicSplineType,
+    psi_in::Spl.BicubicSpline,
     sq_in::Spl.CubicSpline,
     psio::Float64;
     derivs::Int=0
@@ -152,7 +152,7 @@ and the inboard/outboard separatrix crossings on the midplane.
 - `psi_in_new` : returns psi_in renormalized by * psio/psi(ro,zo)
 """
 function direct_position(
-    psi_in::Spl.BicubicSplineType,
+    psi_in::Spl.BicubicSpline,
     sq_in::Spl.CubicSpline,
     psio::Float64,
     ro_guess::Float64,
@@ -225,7 +225,7 @@ function direct_position(
             r_sep = (start_r * (3.0 - 0.5 * ird) + end_r) / (4.0 - 0.5 * ird)
             @printf "  Restart attempt %d/6 with initial R = %.6f\n" (ird + 1) r_sep
             for _ in 1:max_newton_iter
-                
+
                 direct_get_bfield!(bf_temp, r_sep, zo, psi_in_new, sq_in, psio, derivs=1)
                 if abs(bf_temp.psir) < 1e-14; @warn "d(psi)/dr is near zero."; break; end
                 dr = -bf_temp.psi / bf_temp.psir
@@ -290,8 +290,8 @@ function direct_fl_int(
     u0 = zeros(Float64, 4)
     #[1]:∫(dl/Bp)
     #[2]: rfac (radial distance from magnetic axis)
-    #[3]: ∫(dl/(R²Bp)) 
-    #[4]: ∫(jac*dl/Bp) 
+    #[3]: ∫(dl/(R²Bp))
+    #[4]: ∫(jac*dl/Bp)
     u0[2] = sqrt((r_start - ro)^2 + (z_start - zo)^2) # Initial rfac
     tspan = (0.0, 2.0 * pi)
 
@@ -363,7 +363,7 @@ function direct_fl_der!(dy, y, params::FieldLineDerivParams, eta)
     # dy/d(eta)
     dy[1] = y[2] / denominator  # d/dη [∫(dl/Bp)] = 1/|B_P| dl/d(eta) = rfac/denominator
     dy[2] = dy[1] * (bf_temp.br * cos_eta + bf_temp.bz * sin_eta)
-    # d(rfac)/d(eta) = rfac/denom *( Br cos(eta) + Bz sin(eta) ) 
+    # d(rfac)/d(eta) = rfac/denom *( Br cos(eta) + Bz sin(eta) )
     dy[3] = dy[1] / (r^2)       # d/dη [∫(dl/(R²Bp))]
     dy[4] = dy[1] * jacfac      # d/dη [∫(jac*dl/Bp)]
     return
@@ -475,7 +475,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
     normalized_profile = DirectRunInput(
         raw_profile.config,
         raw_profile.sq_in,
-        psi_in_norm, 
+        psi_in_norm,
         raw_profile.rmin,
         raw_profile.rmax,
         raw_profile.zmin,
@@ -484,9 +484,9 @@ function equilibrium_solver(raw_profile::DirectRunInput)
     )
 
     # 4. Main integration loop over flux surfaces
-    local rzphi::Spl.BicubicSplineType
-    local eqfun::Spl.BicubicSplineType
-    local rzphi_fs_nodes 
+    local rzphi::Spl.BicubicSpline
+    local eqfun::Spl.BicubicSpline
+    local rzphi_fs_nodes
 
     println("Starting loop over flux surfaces...")
     # Loop from edge inwards (index mpsi+1 down to 1)
@@ -500,8 +500,8 @@ function equilibrium_solver(raw_profile::DirectRunInput)
         #[1]: eta
         #[2]:∫(dl/Bp)
         #[3]: rfac (radial distance from magnetic axis)
-        #[4]: ∫(dl/(R²Bp)) 
-        #[5]: ∫(jac*dl/Bp) 
+        #[4]: ∫(dl/(R²Bp))
+        #[5]: ∫(jac*dl/Bp)
 
         # b. Process integration results into a temporary periodic spline `ff(θ_new)`
         theta_new_nodes = y_out[:, 5] ./ y_out[end, 5] #SFL angle θ_new
@@ -578,7 +578,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
 
         f = Spl.spline_eval(sq, psi_norm, 0)
         q = f[4]
-        f_val = f[1] 
+        f_val = f[1]
 
         f, fx, fy = Spl.bicube_eval(rzphi, psi_norm, theta_new, 1)
         rfac_sq = max(0.0, f[1])
@@ -587,14 +587,14 @@ function equilibrium_solver(raw_profile::DirectRunInput)
         r_coord = ro + rfac * cos(eta)
         jacfac = f[4]
 
- 
+
         v[1,1] = (rfac > 0) ? fx[1] / (2.0 * rfac) : 0.0       # 1/(2rfac) * d(rfac)/d(psi_norm)
         v[1,2] = fx[2] * 2.0 * pi * rfac                       # 2pi*rfac * d(eta)/d(psi_norm)
-        v[1,3] = fx[3] * r_coord                               # r_coord * d(phi_s)/d(psi_norm) 
+        v[1,3] = fx[3] * r_coord                               # r_coord * d(phi_s)/d(psi_norm)
         v[2,1] = (rfac > 0) ? fy[1] / (2.0 * rfac) : 0.0       # 1/(2rfac) d(rfac)/d(theta_new)
-        v[2,2] = (1.0 + fy[2]) * 2.0 * pi * rfac               # 2pi*rfac * d(eta)/d(theta_new) 
+        v[2,2] = (1.0 + fy[2]) * 2.0 * pi * rfac               # 2pi*rfac * d(eta)/d(theta_new)
         v[2,3] = fy[3] * r_coord                               # r_coord * d(phi_s)/d(theta_new)
-        v33 = 2.0 * pi * r_coord                               # 2pi * r_coord 
+        v33 = 2.0 * pi * r_coord                               # 2pi * r_coord
 
 
         w11 = (1.0 + fy[2]) * (2.0*pi)^2 * rfac * r_coord / jacfac
@@ -606,12 +606,12 @@ function equilibrium_solver(raw_profile::DirectRunInput)
 
         denom = jacfac * b_sq
         if abs(denom) > 1e-20
-            # 2. Gyrokinetic coefficient C1 
-            numerator_2 = dot(v[1,:], v[2,:]) + q * v33 * v[1,3] 
+            # 2. Gyrokinetic coefficient C1
+            numerator_2 = dot(v[1,:], v[2,:]) + q * v33 * v[1,3]
             eqfun_fs_nodes[ipsi, itheta, 2] = numerator_2 / denom
-    
-            # 3. Gyrokinetic coefficient C2 
-            numerator_3 = v[2,3] * v33 + q * v33^2 
+
+            # 3. Gyrokinetic coefficient C2
+            numerator_3 = v[2,3] * v33 + q * v33^2
             eqfun_fs_nodes[ipsi, itheta, 3] = numerator_3 / denom
         else
             eqfun_fs_nodes[ipsi, itheta, 2] = 0.0

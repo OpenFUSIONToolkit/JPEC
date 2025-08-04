@@ -10,7 +10,7 @@ include("BicubicSpline.jl")
 include("FourierSpline.jl")
 
 export spline_setup, spline_eval, spline_integrate!, CubicSpline
-export bicube_setup, bicube_eval, BicubicSplineType
-export fspline_setup, fspline_eval, FourierSplineType
+export bicube_setup, bicube_eval, BicubicSpline
+export fspline_setup, fspline_eval, FourierSpline
 
 end
