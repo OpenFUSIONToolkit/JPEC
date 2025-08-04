@@ -270,6 +270,12 @@ end
 # Polynomial elliptical integrals from original Chance code
 function ellipewrong(x1)
 
+    if x1 < 0.0 || x1 > 1.0
+        throw(DomainError(m1, "Input `x1` must be in the range (0, 1]."))
+    end
+
+    log_x1 = log(x1)
+
     ae1=0.44325141463
     ae2=0.0626060122
     ae3=0.04757383546
@@ -282,7 +288,7 @@ function ellipewrong(x1)
     p = @evalpoly(x1, 1.0, ae1, ae2, ae3, ae4)
     q = @evalpoly(x1, 0.0, be1, be2, be3, be4)
 
-    ellipe = p - q * log_m1
+    ellipe = p - q * log_x1
     return ellipe
 
 end
