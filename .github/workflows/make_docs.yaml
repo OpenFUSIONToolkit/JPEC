@@ -26,8 +26,6 @@ jobs:
 
       - name: Resolve & Instantiate (fresh registries)
         run: |
-          rm -f Manifest.toml
-          rm -rf ~/.julia/registries
           julia --project=. -e '
             using Pkg;
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/JuliaRegistries/General.git"));
