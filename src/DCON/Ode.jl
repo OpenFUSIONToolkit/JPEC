@@ -371,8 +371,8 @@ function ode_ideal_cross(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEq
     if !con_flag
         u[:, index[1], :] .= 0  # originally u(ipert0,:,:) = 0
     end
-    sing_der(neq, psi_old, u, du1)
-    sing_der(neq, odet.psifac, u, du2)
+    sing_der(odet.neq, psi_old, u, du1) #TODO: where does du1 come from?
+    sing_der(odet.neq, odet.psifac, u, du2)
     u .= u .+ (du1 .+ du2) .* dpsi
     if !con_flag
         u[ipert0, :, :] .= 0
@@ -472,7 +472,7 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
 
     # Compute absolute tolerances
     for ieq in 1:2, isol in 1:odet.msol
-        atol0 = maximum(abs.(u[:, isol, ieq])) * tol
+        atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol #TODO: u is supposed to come from odet, right? It doesn't come in anywhere else
         if atol0 == 0
             atol0 = typemax(Float64)
         end
@@ -498,24 +498,25 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     #
 
     # Define the ODE function in the DifferentialEquations.jl format
-    function ode_func!(du, u, p, t)
-        sing_der(neq, t, u, du)
+    function ode_func!(odet.du, odet.u, psifac)
+        sing_der(neq, psifac, odet.u, odet.du, ctrl, equil, intr)
     end
 
     # Set up the problem
-    u0 = copy(u)
+    u0 = copy(odet.u)
     tspan = (odet.psifac, psiout)
     prob = ODEProblem(ode_func!, u0, tspan)
 
     # Set tolerances
-    abstol = maximum(abs.(atol))
+    #abstol = maximum(abs.(atol)) #this collapses the atol array to a single value 
+    abstol = vec(abs.(odet.atol))  # flatten atol array to match state size
     reltol = rtol
 
     # Solve the ODE
     sol = solve(prob, abstol=abstol, reltol=reltol)
 
     # Update u and psifac with the solution at the end of the interval
-    u .= sol.u[end]
+    odet.u .= sol.u[end]
     odet.psifac = sol.t[end]
 
 end
