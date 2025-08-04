@@ -95,7 +95,7 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
 
     ccall((:fspline_c_get_cspline_fs, libspline), Cvoid,
           (Ptr{Cvoid}, Ptr{ComplexF64}),
-          cs_handle, cs_fs)
+          handle, cs_fs)
 
 
     unmanaged_cspline = ComplexSplineType(cs_handle, xs, cs_fs, cs_mx, cs_nqty)
