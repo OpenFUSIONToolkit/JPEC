@@ -124,18 +124,15 @@ function spline_eval(spline::CubicSpline{T}, x::Float64, derivs::Int=0) where {T
 		call_spline_c_eval(T, spline, x, f)
 		return f
 	elseif derivs == 1
-		f1 = Vector{T}(undef, spline.nqty)
+		f1 = similar(f)
 		call_spline_c_eval(T, spline, x, f, f1)
 		return f, f1
 	elseif derivs == 2
-		f1 = Vector{T}(undef, spline.nqty)
-		f2 = Vector{T}(undef, spline.nqty)
+		f1, f2 = similar(f), similar(f)
 		call_spline_c_eval(T, spline, x, f, f1, f2)
 		return f, f1, f2
 	elseif derivs == 3
-		f1 = Vector{T}(undef, spline.nqty)
-		f2 = Vector{T}(undef, spline.nqty)
-		f3 = Vector{T}(undef, spline.nqty)
+		f1, f2, f3 = similar(f), similar(f), similar(f)
 		call_spline_c_eval(T, spline, x, f, f1, f2, f3)
 		return f, f1, f2, f3
 	end
@@ -150,16 +147,13 @@ function spline_eval(spline::CubicSpline{T}, xs::Vector{Float64}, derivs::Int=0)
     fs = Matrix{T}(undef, n, spline.nqty)
     f = Vector{T}(undef, spline.nqty)
 	if derivs > 0
-		fs1 = Matrix{T}(undef, n, spline.nqty)
-		f1 = Vector{T}(undef, spline.nqty)
+		fs1, f1 = similar(fs), similar(f)
 	end
 	if derivs > 1
-		fs2 = Matrix{T}(undef, n, spline.nqty)
-		f2 = Vector{T}(undef, spline.nqty)
+		fs2, f2 = similar(fs), similar(f)
 	end
 	if derivs > 2
-		fs3 = Matrix{T}(undef, n, spline.nqty)
-		f3 = Vector{T}(undef, spline.nqty)
+		fs3, f3 = similar(fs), similar(f)
 	end
     for (i, x) in enumerate(xs)
 		if derivs == 0
