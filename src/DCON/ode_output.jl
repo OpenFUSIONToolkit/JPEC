@@ -178,21 +178,23 @@ end
 """
     ode_output_get_crit(psi, u, mpert, m1, nn, sq) -> (q, singfac, logpsi1, logpsi2, crit)
 
-Compute critical quantities at a given flux surface in an MHD stability calculation.
-The calculation involves constructing and inverting the plasma response matrix from the complex 
+Compute critical quantities at a given flux surface by constructing and inverting the plasma response matrix from the complex 
 array `u`, symmetrizing it, computing its Hermitian eigenvalues, and using the smallest (in magnitude) 
 inverse eigenvalue in combination with the equilibrium profiles to form `crit`.
 
+This uses Julia’s built-in linear algebra:
+lu(temp) = zgetrf, temp_fact \ wp = zgetrs
+Under the hood, Julia calls optimized LAPACK routines via the LinearAlgebra standard library.
+
 ### Main Arguments (others defined in main structs)
 - `psi::Float64`: The flux surface at which to evaluate.
-- `u::Array{ComplexF64, 3}`: Complex response data array of shape `(?, mpert, 2)`.
+- `u::Array{ComplexF64, 3}`: Complex response data array of shape `(mpert, mpert, 2)`.
 
 ### Returns
 A tuple `(q, singfac, logpsi1, logpsi2, crit)` of critical data for the time step.
 """
 # TODO: on self-contained functions like this, it feels silly to pass in these large structs when we only need one variable
 # Should we just pass in the variables we need? This seems more readable to me personally
-# TODO: test and cleanup this function (i.e. get rid of commented out sections if the shorted version works)
 #function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, intr::DconInternal, odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium) # (alternate version)
 function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, m1::Int, nn::Int, sq::JPEC.SplinesMod.CubicSplineType)
 
@@ -201,40 +203,13 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, 
     wp = adjoint(uu[:, :, 1])         # adjoint = conjugate transpose
     temp = adjoint(uu[:, :, 2])
 
-    # LU factorization and solve
-    # ipiv = zeros(Int, intr.mpert)
-    # info = Ref{Int}(0)
-    # temp_lapack = copy(temp)
-    # LAPACK.zgetrf!(temp_lapack, ipiv)
-    # wp_lapack = copy(wp)
-    # LAPACK.zgetrs!('N', temp_lapack, ipiv, wp_lapack)
-    # wp = (wp_lapack + conj.(transpose(wp_lapack))) / 2
-
-    # From ChatGPT: 
-    # This uses Julia’s built-in linear algebra:
-    # lu(temp) performs LU decomposition (same as zgetrf)
-    # temp_fact \ wp solves the system (same as zgetrs)
-    # Under the hood, Julia calls optimized LAPACK routines via the LinearAlgebra standard library. 
-    # If temp is a complex matrix (Matrix{ComplexF64}), it automatically uses the equivalent of zgetrf/zgetrs.
-
-    # TODO: this is certainly much more visually appealing than the above - is it right? 
-    # LU decomposition and solve
+    # Compute wp using LU decomposition
     temp_fact = lu(temp)
     wp = temp_fact \ wp
 
     # Symmetrize
     wp = (wp + adjoint(wp)) / 2
 
-    # # Compute and sort inverse eigenvalues
-    # evalsi = zeros(Float64, intr.mpert)
-    # work = zeros(ComplexF64, 2*intr.mpert-1)
-    # rwork = zeros(Float64, 3*intr.mpert-2)
-    # evalsi, wp_diag = LAPACK.zheev!('N', 'U', wp)
-    # indexi = collect(1:intr.mpert)
-    # key = -abs.(evalsi)
-    # indexi = sortperm(key)
-
-    # ChatGPT: This directly calls the appropriate LAPACK routine (e.g., zheevd) for Hermitian matrices.
     # Compute and sort inverse eigenvalues
     evalsi = eigen(Hermitian(wp)).values
     key = -abs.(evalsi)
@@ -243,7 +218,7 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, 
     # Compute critical data for each time step
     profiles = JPEC.SplinesMod.spline_eval(sq, psi, 0)
     q = profiles[4]
-    singfac = abs(m1 - nn*q)
+    singfac = abs(m1 - nn * profiles[4])
     logpsi1 = log10(psi)
     logpsi2 = log10(singfac) # TODO: why is this called logpsi2 and not logsingfac?
     crit = evalsi[indexi[1]] * profiles[3]^2
