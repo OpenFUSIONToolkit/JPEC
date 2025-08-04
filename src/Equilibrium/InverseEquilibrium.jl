@@ -120,4 +120,24 @@ function equilibrium_solver(input::InverseRunInput)
         error("Only 'ldp' grid_type is implemented for now.")
     end
 
+    local rzphi::Spl.BicubicSplineType
+    local eqfun::Spl.BicubicSplineType
+
+    # c-----------------------------------------------------------------------
+    # c     prepare new bicube type for coordinates.
+    # c-----------------------------------------------------------------------
+    if mtheta == 0
+        mtheta = rz_in.my
+    end
+    rzphi_fs = zeros(Float64, mpsi+1, mtheta+1, 4)
+    eqfun_fs = zeros(Float64, mpsi+1, mtheta+1, 3)
+
+    rzphi_xs = copy(sq.xs)
+    rzphi_ys = collect(0:mtheta) ./ mtheta
+    eqfun_xs = copy(sq.xs)
+    eqfun_ys = collect(0:mtheta) ./ mtheta
+
+    rzphi = Spl.bicube_setup(copy(sq.xs), collect(0:mtheta) ./ mtheta, rzphi_fs)
+    eqfun = Spl.bicube_setup(copy(sq.xs), collect(0:mtheta) ./ mtheta, eqfun_fs)
+
 end
