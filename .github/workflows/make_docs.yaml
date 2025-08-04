@@ -24,21 +24,15 @@ jobs:
       - name: Download BLAS
         run: sudo apt install -y libopenblas-dev
 
-      - name: Instantiate Julia environment
-        run: julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'
-
       - name: Resolve & Instantiate (fresh registries)
         run: |
-          rm -f Manifest.toml
-          rm -rf ~/.julia/registries
           julia --project=. -e '
             using Pkg;
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/JuliaRegistries/General.git"));
             Pkg.Registry.update();
-            Pkg.resolve();
-            Pkg.instantiate();
-            Pkg.precompile();
-      
+            Pkg.instantiate();'
+            
+            
       - name: Build package
         run: julia --project=. -e 'using Pkg; Pkg.build()'
       - name: Run tests

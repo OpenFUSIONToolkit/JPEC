@@ -16,8 +16,10 @@ F90 = $(FC) $(FFLAGS) $(RECURSFLAG)
 
 OBJS = \
 	defs.o \
+	fft.o \
 	spline.o \
 	cspline.o \
+	fspline.o \
 	bicube.o \
 	spline_c_api.o
 
@@ -36,5 +38,7 @@ clean:
 
 spline.o: defs.o
 cspline.o: defs.o spline.o
+fft.o: defs.o
+fspline.o: defs.o spline.o cspline.o fft.o
 bicube.o: defs.o spline.o
-spline_c_api.o: defs.o spline.o cspline.o bicube.o
+spline_c_api.o: defs.o spline.o cspline.o bicube.o fft.o fspline.o
