@@ -369,7 +369,7 @@ function sing_der(neq::Int,
     ktmat::Matrix{ComplexF64,3} = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
     
     # Spline evaluation
-    spline_eval!(equil.sq, psifac, 0)
+    spline_eval(equil.sq, psifac, 0)
     q = equil.sq.f[4]
     singfac .= intr.mlow .- ctrl.nn*q .+ collect(0:intr.mpert-1)
     singfac .= 1.0 ./ singfac
@@ -453,12 +453,12 @@ function sing_der(neq::Int,
         # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else =#
         #TODO: find out what this function is actually called now and what to pass in
-        cspline_eval(ffit.amats, psifac, 0)
-        cspline_eval(ffit.bmats, psifac, 0)
-        cspline_eval(ffit.cmats, psifac, 0)
-        cspline_eval(ffit.fmats, psifac, 0)
-        cspline_eval(ffit.kmats, psifac, 0)
-        cspline_eval(ffit.gmats, psifac, 0)
+        spline_eval(ffit.amats, psifac, 0)
+        spline_eval(ffit.bmats, psifac, 0)
+        spline_eval(ffit.cmats, psifac, 0)
+        spline_eval(ffit.fmats, psifac, 0)
+        spline_eval(ffit.kmats, psifac, 0)
+        spline_eval(ffit.gmats, psifac, 0)
         amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
         bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
         cmat = reshape(ffit.cmats.f, intr.mpert, intr.mpert)
