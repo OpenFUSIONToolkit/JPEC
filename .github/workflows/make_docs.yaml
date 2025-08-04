@@ -27,4 +27,4 @@ jobs:
       - name: Build package
         run: julia --project=. -e 'using Pkg; Pkg.build()'
       - name: Run tests
-        run: julia --project=. -e 'using Pkg; Pkg.test()'
+        run: cd test && julia --project=. -e 'using Pkg; Pkg.test()'
