@@ -24,6 +24,29 @@ mutable struct ComplexSplineType <: CubicSplineType
 	_fsi::Matrix{ComplexF64} # To store integrals at gridpoint
 	_fs1::Matrix{ComplexF64} # To store 1-deriv at gridpoint
 
+
+	function ComplexSplineType(
+		unmanaged_handle::Ptr{Cvoid},
+		xs::Vector{Float64},
+		fs::Matrix{ComplexF64},
+		mx::Int64,
+		nqty::Int64,
+		
+	)
+		fi = Matrix{ComplexF64}(undef, 0,0)
+		f1 = Matrix{ComplexF64}(undef, 0,0)
+		new(unmanaged_handle, xs, fs, mx, nqty, 0,fi,f1)
+	end
+
+	# Keep the original constructor for standalone splines
+	function ComplexSplineType(h::Ptr{Cvoid}, xs::Vector{Float64},
+		 fs::Matrix{ComplexF64}, mx::Int64,
+		  nqty::Int64, bctype::Int32, fsi::Matrix{ComplexF64}, fs1::Matrix{ComplexF64})
+		spline = new(h, xs, fs, mx, nqty, bctype, fsi, fs1)
+		return spline
+	end
+
+
 end
 
 @expose_fields RealSplineType xs fs fsi fs1

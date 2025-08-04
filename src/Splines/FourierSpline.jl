@@ -9,6 +9,7 @@ mutable struct FourierSplineType
     nqty::Int64
     bctype::Int32
     fit_method::Int32
+    cs::ComplexSplineType
 
 
 end
@@ -39,7 +40,7 @@ function _MakeFourierSpline(mx::Int, my::Int, mband::Int, nqty::Int, bctype::Int
                              Vector{Float64}(undef, 0),
                              Vector{Float64}(undef, 0),
                              Array{Float64, 3}(undef, 0, 0, 0),
-                             mx, my, mband, nqty, bctype, fit_method)
+                             mx, my, mband, nqty, bctype, fit_method,nothing)
 end
 
 function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3}
@@ -49,25 +50,63 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
     mx = length(xs) - 1
     my = length(ys) - 1
     nqty = size(fs, 3)
-    fourier = _MakeFourierSpline(mx, my, mband, nqty, Int32(bctype), Int32(fit_method))
-    fourier._xs = xs
-    fourier._xs = ys
-    fourier._fs = fs
+
+    h = Ref{Ptr{Cvoid}}()
+    ccall((:fspline_c_create, libspline), Cvoid,
+          (Int64, Int64, Int64, Int64, Ref{Ptr{Cvoid}}),
+          mx, my, mband, nqty, h)
+
+    handle = h[]
+
+    
+
+
+    
 
     ccall((:fspline_c_setup, libspline), Cvoid,
           (Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
-          fourier.handle, xs, ys, fs)
+          handle, xs, ys, fs)
     if fit_method == 1
         ccall((:fspline_c_fit_1, libspline), Cvoid,
               (Ptr{Cvoid}, Int32, Bool),
-              fourier.handle, fourier.bctype, fit_flag)
+              handle, bctype, fit_flag)
     elseif fit_method == 2
         ccall((:fspline_c_fit_2, libspline), Cvoid,
               (Ptr{Cvoid}, Int32, Bool),
-              fourier.handle, fourier.bctype, fit_flag)
+              handle, bctype, fit_flag)
     else
         error("Internal error: Invalid fit_method passed to _fspline_setup.")
     end
+
+    # 1. Get the handle to the embedded cspline object
+    
+    cs_handle_ref = Ref{Ptr{Cvoid}}()
+
+
+    ccall((:fspline_c_get_cspline_handle, libspline), Cvoid,
+          (Ptr{Cvoid}, Ref{Ptr{Cvoid}}),
+          handle, cs_handle_ref)
+    cs_handle = cs_handle_ref[]
+
+    # 2. Get the dimensions and data for the cspline
+    cs_mx = mx
+    cs_nqty = (mband + 1) * nqty
+    cs_fs = Matrix{ComplexF64}(undef, cs_mx + 1, cs_nqty)
+
+    ccall((:fspline_c_get_cspline_fs, libspline), Cvoid,
+          (Ptr{Cvoid}, Ptr{ComplexF64}),
+          handle, cs_fs)
+
+
+    unmanaged_cspline = ComplexSplineType(cs_handle, xs, cs_fs, cs_mx, cs_nqty)
+    
+    # 4. Assign it to the parent object
+    fourier = FourierSplineType(handle,
+    xs,
+    ys,
+    fs,
+    mx, my, mband, nqty, bctype, fit_method,unmanaged_cspline)
+
 
     return fourier
 end

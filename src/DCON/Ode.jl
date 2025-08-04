@@ -53,7 +53,12 @@ Main driver for integrating plasma equilibrium and detecting singular surfaces.
 Initializes state and iterates through flux surfaces, calling appropriate update
 routines and recording output. Terminates when a target singularity is reached
 or integration ends. Support for `res_flag` and `kin_flag` is not yet implemented.
+
+### Returns
+nzero: number of zero crossings of the critical determinant detected during the integration.
 """
+# TODO: We pass the same structs into most functions; however, do to our use of multiple ! functions that modify the structs
+# and the convention that the modified struct comes first, the struct order is never consistent. Is there a better way? 
 function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
     # Initialization
     odet = OdeState(intr.mpert, intr.mpert)
@@ -69,7 +74,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
 
     # Integration loop
     if ctrl.verbose # mimicing an output from ode_output_open
-        println("Starting integration: ψ=$(odet.psifac), q=$(odet.q)")
+        println("   ψ=$(odet.psifac), q=$(JPEC.SplinesMod.spline_eval(equil.sq, odet.psifac, 0)[4])")
     end
     while true
         first = true
@@ -82,8 +87,9 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
             # recording the last point is critical for matching the nominal edge
             test = ode_test(odet, intr, ctrl, ising)
             force_output = first || test
-            ode_output_step(unorm, intr, ctrl, DconFileNames(), equil; op_force=force_output)
-            ode_record_edge!()
+            #ode_output_step(unorm, intr, ctrl, DconFileNames(), equil; force=force_output)
+            ode_output_step(odet, intr, ctrl, equil; force=force_output)
+            ode_record_edge!(intr, odet, ctrl, equil)
             test && break # break out of loop if ode_test returns true
             ode_step(ising, ctrl, equil, intr, odet)
             first = false
@@ -106,6 +112,8 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
         end
         odet.flag_count = 0
     end
+
+    return nzero
 end
 
 
@@ -344,7 +352,7 @@ end
 #     return nothing  # or could return a struct with all these values, for a more Julian approach
 # end
 
-function ode_ideal_cross(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
+function ode_ideal_cross!(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
     # ...existing code...
 
     # Fixup solution at singular surface
@@ -415,7 +423,6 @@ function ode_ideal_cross(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEq
     end
 
     # Restart ode solver
-    istate = 1 # is this in use?
     odet.istep += 1
     rwork[1] = psimax
     new = true
@@ -427,7 +434,6 @@ function ode_ideal_cross(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEq
     if crit_break
         write(crit_bin_unit)
     end
-
 end
 
 # Example stub for kinetic crossing
@@ -518,7 +524,6 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     # Update u and psifac with the solution at the end of the interval
     odet.u .= sol.u[end]
     odet.psifac = sol.t[end]
-
 end
 
 """
@@ -553,8 +558,6 @@ function ode_unorm!(odet::OdeState, intr::DconInternal,  sing_flag::Bool)
             odet.new = true
         end
     end
-
-    return
 end
 
 """
@@ -726,11 +729,11 @@ function ode_record_edge!(intr::DconInternal, odet::OdeState, ctrl::DconControl,
     plasma1 = ComplexF64(0.0, 0.0)
 
     q_psifac = JPEC.SplinesMod.spline_eval(equil.sq, odet.psifac, 0)
-    if size_edge > 0
+    if intr.size_edge > 0
         #TODO: WTH? fortran has both a psiedge and psi_edge and they appear to be different.
         # someone smarter than me please double check this
-        if q_psifac >= q_edge[intr.i_edge] && odet.psifac >= ctrl.psiedge
-            @error "Vacuum code not yet integrated. This run has size_edge = $(size_edge) > 0 and integrator passed psiedge/q_edge"
+        if q_psifac >= intr.q_edge[intr.i_edge] && odet.psifac >= ctrl.psiedge
+            @error "Vacuum code not yet integrated. This run has size_edge = $(intr.size_edge) > 0 and integrator passed psiedge/q_edge"
             #free_test(plasma1, vacuum1, total1, odet.psifac)
             intr.dw_edge[intr.i_edge] = total1
             intr.q_edge[intr.i_edge] = q_psifac
