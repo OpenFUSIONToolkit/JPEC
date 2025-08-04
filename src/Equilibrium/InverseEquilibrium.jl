@@ -87,7 +87,26 @@ function equilibrium_solver(input::InverseRunInput)
         end
     end
 
+    # c-----------------------------------------------------------------------
+    # c     transform input coordinates from cartesian to polar.
+    # c-----------------------------------------------------------------------
+    for ipsi in 0:mx
+        for itheta in 1:my
+            Δ = deta[ipsi+1, itheta+1] - deta[ipsi+1, itheta]
+            if Δ > 0.5
+                deta[ipsi+1, itheta+1] -= 1
+            elseif Δ < -0.5
+                deta[ipsi+1, itheta+1] += 1
+            end
+        end
+        for itheta in 0:my
+            if r2[ipsi+1, itheta+1] > 0
+                deta[ipsi+1, itheta+1] -= rz_in.ys[itheta+1]
+            end
+        end
+    end
 
+    deta[1, :] = JPEC.Equilibrium.inverse_extrap(r2[2:me+1, :], deta[2:me+1, :], 0.0)
 
 
 end
