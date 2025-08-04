@@ -358,7 +358,7 @@ provides a complete representation of the processed plasma equilibrium in flux c
 
 ## Fields:
 - `equil_input`: The original `EquilInput` object used for the reconstruction.
-- `sq`: The final 1D profile spline (`RealSplineType`).
+- `sq`: The final 1D profile spline (`CubicSpline{Float64}`).
         # x value: normalized psi
         # Quantity 1: Toroidal Field Function * 2π, `F * 2π` (where `F = R * B_toroidal`)
         # Quantity 2: Pressure * μ₀, `P * μ₀`.

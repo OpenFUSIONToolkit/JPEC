@@ -9,7 +9,7 @@ mutable struct FourierSplineType
     nqty::Int64
     bctype::Int32
     fit_method::Int32
-    cs::ComplexSplineType
+    cs::CubicSpline{ComplexF64}
 
 
 end
@@ -58,10 +58,10 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
 
     handle = h[]
 
-    
 
 
-    
+
+
 
     ccall((:fspline_c_setup, libspline), Cvoid,
           (Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
@@ -79,7 +79,7 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
     end
 
     # 1. Get the handle to the embedded cspline object
-    
+
     cs_handle_ref = Ref{Ptr{Cvoid}}()
 
 
@@ -98,8 +98,8 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
           handle, cs_fs)
 
 
-    unmanaged_cspline = ComplexSplineType(cs_handle, xs, cs_fs, cs_mx, cs_nqty)
-    
+    unmanaged_cspline = CubicSpline(cs_handle, xs, cs_fs, cs_mx, cs_nqty)
+
     # 4. Assign it to the parent object
     fourier = FourierSplineType(handle,
     xs,
