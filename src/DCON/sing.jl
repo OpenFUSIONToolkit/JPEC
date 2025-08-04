@@ -285,256 +285,246 @@ function sing_get_ca!(ca::AbstractArray{ComplexF64,3},
 end
 
 """
-    sing_der(
-        neq::Int,
-        psifac::Float64,
-        u::Array{ComplexF64,3},
+    sing_der!(
         du::Array{ComplexF64,3},
-        ctrl::DconControl,
-        equil::Equilibrium.PlasmaEquilibrium,
-        intr::DconInternal
-        #, ffit::FourFitVars
+        u::Array{ComplexF64,3},
+        params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, FourFitVars},
+        psieval::Float64
     )
 
 Evaluate the Euler-Lagrange differential equations for the DCON system.
+This follows the Julia DifferentialEquations package format for in place updating.
 
-- `neq`: Number of equations (integer)
-- `psifac`: Flux surface label (real scalar)
-- `u`: Input 3D complex array (solution array), shape (mpert, msol, 2)
-- `du`: Output 3D complex array (derivative array, mutated in-place), shape (mpert, msol, 2)
-- `ctrl`: DCON control parameters
-- `equil`: Plasma equilibrium object (contains spline data)
-- `intr`: DCON internal state (contains singularity data, mpert, etc.)
-- `ffit`: (optional) Fourier fit variables for kinetic DCON (currently commented out)
+    ode_function!(du, u, p, t)
 
 Fills `du` with the derivatives for the specified state and flux surface.
-"""
-# evaluates Euler-Lagrange differential equations
-function sing_der(neq::Int,
-    psifac::Float64,
-    u::Array{ComplexF64,3},
-    du::Array{ComplexF64,3},
-    ctrl::DconControl,
-    equil::Equilibrium.PlasmaEquilibrium,
-    intr::DconInternal,
-    #ffit::FourFitVars # JMH - commenting out until we fix the data struct
-    )
 
+# "Defining your ODE function to be in-place updating can have performance benefits. 
+# What this means is that, instead of writing a function which outputs its solution, 
+# you write a function which updates a vector that is designated to hold the solution. 
+# By doing this, DifferentialEquations.jl's solver packages are able to reduce the 
+# amount of array allocations and achieve better performance."
+"""
+function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, FourFitVars}, psieval::Float64)
+
+    ctrl, equil, intr, ffit = params
     # Workspace
-    singfac::Vector{Float64} = zeros(Float64, intr.mpert)
-    ipiv::Vector{Int} = zeros(Int, intr.mpert)
-    work::Vector{ComplexF64}  = zeros(ComplexF64, intr.mpert*intr.mpert)
-    fmatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mband+1, intr.mpert)
-    gmatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mband+1, intr.mpert)
-    kmatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, 2*intr.mband+1, intr.mpert)
-    kaatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, 2*intr.mband+1, intr.mpert)
-    gaatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, 2*intr.mband+1, intr.mpert)
-    amatlu::Matrix{ComplexF64,2}  = zeros(ComplexF64, 3*intr.mband+1, intr.mpert)
-    fmatlu::Matrix{ComplexF64,2}  = zeros(ComplexF64, 3*intr.mband+1, intr.mpert)
-    # 2D arrays (intr.mpert x intr.mpert)
-    temp1::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    temp2::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    amat::Matrix{ComplexF64,2} = zeros(ComplexF64, intr.mpert, intr.mpert)
-    bmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    cmat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    dmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    emat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    hmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    baat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    caat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    eaat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    dbat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    ebat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    fmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    kmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    gmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    kaat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    gaat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    pmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    paat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    umat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
-    aamat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    b1mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    bkmat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    bkaat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    kkmat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    kkaat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    r1mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    r2mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    r3mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
-    f0mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    fmatb = zeros(eltype(fmats.f), mband+1, intr.mpert)
+    gmatb = zeros(eltype(gmats.f), mband+1, intr.mpert)
+    kmatb = zeros(eltype(kmats.f), 2*mband+1, intr.mpert)
+    du_temp = zeros(eltype(du), intr.mpert, intr.msol, 2)
+    # singfac::Vector{Float64} = zeros(Float64, intr.mpert)
+    # ipiv::Vector{Int} = zeros(Int, intr.mpert)
+    # work::Vector{ComplexF64}  = zeros(ComplexF64, intr.mpert*intr.mpert)
+    # fmatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mband+1, intr.mpert)
+    # gmatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mband+1, intr.mpert)
+    # kmatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, 2*intr.mband+1, intr.mpert)
+    # kaatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, 2*intr.mband+1, intr.mpert)
+    # gaatb::Matrix{ComplexF64,2}  = zeros(ComplexF64, 2*intr.mband+1, intr.mpert)
+    # amatlu::Matrix{ComplexF64,2}  = zeros(ComplexF64, 3*intr.mband+1, intr.mpert)
+    # fmatlu::Matrix{ComplexF64,2}  = zeros(ComplexF64, 3*intr.mband+1, intr.mpert)
+    # # 2D arrays (intr.mpert x intr.mpert)
+    # temp1::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # temp2::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # amat::Matrix{ComplexF64,2} = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # bmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # cmat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # dmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # emat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # hmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # baat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # caat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # eaat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # dbat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # ebat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # fmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # kmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # gmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # kaat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # gaat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # pmat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # paat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # umat::Matrix{ComplexF64,2}   = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # aamat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # b1mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # bkmat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # bkaat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # kkmat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # kkaat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # r1mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # r2mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # r3mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
+    # f0mat::Matrix{ComplexF64,2}  = zeros(ComplexF64, intr.mpert, intr.mpert)
 
     # 3D arrays (intr.mpert x intr.mpert x 6)
-    kwmat::Matrix{ComplexF64,3} = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
-    ktmat::Matrix{ComplexF64,3} = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
+    # kwmat::Matrix{ComplexF64,3} = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
+    # ktmat::Matrix{ComplexF64,3} = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
     
     # Spline evaluation
-    spline_eval(equil.sq, psifac, 0)
-    q = equil.sq.f[4]
+    q = JPEC.SplinesMod.spline_eval(equil.sq, psifac, 0)[4]
     singfac .= intr.mlow .- ctrl.nn*q .+ collect(0:intr.mpert-1)
     singfac .= 1.0 ./ singfac
-    chi1 = 2pi * equil.psio
+    chi1 = 2π * equil.psio
 
-    #= kinetic stuff - skip for now
-    if ctrl.kin_flag
-        cspline_eval(ffit.amats, psifac, 0)
-        cspline_eval(ffit.bmats, psifac, 0)
-        cspline_eval(ffit.cmats, psifac, 0)
-        cspline_eval(ffit.dmats, psifac, 0)
-        cspline_eval(ffit.emats, psifac, 0)
-        cspline_eval(ffit.hmats, psifac, 0)
-        cspline_eval(ffit.dbats, psifac, 0)
-        cspline_eval(ffit.ebats, psifac, 0)
-        cspline_eval(ffit.fbats, psifac, 0)
+    # kinetic stuff - skip for now
+    if false #(TODO: kin_flag)
+        # cspline_eval(ffit.amats, psifac, 0)
+        # cspline_eval(ffit.bmats, psifac, 0)
+        # cspline_eval(ffit.cmats, psifac, 0)
+        # cspline_eval(ffit.dmats, psifac, 0)
+        # cspline_eval(ffit.emats, psifac, 0)
+        # cspline_eval(ffit.hmats, psifac, 0)
+        # cspline_eval(ffit.dbats, psifac, 0)
+        # cspline_eval(ffit.ebats, psifac, 0)
+        # cspline_eval(ffit.fbats, psifac, 0)
 
-        amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
-        bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
-        cmat = reshape(ffit.cmats.f, intr.mpert, intr.mpert)
-        dmat = reshape(ffit.dmats.f, intr.mpert, intr.mpert)
-        emat = reshape(ffit.emats.f, intr.mpert, intr.mpert)
-        hmat = reshape(ffit.hmats.f, intr.mpert, intr.mpert)
-        dbat = reshape(ffit.dbats.f, intr.mpert, intr.mpert)
-        ebat = reshape(ffit.ebats.f, intr.mpert, intr.mpert)
-        fmat = reshape(ffit.fbats.f, intr.mpert, intr.mpert)
+        # amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
+        # bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
+        # cmat = reshape(ffit.cmats.f, intr.mpert, intr.mpert)
+        # dmat = reshape(ffit.dmats.f, intr.mpert, intr.mpert)
+        # emat = reshape(ffit.emats.f, intr.mpert, intr.mpert)
+        # hmat = reshape(ffit.hmats.f, intr.mpert, intr.mpert)
+        # dbat = reshape(ffit.dbats.f, intr.mpert, intr.mpert)
+        # ebat = reshape(ffit.ebats.f, intr.mpert, intr.mpert)
+        # fmat = reshape(ffit.fbats.f, intr.mpert, intr.mpert)
 
-        kwmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
-        ktmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
-        for i in 1:6
-            cspline_eval(ffit.kwmats[i], psifac, 0)
-            cspline_eval(ffit.ktmats[i], psifac, 0)
-            kwmat[:,:,i] = reshape(ffit.kwmats[i].f, intr.mpert, intr.mpert)
-            ktmat[:,:,i] = reshape(ffit.ktmats[i].f, intr.mpert, intr.mpert)
-        end
+        # kwmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
+        # ktmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
+        # for i in 1:6
+        #     cspline_eval(ffit.kwmats[i], psifac, 0)
+        #     cspline_eval(ffit.ktmats[i], psifac, 0)
+        #     kwmat[:,:,i] = reshape(ffit.kwmats[i].f, intr.mpert, intr.mpert)
+        #     ktmat[:,:,i] = reshape(ffit.ktmats[i].f, intr.mpert, intr.mpert)
+        # end
 
-        if intr.fkg_kmats_flag
-            cspline_eval(akmats, psifac, 0)
-            cspline_eval(bkmats, psifac, 0)
-            cspline_eval(ckmats, psifac, 0)
-            cspline_eval(f0mats, psifac, 0)
-            cspline_eval(pmats, psifac, 0)
-            cspline_eval(paats, psifac, 0)
-            cspline_eval(kkmats, psifac, 0)
-            cspline_eval(kkaats, psifac, 0)
-            cspline_eval(r1mats, psifac, 0)
-            cspline_eval(r2mats, psifac, 0)
-            cspline_eval(r3mats, psifac, 0)
-            cspline_eval(gaats, psifac, 0)
+        # if intr.fkg_kmats_flag
+        #     cspline_eval(akmats, psifac, 0)
+        #     cspline_eval(bkmats, psifac, 0)
+        #     cspline_eval(ckmats, psifac, 0)
+        #     cspline_eval(f0mats, psifac, 0)
+        #     cspline_eval(pmats, psifac, 0)
+        #     cspline_eval(paats, psifac, 0)
+        #     cspline_eval(kkmats, psifac, 0)
+        #     cspline_eval(kkaats, psifac, 0)
+        #     cspline_eval(r1mats, psifac, 0)
+        #     cspline_eval(r2mats, psifac, 0)
+        #     cspline_eval(r3mats, psifac, 0)
+        #     cspline_eval(gaats, psifac, 0)
 
-            amat = reshape(akmats.f, mpert, mpert)
-            bmat = reshape(bkmats.f, mpert, mpert)
-            cmat = reshape(ckmats.f, mpert, mpert)
-            f0mat = reshape(f0mats.f, mpert, mpert)
-            pmat = reshape(pmats.f, mpert, mpert)
-            paat = reshape(paats.f, mpert, mpert)
-            kkmat = reshape(kkmats.f, mpert, mpert)
-            kkaat = reshape(kkaats.f, mpert, mpert)
-            r1mat = reshape(r1mats.f, mpert, mpert)
-            r2mat = reshape(r2mats.f, mpert, mpert)
-            r3mat = reshape(r3mats.f, mpert, mpert)
+        #     amat = reshape(akmats.f, mpert, mpert)
+        #     bmat = reshape(bkmats.f, mpert, mpert)
+        #     cmat = reshape(ckmats.f, mpert, mpert)
+        #     f0mat = reshape(f0mats.f, mpert, mpert)
+        #     pmat = reshape(pmats.f, mpert, mpert)
+        #     paat = reshape(paats.f, mpert, mpert)
+        #     kkmat = reshape(kkmats.f, mpert, mpert)
+        #     kkaat = reshape(kkaats.f, mpert, mpert)
+        #     r1mat = reshape(r1mats.f, mpert, mpert)
+        #     r2mat = reshape(r2mats.f, mpert, mpert)
+        #     r3mat = reshape(r3mats.f, mpert, mpert)
 
-            #TODO: reproduce lines 943-956
-            # Factor banded matrix, fill in amatlu, call LAPACK, etc.
-            # Use LinearAlgebra.LAPACK.gbtrf! and gbtrs! for banded solves
-            # Fill in fmat, kmat, kaat, etc.
-        else
-            amat .+= kwmat[:,:,1] .+ ktmat[:,:,1]
-            bmat .+= kwmat[:,:,2] .+ ktmat[:,:,2]
-            cmat .+= kwmat[:,:,3] .+ ktmat[:,:,3]
-            dmat .+= kwmat[:,:,4] .+ ktmat[:,:,4]
-            emat .+= kwmat[:,:,5] .+ ktmat[:,:,5]
-            hmat .+= kwmat[:,:,6] .+ ktmat[:,:,6]
-            baat = bmat .- 2 .* ktmat[:,:,2]
-            caat = cmat .- 2 .* ktmat[:,:,3]
-            eaat = emat .- 2 .* ktmat[:,:,5]
-            b1mat = ifac * dbat
-            # ... (rest of the kinetic matrix setup, as above) ...
-            #TODO: reproduc lines 977-1157
-        end
-        # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
-    else =#
-        #TODO: find out what this function is actually called now and what to pass in
-        spline_eval(ffit.amats, psifac, 0)
-        spline_eval(ffit.bmats, psifac, 0)
-        spline_eval(ffit.cmats, psifac, 0)
-        spline_eval(ffit.fmats, psifac, 0)
-        spline_eval(ffit.kmats, psifac, 0)
-        spline_eval(ffit.gmats, psifac, 0)
-        amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
-        bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
-        cmat = reshape(ffit.cmats.f, intr.mpert, intr.mpert)
-        # Factor Hermitian matrix amat, solve for bmat and cmat
-        # Use LinearAlgebra.LAPACK.hetrf! and hetrs!
-        # Fill in fmatb, gmatb, kmatb as above
+        #     #TODO: reproduce lines 943-956
+        #     # Factor banded matrix, fill in amatlu, call LAPACK, etc.
+        #     # Use LinearAlgebra.LAPACK.gbtrf! and gbtrs! for banded solves
+        #     # Fill in fmat, kmat, kaat, etc.
+        # else
+        #     amat .+= kwmat[:,:,1] .+ ktmat[:,:,1]
+        #     bmat .+= kwmat[:,:,2] .+ ktmat[:,:,2]
+        #     cmat .+= kwmat[:,:,3] .+ ktmat[:,:,3]
+        #     dmat .+= kwmat[:,:,4] .+ ktmat[:,:,4]
+        #     emat .+= kwmat[:,:,5] .+ ktmat[:,:,5]
+        #     hmat .+= kwmat[:,:,6] .+ ktmat[:,:,6]
+        #     baat = bmat .- 2 .* ktmat[:,:,2]
+        #     caat = cmat .- 2 .* ktmat[:,:,3]
+        #     eaat = emat .- 2 .* ktmat[:,:,5]
+        #     b1mat = ifac * dbat
+        #     # ... (rest of the kinetic matrix setup, as above) ...
+        #     #TODO: reproduc lines 977-1157
+        # end
+        # # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
+    else
+        # Evaluate splines at psieval
+        #TODO: double check this
+        amat = reshape(JPEC.SplinesMod.spline_eval(ffit.amats, psieval, 0), intr.mpert, intr.mpert)
+        bmat = reshape(JPEC.SplinesMod.spline_eval(ffit.bmats, psieval, 0), intr.mpert, intr.mpert)
+        cmat = reshape(JPEC.SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
+
+        # TODO: double check this too. I changed the matrix copies below from fmats -> fmat, etc. 
+        fmat = JPEC.SplinesMod.spline_eval(ffit.fmats, psieval, 0), intr.mpert, intr.mpert
+        kmat = JPEC.SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert
+        gmat = JPEC.SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert
 
         #TODO: is this right? ChatGPT says it is equivalent so that is probably true
-        F = cholesky(Hermitian(amat, :L))  # factorization using the lower triangle
-        bmat .= F \ bmat 
-        cmat .= F \ cmat
+        # Says this will work if amat is Hermitian and positive definite - is it? 
+        # If not, use F = lu(amat)
+        Afact = cholesky(Hermitian(amat, :L))  # factorization using the lower triangle
+        bmat .= Afact \ bmat 
+        cmat .= Afact \ cmat
 
-        # copy ideal Hermitian matrices F and G
-        fill!(fmatb, 0.0 + 0.0im)
-        fill!(gmatb, 0.0 + 0.0im)
+        # copy ideal Hermitian banded matrices F and G
         iqty = 1
         @inbounds for jpert in 1:intr.mpert
             for ipert in jpert:min(intr.mpert, jpert + mband)
-                fmatb[1 + ipert - jpert, jpert] = fmats.f[iqty]
-                gmatb[1 + ipert - jpert, jpert] = gmats.f[iqty]
+                fmatb[1 + ipert - jpert, jpert] = fmat.f[iqty]
+                gmatb[1 + ipert - jpert, jpert] = gmat.f[iqty]
                 iqty += 1
             end
         end
 
-        #copy ideal non-Hermitian banded matrix K
-        fill!(kmatb, 0.0 + 0.0im)
+        # copy ideal non-Hermitian banded matrix K
         iqty = 1
         @inbounds for jpert in 1:intr.mpert
             for ipert in max(1, jpert - mband):min(intr.mpert, jpert + mband)
-                kmatb[1 + mband + ipert - jpert, jpert] = kmats.f[iqty]
+                kmatb[1 + mband + ipert - jpert, jpert] = kmat.f[iqty]
                 iqty += 1
             end
         end
-    #end #this is the end of the IfElse for when we re-implement kinetic stuff
+    end
 
-    # Compute du1 and du2
-    du .= 0
-    
-    #= we are currently assuming it is not kinetic, so ignore for now
-    if ctrl.kin_flag
-        for isol in 1:msol
-            du[:,isol,1] .= u[:,isol,2]
-            # du[:,isol,1] .+= -kmatb * u[:,isol,1] (banded matvec)
-            # Use BLAS.gbmv! or custom banded multiplication
-        end
+    # Compute du    
+    # TODO: this section needs to be heavily checked/optimized
+
+    if false #(TODO: kin_flag)
+        # for isol in 1:msol
+        #     du[:,isol,1] .= u[:,isol,2]
+        #     # du[:,isol,1] .+= -kmatb * u[:,isol,1] (banded matvec)
+        #     # Use BLAS.gbmv! or custom banded multiplication
+        # end
         # Factor fmatlu, solve for du
         # for isol in 1:msol
         #     du[:,isol,2] .+= gaatb * u[:,isol,1] + kaatb * du[:,isol,1]
         # end
-    else =#
+    else
+        K = BandedMatrix(kmatb, (mband, mband))
+        K_adj = adjoint(K)
+        Ffact = cholesky(Hermitian(BandedMatrix(fmatb, (0, mband)), :L))
+        Gmat = Hermitian(BandedMatrix(gmatb, (0, mband)), :L)
+
+        # 1. Compute du_temp[:,:,1] = u[:,:,2]*singfac - K * u[:,:,1]
         for isol in 1:msol
-            # du(:, isol, 1) = u(:, isol, 2)*singfac - kmatb * u(:, isol, 1)
-            du[:, isol, 1] .= u[:, isol, 2] .* singfac
-            mul!(du[:, isol, 1], BandedMatrix(kmatb, (mband, mband)), u[:, isol, 1], -1.0, 1.0)
+            du_temp[:, isol, 1] .= u[:, isol, 2] .* singfac
+            mul!(du_temp[:, isol, 1], K, u[:, isol, 1], -1.0, 1.0)
         end
 
-        # Solve fmatb * du = du
-        F = cholesky(Hermitian(BandedMatrix(fmatb, (mband, 0)), :L))
-        for isol in 1:msol
-            du[:, isol, 1] .= F \ du[:, isol, 1]
-        end
+        # 2. Solve Ffact * Y = du_temp[:,:,1] for Y
+        # for isol in 1:msol
+        #     du_temp[:, isol, 1] .= Ffact \ du_temp[:, isol, 1]
+        # end
+        du_temp[:, :, 1] .= Ffact \ du_temp[:, :, 1] # all at once
 
-        #TODO: Apparently this can run into issues if gmat has complex diagonal entries
+        # 3. Compute du_temp[:,:,2] = Gmat * u[:,:,1] + K_adj * du_temp[:,:,1]
+        # TODO: Apparently this can run into issues if gmat has complex diagonal entries
         for isol in 1:msol
             # du(:, isol, 2) += gmatb * u(:, isol, 1) + kmatb' * du(:, isol, 1)
-            mul!(du[:, isol, 2], BandedMatrix(gmatb, (mband, 0)), u[:, isol, 1], 1.0, 1.0)
-            mul!(du[:, isol, 2], BandedMatrix(kmatb, (mband, mband))', du[:, isol, 1], 1.0, 1.0)
-            du[:, isol, 1] .*= singfac
+            mul!(du_temp[:, isol, 2], Gmat, u[:, isol, 1], 1.0, 0.0)
+            mul!(du_temp[:, isol, 2], K_adj, du_temp[:, isol, 1], 1.0, 1.0)
+            du_temp[:, isol, 1] .*= singfac
         end
-    #end
+    end
 
-    # Store u-derivative and xss
-    intr.ud[:,:,1] = du[:,:,1]
-    intr.ud[:,:,2] = -bmat * du[:,:,1] - cmat * u[:,:,1]
-
-    return nothing
+    # 4. Store u-derivative and xss in place
+    du[:,:,1] .= du_temp[:,:,1]
+    du[:,:,2] .= -bmat * du_temp[:,:,1] - cmat * u[:,:,1]
 end
 
 #= Matrix stuff- ignore for now

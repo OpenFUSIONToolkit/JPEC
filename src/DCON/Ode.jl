@@ -21,7 +21,7 @@ including solution vectors, tolerances, and flags for the integration process.
     psi_save::Float64 = 0.0     # last saved psi value
     istep::Int= 0               # integration step count
     ix::Int= 0                  # index for psiout in spline
-    atol0::Float64 = 1e-10       # absolute tolerance
+    atol0::Float64 = 1e-10       # absolute tolerance # TODO: I'm not convinced this and atol need to be a member of a struct. I think its calculated and used only once per step in ode_step
     atol::Array{Float64,2} = zeros(Float64, msol, msol)       #  tolerance
     singfac::Float64 = 0.0      # separation from singular surface
     psifac::Float64 = 0.0       # normalized flux coordinate
@@ -449,10 +449,12 @@ function ode_resist_cross()
 end
 
 function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
-    # ODE integrator step
+
+    # TODO: is there better relative/absolute tolerance handling for Julia? This might be specific to lsode
+    
     # Compute relative tolerances
     singfac_local = typemax(Float64)
-    if ctrl.kin_flag
+    if false #(TODO: kin_flag)
  #       if ising == 1 && intr.kmsing >= 1
  #           singfac_local = abs(odet.psifac - kinsing[ising].psifac) /
  #                           (kinsing[ising].psifac - psilow)
@@ -467,22 +469,16 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
             singfac_local = abs(intr.sing[ising].m - ctrl.nn * odet.q)
         end
         if ising > 1
-            singfac_local = min(
-                singfac_local,
-                abs(intr.sing[ising-1].m - ctrl.nn * q)
-            )
+            singfac_local = min(singfac_local, abs(intr.sing[ising-1].m - ctrl.nn * q))
         end
     end
-    tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
-    rtol = tol
+    rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
 
     # Compute absolute tolerances
     for ieq in 1:2, isol in 1:odet.msol
-        atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol #TODO: u is supposed to come from odet, right? It doesn't come in anywhere else
-        if atol0 == 0
-            atol0 = typemax(Float64)
-        end
-        odet.atol[:, isol, ieq] .= ComplexF64(atol0, atol0)
+        odet.atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
+        odet.atol0 = odet.atol0 == 0 ? typemax(Float64) : odet.atol0
+        odet.atol[:, isol, ieq] .= ComplexF64(odet.atol0, odet.atol0)
     end
 
     # Choose psiout
@@ -492,34 +488,14 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
         end
         psiout = equil.sq.xs[ix]
         psiout = min(psiout, odet.psimax)
-        rwork[1] = psiout
     else
         psiout = odet.psimax
     end
 
-    # Advance differential equations
-    odet.istep += 1
-
-    # Use DifferentialEquations.jl for general ODE solving in Julia
-    #
-
-    # Define the ODE function in the DifferentialEquations.jl format
-    function ode_func!(odet.du, odet.u, psifac)
-        sing_der(neq, psifac, odet.u, odet.du, ctrl, equil, intr)
-    end
-
-    # Set up the problem
-    u0 = copy(odet.u)
-    tspan = (odet.psifac, psiout)
-    prob = ODEProblem(ode_func!, u0, tspan)
-
-    # Set tolerances
-    #abstol = maximum(abs.(atol)) #this collapses the atol array to a single value 
-    abstol = vec(abs.(odet.atol))  # flatten atol array to match state size
-    reltol = rtol
-
-    # Solve the ODE
-    sol = solve(prob, abstol=abstol, reltol=reltol)
+    # Advance differential equation
+    odet.istep += 1    
+    prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, fourfit))
+    sol = solve(prob, abstol=vec(abs.(odet.atol)), reltol=rtol) #TODO: add flag for DiffEq solver here? 
 
     # Update u and psifac with the solution at the end of the interval
     odet.u .= sol.u[end]
