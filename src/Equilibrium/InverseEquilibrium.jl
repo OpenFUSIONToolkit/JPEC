@@ -41,6 +41,7 @@ end
 
 function equilibrium_solver(input::InverseRunInput)
     println("--- Starting Inverse Equilibrium Processing ---")
+    # Extract input parameters
 
     config = input.config
     rz_in = input.rz_in
@@ -61,7 +62,10 @@ function equilibrium_solver(input::InverseRunInput)
     diagnose_rz_in = false
     diagnose_rzphi = false
 
-    sq_in._fs[:, 3] .= sqrt.(sq_in._xs)
+    # c-----------------------------------------------------------------------
+    # c     allocate and define local arrays.
+    # c-----------------------------------------------------------------------
+    # sq_in._fs[:, 3] .= sqrt.(sq_in._xs)
     rz_in._xs = sq_in._xs
     rz_in._ys = collect(0:rz_in.my) ./ rz_in.my
 
@@ -74,10 +78,6 @@ function equilibrium_solver(input::InverseRunInput)
 
     twopi = 2 * pi
 
-    # c-----------------------------------------------------------------------
-    # c     allocate and define local arrays.
-    # c-----------------------------------------------------------------------
-
     deta = zeros(Float64, mx+1, my+1)
     for ipsi in 0:mx, itheta in 0:my
         if r2[ipsi+1, itheta+1] == 0.0
@@ -87,125 +87,7 @@ function equilibrium_solver(input::InverseRunInput)
         end
     end
 
-    # c-----------------------------------------------------------------------
-    # c     transform input coordinates from cartesian to polar.
-    # c-----------------------------------------------------------------------
-    for ipsi in 0:mx
-        for itheta in 1:my
-            Δ = deta[ipsi+1, itheta+1] - deta[ipsi+1, itheta]
-            if Δ > 0.5
-                deta[ipsi+1, itheta+1] -= 1
-            elseif Δ < -0.5
-                deta[ipsi+1, itheta+1] += 1
-            end
-        end
-        for itheta in 0:my
-            if r2[ipsi+1, itheta+1] > 0
-                deta[ipsi+1, itheta+1] -= rz_in.ys[itheta+1]
-            end
-        end
-    end
-
-    deta[1, :] = JPEC.Equilibrium.inverse_extrap(r2[2:me+1, :], deta[2:me+1, :], 0.0)
-
-    rz_ = zeros(Float64, mx+1, my+1, 2)
-    rz_[:, :, 1] .= r2
-    rz_[:, :, 2] .= deta
-
-    rz_spline = Spl.bicube_setup(rz_, rz_in.xs, rz_in.ys; bctypex="extrap", bctypey="periodic")
-
-    # c-----------------------------------------------------------------------
-    # c     prepare new spline type for surface quantities.
-    # c-----------------------------------------------------------------------
-
-    if grid_type in ["original", "orig"]
-        mpsi = size(sq_in._fs, 1) - 1
-    end
-
-    # c-----------------------------------------------------------------------
-    # c     set up radial grid (only "ldp" implemented)
-    # c-----------------------------------------------------------------------
-    if grid_type == "ldp"
-        xs = psilow .+ (psihigh - psilow) .* (sin.(range(0.0, 1.0; length=mpsi+1) .* (π/2))).^2
-        fs = zeros(Float64, mpsi+1, 4) 
-        sq = Spl.spline_setup(xs, fs; bctype="extrap")
-    else
-        error("Only 'ldp' grid_type is implemented for now.")
-    end
-
-    if mtheta == 0
-        mtheta = rz_in.my
-    end
-    rzphi_fs = zeros(Float64, mpsi+1, mtheta+1, 4)
-    eqfun_fs = zeros(Float64, mpsi+1, mtheta+1, 3)
-
-    rzphi_xs = copy(sq.xs)
-    rzphi_ys = collect(0:mtheta) ./ mtheta
-    eqfun_xs = copy(sq.xs)
-    eqfun_ys = collect(0:mtheta) ./ mtheta
-
-    rzphi = Spl.bicube_setup(copy(sq.xs), collect(0:mtheta) ./ mtheta, rzphi_fs)
-    eqfun = Spl.bicube_setup(copy(sq.xs), collect(0:mtheta) ./ mtheta, eqfun_fs)
 
 
-    # spl_xs = zeros(Float64,mtheta+1)
-    # spl_fs = zeros(Float64,mtheta+1, 5)
-    # spl = Spl.spline_setup(spl_xs, spl_fs; bctype="extrap")
-
-    # for ipsi in 0:mpsi
-    #     psifac = rzphi.xs[ipsi+1]
-    #     f_s = Spl.spline_eval(sq, psifac)
-    #     # spl.xs = rzphi.ys
-    #     for itheta in 0:mtheta
-    #         theta = rzphi.ys[itheta+1]
-    #         fs_rz_, fsx_rz_, fsy_rz_ = Spl.bicube_eval(rz_, psifac, theta, 1)
-    #         f_sq = Spl.spline_eval(sq_in, psifac, 0)
-    #         if f_rz_[1]<0
-    #             error("Negative radius found at psi=$(psifac), theta=$(theta).")
-    #         end
-
-    #         rfac = sqrt(f_rz_[1])
-    #         r = ro+rfac*cos(twopi*(theta+fsx_rz_[2]))
-    #         jacfac = fsx_rz_[1] * (1+ fsy_rz_[2]) - fsy_rz_[1] * fsx_rz_[2]
-    #         w11 = (1+ fsy_rz_[2]) * twopi^2 *rfac / jacfac
-    #         w12 = - fsy_rz_[1] * pi/ (rfac * jacfac)
-    #         bp = psio * sqrt(w11^2 + w12^2)/r
-    #         bt = f_sq[1]/r
-    #         b = sqrt(bp^2 + bt^2)
-
-    #         spl.fs[itheta+1, 1] = f_rz_[1]
-    #         spl.fs[itheta+1, 2] = f_rz_[2]
-    #         spl.fs[itheta+1, 3] = r*jacfac
-    #         spl.fs[itheta+1, 4] = spl.fs[itheta+1, 3]/(r*r)
-    #         spl.fs[itheta+1, 5] = spl.fs[itheta+1, 3]*bp^(config.power_bp)*b^(config.power_b)/r^(config.power_r)
-    #     end
-
-    #     spl.xs = spl.integral!()
-    #     spl.xs = spl.fsi[:, 5] ./ spl.fs[end, 5]
-    #     spl.fs[:, 2] .= spl.fs[:, 2] .+ rzphi.ys .- spl.xs
-    #     spl.fs[:, 4] .= (spl.fs[:, 3] ./ spl.fsi[end, 3]) ./ (spl.fs[:, 5] ./ spl.fsi[end, 5]) .* spl.fsi[end, 3] * twopi * pi
-    #     spl.fs[:, 3] .= f_sq[1] * pi / psio .* (spl.fsi[:, 4] .- spl.fsi[end, 4] .* spl.xs)
-    #     # spl.xs = Spl.spline_setup(spl.xs, spl.fs; bctype="periodic").integral!()
-
-    #     for itheta in 0:mtheta
-    #         theta = rzphi.ys[itheta+1]
-    #         f = Spl.spline_eval(spl, theta, 0)
-    #         rzphi.fs[ipsi+1, itheta+1, 1:4] .= f[1:4]
-    #     end
-
-    #     sq.fs[ipsi+1, 1] = f_sq[ipsi+1, 1] * twopi
-    #     sq.fs[ipsi+1, 2] = f_sq[ipsi+1, 2]
-    #     sq.fs[ipsi+1, 3] = spl.fsi[end, 3] * twopi * pi
-    #     sq.fs[ipsi+1, 4] = spl.fsi[end, 4] * sq.fs[ipsi+1, 1] / (2 * twopi * psio)
-    # end
-
-    # # sq = Spl.spline_setup(sq.xs, sq.fs; bctype="extrap")
-    # f = Spl.spline_eval(sq, sq.xs[1], 0)
-    # _, f1 = Spl.spline_eval(sq, sq.xs[1], 1)
-    # q0 = f[4] - f1[4] * sq.xs[1]
-
-    # if newq0 == -1
-    #     newq0 = -q0
-    # end
 
 end
