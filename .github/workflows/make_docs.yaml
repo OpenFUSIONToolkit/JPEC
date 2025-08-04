@@ -31,9 +31,8 @@ jobs:
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/JuliaRegistries/General.git"));
             Pkg.Registry.update();
             Pkg.resolve();
-            Pkg.instantiate();
-            Pkg.precompile();'
-      
+            Pkg.instantiate();'
+            
       - name: Build package
         run: julia --project=. -e 'using Pkg; Pkg.build()'
       - name: Run tests
