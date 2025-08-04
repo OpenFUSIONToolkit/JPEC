@@ -127,82 +127,140 @@ function read_efit(config::EquilibriumConfig)
 end
 
 """
-    _read_chease2(config::EquilInput) -> InverseRunInput
+    _read_chease2(equil_in)
 
-Debug version: Reads ASCII CHEASE file and prints checking info at each read.
+Parses a chease2 file, creates initial 1D and 2D splines, finds magnetic axis, and bundles
+them into a `InverseRunInput` object.
+
+## Arguments:
+- `equil_in`: The `EquilInput` object containing the filename and parameters.
+## Returns:
+- A `InverseRunInput` object ready for the inverse solver.
 """
 function read_chease2(config::EquilibriumConfig)
     println("--> Reading CHEASE file: $(config.control.eq_filename)")
+    lines = readlines(config.control.eq_filename)
 
-    # Robust splitting, also for glued numbers
-    split_chease_numbers(str::String) = replace(str, r"([eE][+-]\d+)(?=[\-+]\d+\.)" => s"\1 ") |> split
-    parse_chease_floats(str::String) = [parse(Float64, s) for s in split_chease_numbers(str) if !isempty(s)]
-    function read_n_floats(io::Any, n::Int; label="unknown")
-        vals = Float64[]
-        read_lines = 0
-        while length(vals) < n && !eof(io)
-            line = readline(io)
-            read_lines += 1
-            newvals = parse_chease_floats(line)
-            if !isempty(newvals)
-                append!(vals, newvals)
+    # --- Parse Header (FORMAT 10: 3I5) ---
+    header_parts = split(lines[1])
+    ntnova = parse(Int, header_parts[1])
+    npsi1  = parse(Int, header_parts[2])
+    nsym   = parse(Int, header_parts[3])
+
+    # --- Parse axx (FORMAT 20: 1E22.15) ---
+    axx = parse(Float64, split(lines[2])[1])
+
+    # --- Pre-allocate Arrays ---
+    zcpr  = zeros(npsi1 - 1)
+    zcppr = zeros(npsi1)
+    zq    = zeros(npsi1)
+    zdq   = zeros(npsi1)
+    ztmf  = zeros(npsi1)
+    ztp   = zeros(npsi1)
+    zfb   = zeros(npsi1)
+    zfbp  = zeros(npsi1)
+    zpsi  = zeros(npsi1)
+    zpsim = zeros(npsi1 - 1)
+
+    zrcp  = zeros(ntnova + 3, npsi1)
+    zzcp  = zeros(ntnova + 3, npsi1)
+    zjacm = zeros(ntnova + 3, npsi1)
+    zjac  = zeros(ntnova + 3, npsi1)
+
+    # --- Helper to parse 5E22.15 data per line ---
+    function parse_floats(lines_range)
+        data = Float64[]
+        for line in lines[lines_range]
+            for i in 0:4
+                s = strip(line[22*i+1:min(end, 22*(i+1))])
+                if !isempty(s)
+                    push!(data, parse(Float64, s))
+                end
             end
         end
-        println("    [DEBUG] $label: read $n floats, actually got $(length(vals)); lines read = $read_lines")
-        length(vals) < n && error("[DEBUG] Unexpected EOF while reading $label — needed $n, got $(length(vals))")
-        return vals[1:n]
+        return data
     end
-    function read_2d(io::Any, rows::Int, cols::Int; label="unknown")
-        arr = Array{Float64}(undef, rows, cols)
-        for j in 1:cols
-            arr[:,j] .= read_n_floats(io, rows; label="$label col $j")
+
+    # --- Compute line offsets ---
+    line_idx = 3  # Start after header (line 1) and axx (line 2)
+
+    function load_vector!(vec)
+        count = length(vec)
+        lines_needed = cld(count, 5)
+        vec .= parse_floats(line_idx : line_idx + lines_needed - 1)
+        line_idx += lines_needed
+    end
+
+    function load_matrix!(mat)
+        count = size(mat, 1) * size(mat, 2)
+        lines_needed = cld(count, 5)
+        data = parse_floats(line_idx : line_idx + lines_needed - 1)
+        line_idx += lines_needed
+        # Fill column-major (Fortran-style)
+        for j in 1:size(mat, 2)
+            for i in 1:size(mat, 1)
+                mat[i, j] = data[(j-1)*size(mat,1) + i]
+            end
         end
-        println("    [DEBUG] $label: finished 2D read of ($rows x $cols) values")
-        arr
     end
 
-    open(config.control.eq_filename, "r") do io
-        # Header and axx
-        header_line = readline(io)
-        header = split(strip(header_line))
-        ntnova, npsi1, nsym = parse.(Int, header)
-        println("--> Header: ntnova=$ntnova, npsi1=$npsi1, nsym=$nsym")
-        axxline = readline(io)
-        println("    [DEBUG] axx raw: $axxline")
-        axx = parse_chease_floats(axxline)
-        println("    [DEBUG] axx parsed: $axx")
-        ma = npsi1 - 1
-        nrc = ntnova + 3
+    # --- Read Vectors ---
+    load_vector!(zcpr)
+    load_vector!(zcppr)
+    load_vector!(zq)
+    load_vector!(zdq)
+    load_vector!(ztmf)
+    load_vector!(ztp)
+    load_vector!(zfb)
+    load_vector!(zfbp)
+    load_vector!(zpsi)
+    load_vector!(zpsim)
 
-        # 1D arrays
-        zcpr   = read_n_floats(io, ma;      label="zcpr  (ma = $ma)")
-        zcppr  = read_n_floats(io, npsi1;   label="zcppr (npsi1 = $npsi1)")
-        zq     = read_n_floats(io, npsi1;   label="zq")
-        zdq    = read_n_floats(io, npsi1;   label="zdq")
-        ztmf   = read_n_floats(io, npsi1;   label="ztmf")
-        ztp    = read_n_floats(io, npsi1;   label="ztp")
-        zfb    = read_n_floats(io, npsi1;   label="zfb")
-        zfbp   = read_n_floats(io, npsi1;   label="zfbp")
-        zpsi   = read_n_floats(io, npsi1;   label="zpsi")
-        zpsim  = read_n_floats(io, ma;      label="zpsim")
+    # --- Read Matrices ---
+    load_matrix!(zrcp)
+    load_matrix!(zzcp)
+    load_matrix!(zjacm)
+    load_matrix!(zjac)
 
-        # 2D arrays
-        println("    [DEBUG] About to read 2D: zrcp nrc=$nrc npsi1=$npsi1 (should be $((nrc)*(npsi1)) numbers)")
-        zrcp  = read_2d(io, nrc, npsi1;     label="zrcp")
-        println("    [DEBUG] About to read 2D: zzcp")
-        zzcp  = read_2d(io, nrc, npsi1;     label="zzcp")
-        println("    [DEBUG] About to read 2D: zjacm")
-        zjacm = read_2d(io, nrc, npsi1;     label="zjacm")
-        println("    [DEBUG] About to read 2D: zjac")
-        zjac  = read_2d(io, nrc, npsi1;     label="zjac")
+    println("--> Parsed from header:  ntnova = $ntnova, npsi1 = $npsi1, nsym = $nsym")
 
-        ro = zrcp[1, 1]
-        zo = zzcp[1, 1]
-        psio = abs(zpsi[end] - zpsi[1])
+    # Number of spline intervals
+    ma = npsi1 - 1
+    # Total ψ range for normalization
+    psio = zpsi[end] - zpsi[1]
+    # Normalize ψ to [0, 1]
+    xs = (zpsi .- zpsi[1]) ./ psio
+    # Construct fs matrix: (npsi1 rows, 4 columns)
+    fs = zeros(npsi1, 4)
+    fs[:, 1] .= zq .* zfb
+    fs[:, 2] .= zcppr
+    fs[:, 3] .= zq
+    # Fit spline with extrapolation boundary condition (bctype = 3)
+    sq_in = Spl.spline_setup(xs, fs; bctype=3)
+    # --- Integrate pressure ---
+    Spl.spline_integrate!(sq_in)  # Integrate in-place, sq_in.fsi filled
+    # Make a writable copy of the fs array
+    fs_copy = copy(sq_in.fs)
+    # Normalize pressure integral column (2nd column)
+    fs_copy[:, 2] .= (sq_in.fsi[:, 2] .- sq_in.fsi[ma, 2]) .* psio
+    # Refit spline using the modified fs_copy
+    sq_in = Spl.spline_setup(sq_in._xs, fs_copy; bctype=3)
 
-        println("--> Finished reading CHEASE equilibrium.")
-        println("    Magnetic axis at (ro=$ro, zo=$zo), psio=$psio")
-        return nothing # replace with construction of your InverseRunInput, if desired
-    end
+    # --- Copy 2D geometry arrays ---
+    mtau = ntnova+1
+    ro = zrcp[1, 1]
+    zo = zzcp[1, 1]
+    ys = range(0, 2π, length=mtau) |> collect
+    # Allocate and fill fs array (radial × poloidal × 2 quantities)
+    fs = zeros(length(xs), length(ys), 2)
+    fs[:, :, 1] .= transpose(zrcp[1:ntnova+1, :])
+    fs[:, :, 2] .= transpose(zzcp[1:ntnova+1, :])
+    
+
+    # Setup bicubic spline with periodic boundary conditions (bctype=2)
+    rz_in = Spl.bicube_setup(xs, ys, fs; bctypex=2, bctypey=2)
+    println("--> Finished reading CHEASE equilibrium.")
+    println("    Magnetic axis at (ro=$ro, zo=$zo), psio=$psio")
+        return InverseRunInput(config,sq_in,rz_in,ro,zo,psio)
 end
 
