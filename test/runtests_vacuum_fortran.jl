@@ -19,8 +19,8 @@
         kernelsignin = -1.0
         wall_flag    = false
         farwal_flag  = true
-        grrio    = rand(Float64, 2*(mthvac+5), mpert*2)  
-        xzptso   = rand(Float64, mthvac+5, 4)             
+        grrio    = rand(Float64, 2*(mthvac+5), mpert*2)
+        xzptso   = rand(Float64, mthvac+5, 4)
         op_ahgfile = "aaaa"
 
         # Print working directory and file existence

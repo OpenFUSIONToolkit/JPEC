@@ -48,10 +48,10 @@ function mscvac(
          Ref{Cint},            # mpert
          Ref{Cint},            # mtheta
          Ref{Cint},            # mthvac
-         Ref{Bool},            # complex_flag (logical)
+         Ref{Cint},            # complex_flag (logical)
          Ref{Cdouble},         # kernelsignin
-         Ref{Bool},            # wall_flag (logical)
-         Ref{Bool},            # farwal_flag (logical)
+         Ref{Cint},            # wall_flag (logical)
+         Ref{Cint},            # farwal_flag (logical)
          Ptr{Cdouble},         # grrio(:,:)
          Ptr{Cdouble},         # xzptso(:,:)
          Ptr{UInt8}),          # op_ahgfile (optional)
@@ -59,10 +59,10 @@ function mscvac(
         Ref(mpert),
         Ref(mtheta),
         Ref(mthvac),
-        Ref(complex_flag),
+        Ref(Int32(complex_flag)),
         Ref(kernelsignin),
-        Ref(wall_flag),
-        Ref(farwal_flag),
+        Ref(Int32(wall_flag)),
+        Ref(Int32(farwal_flag)),
         pointer(grrio),
         pointer(xzptso),
         ahgfile_ptr
