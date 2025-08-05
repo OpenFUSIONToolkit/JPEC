@@ -27,6 +27,8 @@
         @info "Current working directory: $(pwd())"
         @info "Checking if vac.in exists: $(isfile("vac.in"))"
 
+        # print wall_flag value
+        @info "wall_flag value: $wall_flag"
         JPEC.VacuumMod.mscvac(
             wv, mpert, mtheta, mthvac,
             complex_flag, kernelsignin,
