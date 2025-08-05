@@ -20,15 +20,11 @@ jobs:
 
       - name: Set up Julia
         uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.11'
       
       - name: Check julia cache
         uses: julia-actions/cache@v2
-      
-      - 
-
-
-        with:
-          version: '1.11'
       - name: Instantiate Julia environment
         run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
