@@ -92,19 +92,6 @@ c-----------------------------------------------------------------------
       nfm=mpert
       mtot=mpert
 
-      WRITE(*,*) "wv: ", wv(1,1), wv(2,1)
-      WRITE(*,*) "mpert: ", mpert
-      WRITE(*,*) "mtheta: ", mtheta
-      WRITE(*,*) "mthvac: ", mthvac
-      WRITE(*,*) "complex_flag: ", complex_flag
-      WRITE(*,*) "kernelsignin: ", kernelsignin
-      WRITE(*,*) "wall_flag: ", wall_flag
-      WRITE(*,*) "farwal_flag: ", farwal_flag
-      WRITE(*,*) "grrio: ", grrio(1,1), grrio(2,1)
-      WRITE(*,*) "xzptso: ", xzptso(1,1), xzptso(2,1), xzptso(3,1),
-     $  xzptso(4,1)
-      WRITE(*,*) "op_ahgfile: ", ahgfile
-
       call global_alloc(nths0,nfm,mtot,ntsin0)
       farwal=.false.
       IF (farwal_flag) farwal=.true.
