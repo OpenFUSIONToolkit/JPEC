@@ -32,6 +32,6 @@ jobs:
         run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
       - name: Build package
-        run: julia --project=. -e 'using Pkg; Pkg.build()'
+        run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
       - name: Run tests
         run: julia --project=. -e 'using Pkg; Pkg.test("JPEC")'
