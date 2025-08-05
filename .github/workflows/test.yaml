@@ -1,0 +1,37 @@
+name: Build and Test Julia Package
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.11'
+
+      - name: Restore Julia cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.julia
+          key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}
+          restore-keys: |
+           ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}
+      - name: Download BLAS
+        run: sudo apt install -y libopenblas-dev
+      - name: Instantiate Julia environment
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Build package
+        run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
+      - name: Run tests
+        run: julia --project=. -e 'using Pkg; Pkg.test("JPEC")'
