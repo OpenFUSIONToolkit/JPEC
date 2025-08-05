@@ -74,7 +74,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
 
     # Integration loop
     if ctrl.verbose # mimicing an output from ode_output_open
-        println("   ψ=$(odet.psifac), q=$(JPEC.SplinesMod.spline_eval(equil.sq, odet.psifac, 0)[4])")
+        println("   ψ=$(odet.psifac), q=$(SplinesMod.spline_eval(equil.sq, odet.psifac, 0)[4])")
     end
     while true
         first = true
@@ -133,8 +133,8 @@ Returns the index of the next relevant singular surface.
 function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState; itmax = 50)
 
     # Shorthand to evaluate q/q1 inside newton iteration
-    qval = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
-    q1val = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
+    qval = psi -> SplinesMod.spline_eval(equil.sq, psi, 0)[4]
+    q1val = psi -> SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     # Preliminary computations
     odet.psifac = equil.sq.xs[1]
@@ -352,8 +352,34 @@ end
 #     return nothing  # or could return a struct with all these values, for a more Julian approach
 # end
 
+"""
+    ode_ideal_cross!(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
+                     intr::DconInternal, ctrl::DconControl)
+
+Handle the crossing of an ideal MHD singular surface during ODE integration 
+in a plasma equilibrium calculation.
+
+# Arguments
+- `ising::Int`: Current index of the singular surface.
+- `odet::OdeState`: The current state of the ODE system (mutable, updated in-place).
+- `equil::Equilibrium.PlasmaEquilibrium`: Object representing plasma equilibrium parameters.
+- `intr::DconInternal`: Structure containing internal data, including singular surface information.
+- `ctrl::DconControl`: Holds control flags and integration parameters.
+
+# Description
+This function updates the ODE solution as it crosses a (resonant) singular surface in the 
+ideal MHD calculation. It normalizes and reinitializes the solution vector at the singularity, 
+handles singular asymptotics, manages control flags, and updates relevant state variables 
+in `odet` for continued integration. It also determines the location and parameters of 
+the next singular surface, updates tolerance/stepping logic for the ODE solver, and may 
+write auxiliary diagnostic output or coefficients as configured.
+
+# Notes
+- Handles resetting or reinitializing the solver after singular surface crossing.
+- Assumes certain global state (such as `u`, `ua`, `index`, etc.) is properly managed.
+- Intended for ideal MHD regions; kinetic surface handling is not included in this function.
+"""
 function ode_ideal_cross!(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
-    # ...existing code...
 
     # Fixup solution at singular surface
     if ctrl.verbose
@@ -372,17 +398,22 @@ function ode_ideal_cross!(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaE
 
     # Re-initialize
     psi_old = odet.psifac
-    ipert0 = round(Int, ctrl.nn * intr.sing[ising].q) - intr.mlow + 1
+    ipert0 = round(Int, ctrl.nn * intr.sing[ising].q, RoundFromZero) - intr.mlow + 1
     dpsi = intr.sing[ising].psifac - odet.psifac
     odet.psifac = intr.sing[ising].psifac + dpsi
     sing_get_ua(ising, odet.psifac, ua)
-    if !con_flag
-        u[:, index[1], :] .= 0  # originally u(ipert0,:,:) = 0
+    if !ctrl.con_flag
+        u[:, index[1], :] .= 0
     end
-    sing_der(odet.neq, psi_old, u, du1) #TODO: where does du1 come from?
-    sing_der(odet.neq, odet.psifac, u, du2)
+
+    # Update solution vectors
+    du1 = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
+    du2 = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
+    params = (ctrl, equil, intr, ffit)
+    sing_der!(du1, odet.u, params, psi_old) #TODO: where does du1 come from?
+    sing_der!(du2, odet.u, params, odet.psifac)
     u .= u .+ (du1 .+ du2) .* dpsi
-    if !con_flag
+    if !ctrl.con_flag
         u[ipert0, :, :] .= 0
         u[:, index[1], :] .= ua[:, ipert0 + mpert, :]
     end
@@ -405,35 +436,35 @@ function ode_ideal_cross!(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaE
         if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac
             break
         end
-        q = intr.sing[ising].q
-        if intr.mlow <= ctrl.nn * q && intr.mhigh >= ctrl.nn * q
+        odet.q = intr.sing[ising].q
+        if intr.mlow <= ctrl.nn * odet.q && intr.mhigh >= ctrl.nn * odet.q
             break
         end
     end
-
+    
     # Compute conditions at next singular surface
     if ising > intr.msing || intr.psilim < intr.sing[min(ising, intr.msing)].psifac
-        psimax = intr.psilim * (1 - eps)
-        m1 = round(Int, ctrl.nn * intr.qlim) + sign(one, ctrl.nn * equil.sq.fs1[mpsi, 4])
-        next = "finish"
+        odet.psimax = intr.psilim * (1 - eps)
+        odet.m1 = round(Int, ctrl.nn * intr.qlim, RoundFromZero) + sign(ctrl.nn * equil.sq.fs1[mpsi, 4])
+        odet.next = "finish"
     else
-        psimax = sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
-        m1 = round(Int,ctrl.nn * intr.sing[ising].q)
-        println(crit_out_unit, "ising = $ising, psifac = $(intr.sing[ising].psifac), q = $(intr.sing[ising].q), di = $(intr.sing[ising].di), alpha = $(intr.sing[ising].alpha)")
+        odet.psimax = intr.sing[ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[ising].q1)
+        odet.m1 = round(Int,ctrl.nn * intr.sing[ising].q, RoundFromZero)
+        # println(crit_out_unit, "ising = $ising, psifac = $(intr.sing[ising].psifac), q = $(intr.sing[ising].q), di = $(intr.sing[ising].di), alpha = $(intr.sing[ising].alpha)")
+
     end
 
     # Restart ode solver
     odet.istep += 1
-    rwork[1] = psimax
-    new = true
-    u_save .= u
-    psi_save = odet.psifac
+    odet.new = true
+    odet.u_save .= u
+    odet.psi_save = odet.psifac
 
     # Write to files
-    println(crit_out_unit, "step info")
-    if crit_break
-        write(crit_bin_unit)
-    end
+    # println(crit_out_unit, "step info")
+    # if crit_break
+    #     write(crit_bin_unit)
+    # end
 end
 
 # Example stub for kinetic crossing
@@ -448,6 +479,33 @@ function ode_resist_cross()
     return
 end
 
+"""
+    ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
+             intr::DconInternal, ctrl::DconControl, ffit::FourFitVars)
+
+Advance one adaptive integration step of the ODE system for a plasma equilibrium calculation.
+
+# Arguments
+- `ising::Int`: Index of the current singular surface (or resonance).
+- `odet::OdeState`: Structure storing the current ODE state and solution arrays.
+- `equil::Equilibrium.PlasmaEquilibrium`: Plasma equilibrium parameters and profiles.
+- `intr::DconInternal`: Internal data, including singular surfaces.
+- `ctrl::DconControl`: Control and solver settings (e.g., tolerances, flags).
+- `ffit::FourFitVars`: Additional fitting variables or Fourier fit coefficients.
+
+# Description
+This function computes and sets appropriate relative and absolute tolerances
+for the ODE integration depending on proximity to singular surfaces, 
+chooses the next integration endpoint, and advances the solution using 
+an adaptive ODE solver. The state in `odet` is updated in-place with
+the solution at the new point. Designed for use in stability or equilibrium 
+scanning in plasma physics and MHD codes.
+
+# Notes
+- Tolerance logic distinguishes between "near-singular" and "regular" regions.
+- ODE integration is performed using the DifferentialEquations.jl interface.
+- Handles both node-based and maximal-psi stepping, depending on control flags.
+"""
 function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl, ffit::FourFitVars)
 
     # TODO: is there better relative/absolute tolerance handling for Julia? This might be specific to lsode
@@ -704,7 +762,7 @@ function ode_record_edge!(intr::DconInternal, odet::OdeState, ctrl::DconControl,
     vacuum1 = ComplexF64(0.0, 0.0)
     plasma1 = ComplexF64(0.0, 0.0)
 
-    q_psifac = JPEC.SplinesMod.spline_eval(equil.sq, odet.psifac, 0)
+    q_psifac = SplinesMod.spline_eval(equil.sq, odet.psifac, 0)
     if intr.size_edge > 0
         #TODO: WTH? fortran has both a psiedge and psi_edge and they appear to be different.
         # someone smarter than me please double check this

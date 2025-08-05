@@ -196,7 +196,7 @@ A tuple `(q, singfac, logpsi1, logpsi2, crit)` of critical data for the time ste
 # TODO: on self-contained functions like this, it feels silly to pass in these large structs when we only need one variable
 # Should we just pass in the variables we need? This seems more readable to me personally
 #function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, intr::DconInternal, odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium) # (alternate version)
-function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, m1::Int, nn::Int, sq::JPEC.SplinesMod.CubicSpline)
+function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, m1::Int, nn::Int, sq::SplinesMod.CubicSpline)
 
     # Compute inverse plasma response matrix
     uu = u[:, 1:mpert, :]
@@ -216,7 +216,7 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, 
     indexi = sortperm(key)  # Sort indices based on decreasing |evalsi|
 
     # Compute critical data for each time step
-    profiles = JPEC.SplinesMod.spline_eval(sq, psi, 0)
+    profiles = SplinesMod.spline_eval(sq, psi, 0)
     q = profiles[4]
     singfac = abs(m1 - nn * profiles[4])
     logpsi1 = log10(psi)

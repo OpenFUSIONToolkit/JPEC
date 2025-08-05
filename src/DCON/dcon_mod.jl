@@ -8,9 +8,8 @@ using BandedMatrices #for banded matrix operations
 using TOML
 using FFTW
 using DifferentialEquations
-using ..Equilibrium
-
-#TODO: seems like we can import ..Spl to shorten spline calls? 
+import ..Equilibrium
+import ..Spl
 
 # Include all necessary files
 include("dcon_structs.jl")

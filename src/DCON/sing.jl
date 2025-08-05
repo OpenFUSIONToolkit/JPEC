@@ -22,7 +22,7 @@ function sing_scan!(odet::OdeState, intr::DconInternal)
 end
 
 """
-    sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
+    sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
 
 Locate singular rational q-surfaces (q = m/nn) using a bisection method between extrema of the q-profile, and store their properties in `intr.sing`.
 
@@ -30,10 +30,10 @@ Locate singular rational q-surfaces (q = m/nn) using a bisection method between 
 - 'itmax::Int`: Maximum number of iterations for the bisection method (default: 200)
 """
 # JMH - I confirmed this function outputs the same sing struct as fortran dcon for DIII_Ideal
-function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
+function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
 
     # Shorthand to evaluate q inside bisection search
-    qval = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
+    qval = psi -> SplinesMod.spline_eval(equil.sq, psi, 0)[4]
 
     # Loop over extrema of q, find all rational values in between
     for iex in 2:equil.params.mextrema
@@ -73,11 +73,11 @@ function sing_find!(ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium
                         psifac = psifac,
                         rho = sqrt(psifac),
                         q = m / ctrl.nn,
-                        q1 = JPEC.SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4],
+                        q1 = SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4],
                 ))
                 intr.msing += 1
                 if ctrl.verbose
-                    println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(JPEC.SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4])")
+                    println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4])")
                 end
             end
             m += dm
@@ -99,11 +99,11 @@ truncates before the last singular surface.
 # There are some discrepancies at the 4-5th digit between the two, not sure if this is numerical noise, 
 # an issue in the spline evals, or a bug here. However, the differences in the main internal parameters are small
 # so ignoring for now, can address in a unit test later.
-function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibrium.PlasmaEquilibrium; itmax=50, eps=1e-10)
+function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=50, eps=1e-10)
 
     # Shorthand to evaluate q/q1 inside newton iteration
-    qval = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 0)[4]
-    q1val = psi -> JPEC.SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
+    qval = psi -> SplinesMod.spline_eval(equil.sq, psi, 0)[4]
+    q1val = psi -> SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
 
     #compute and modify the DconInternal struct 
     intr.qlim   = min(equil.params.qmax, ctrl.qhigh)
@@ -156,7 +156,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibriu
 
     #set up record for determining the peak in dW near the boundary.
     if ctrl.psiedge < intr.psilim
-        qedgestart = trunc(Int, JPEC.SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
+        qedgestart = trunc(Int, SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
         intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * ctrl.nn * ctrl.nperq_edge)
 
         intr.dw_edge  = fill(-typemax(Float64) * (1 + im), intr.size_edge)
@@ -166,7 +166,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::JPEC.Equilibriu
         # monitor some deeper points for an informative profile
         intr.pre_edge = 1
         for i in 1:intr.size_edge
-            if intr.q_edge[i] < JPEC.SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4] 
+            if intr.q_edge[i] < SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4] 
                 intr.pre_edge += 1
             end
         end
@@ -361,7 +361,7 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
     # ktmat::Matrix{ComplexF64,3} = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
     
     # Spline evaluation
-    q = JPEC.SplinesMod.spline_eval(equil.sq, psifac, 0)[4]
+    q = SplinesMod.spline_eval(equil.sq, psifac, 0)[4]
     singfac .= intr.mlow .- ctrl.nn*q .+ collect(0:intr.mpert-1)
     singfac .= 1.0 ./ singfac
     chi1 = 2π * equil.psio
@@ -445,14 +445,14 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
     else
         # Evaluate splines at psieval
         #TODO: double check this
-        amat = reshape(JPEC.SplinesMod.spline_eval(ffit.amats, psieval, 0), intr.mpert, intr.mpert)
-        bmat = reshape(JPEC.SplinesMod.spline_eval(ffit.bmats, psieval, 0), intr.mpert, intr.mpert)
-        cmat = reshape(JPEC.SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
+        amat = reshape(SplinesMod.spline_eval(ffit.amats, psieval, 0), intr.mpert, intr.mpert)
+        bmat = reshape(SplinesMod.spline_eval(ffit.bmats, psieval, 0), intr.mpert, intr.mpert)
+        cmat = reshape(SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
 
         # TODO: double check this too. I changed the matrix copies below from fmats -> fmat, etc. 
-        fmat = JPEC.SplinesMod.spline_eval(ffit.fmats, psieval, 0), intr.mpert, intr.mpert
-        kmat = JPEC.SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert
-        gmat = JPEC.SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert
+        fmat = SplinesMod.spline_eval(ffit.fmats, psieval, 0), intr.mpert, intr.mpert
+        kmat = SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert
+        gmat = SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert
 
         #TODO: is this right? ChatGPT says it is equivalent so that is probably true
         # Says this will work if amat is Hermitian and positive definite - is it? 
