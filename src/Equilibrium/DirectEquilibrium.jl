@@ -208,7 +208,7 @@ function direct_position(
     new_psi_fs = psi_in.fs * fac
     x_coords = Vector(psi_in.xs)
     y_coords = Vector(psi_in.ys)
-    psi_in_new = Spl.bicube_setup(x_coords, y_coords, new_psi_fs, bctypex=4, bctypey=4)
+    psi_in_new = Spl.BicubicSpline(x_coords, y_coords, new_psi_fs, bctypex=4, bctypey=4)
 
     if abs(psi_at_axis - psio) / psio > 1e-3
         @warn "Psi at located axis (O-point) differs from expected psio. " *
@@ -511,7 +511,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
             bf_start.f * (y_out[:, 4] .- theta_new_nodes .* y_out[end, 4]), # 3: Toroidal stream function term (term for calculate q)
             y_out[:, 2] ./ y_out[end, 2] .- theta_new_nodes            # 4: Jacobian-related term
         )
-        ff = Spl.spline_setup(theta_new_nodes, ff_fs_nodes, bctype="periodic")
+        ff = Spl.CubicSpline(theta_new_nodes, ff_fs_nodes, bctype="periodic")
 
         # c. On first iteration, allocate the main output data array
         if ipsi == (mpsi+1)
@@ -538,7 +538,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
     println("...Loop over flux surfaces finished.")
 
     # 5. Finalize splines and perform q-profile revision if needed
-    sq = Spl.spline_setup(sq_x_nodes, sq_fs_nodes, bctype=4)
+    sq = Spl.CubicSpline(sq_x_nodes, sq_fs_nodes, bctype=4)
 
     if equil_params.newq0 != 0.0
         println("Revising q-profile for newq0 = $(equil_params.newq0)...")
@@ -558,13 +558,13 @@ function equilibrium_solver(raw_profile::DirectRunInput)
             rzphi_fs_nodes[i, :, 3] .*= ffac # Toroidal stream function
         end
         # Re-create the spline with the revised data
-        sq = Spl.spline_setup(sq_x_nodes, sq_fs_nodes, bctype=4)
+        sq = Spl.CubicSpline(sq_x_nodes, sq_fs_nodes, bctype=4)
         println("...q-profile revision complete.")
     end
 
     # Create the final geometric spline `rzphi`. Periodic in theta (y-dimension)
     rzphi_y_nodes = range(0.0, 1.0, length=mtheta + 1)
-    rzphi = Spl.bicube_setup(sq_x_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
+    rzphi = Spl.BicubicSpline(sq_x_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
     println("Final geometric spline 'rzphi' is fitted.")
 
     # 6. Calculate final physics quantities (B-field, metric components, etc.)
@@ -620,7 +620,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
     end
     println("...done.")
 
-    eqfun = Spl.bicube_setup(sq_x_nodes, collect(rzphi_y_nodes), eqfun_fs_nodes, bctypex=4, bctypey=2)
+    eqfun = Spl.BicubicSpline(sq_x_nodes, collect(rzphi_y_nodes), eqfun_fs_nodes, bctypex=4, bctypey=2)
 
     println("--- Direct Equilibrium Processing Finished ---")
 

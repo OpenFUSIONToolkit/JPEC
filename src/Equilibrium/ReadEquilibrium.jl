@@ -99,7 +99,7 @@ function read_efit(config::EquilibriumConfig)
         sqrt.(psi_norm_grid)
     )
     # According to Spline_document.txt, bctype=4 is Not-a-Knot
-    sq_in = Spl.spline_setup(collect(psi_norm_grid), sq_fs_nodes, bctype=4)
+    sq_in = Spl.CubicSpline(collect(psi_norm_grid), sq_fs_nodes, bctype=4)
     println("--> 1D Spline fitting complete.")
 
     # --- Process and Normalize 2D Psi Data ---
@@ -119,7 +119,7 @@ function read_efit(config::EquilibriumConfig)
     zmin, zmax = extrema(z_grid)
 
     psi_proc_3d = reshape(psi_proc, (nw, nh, 1))
-    psi_in = Spl.bicube_setup(collect(r_grid), collect(z_grid), psi_proc_3d, bctypex=4, bctypey=4)
+    psi_in = Spl.BicubicSpline(collect(r_grid), collect(z_grid), psi_proc_3d, bctypex=4, bctypey=4)
     println("--> 2D Spline fitting complete.")
 
     # --- Bundle everything for the solver ---
@@ -236,7 +236,7 @@ function read_chease2(config::EquilibriumConfig)
     fs[:, 2] .= zcppr
     fs[:, 3] .= zq
     # Fit spline with extrapolation boundary condition (bctype = 3)
-    sq_in = Spl.spline_setup(xs, fs; bctype=3)
+    sq_in = Spl.CubicSpline(xs, fs; bctype=3)
     # --- Integrate pressure ---
     Spl.spline_integrate!(sq_in)  # Integrate in-place, sq_in.fsi filled
     # Make a writable copy of the fs array
@@ -244,7 +244,7 @@ function read_chease2(config::EquilibriumConfig)
     # Normalize pressure integral column (2nd column)
     fs_copy[:, 2] .= (sq_in.fsi[:, 2] .- sq_in.fsi[ma, 2]) .* psio
     # Refit spline using the modified fs_copy
-    sq_in = Spl.spline_setup(sq_in._xs, fs_copy; bctype=3)
+    sq_in = Spl.CubicSpline(sq_in._xs, fs_copy; bctype=3)
 
     # --- Copy 2D geometry arrays ---
     mtau = ntnova+1
@@ -255,10 +255,10 @@ function read_chease2(config::EquilibriumConfig)
     fs = zeros(length(xs), length(ys), 2)
     fs[:, :, 1] .= transpose(zrcp[1:ntnova+1, :])
     fs[:, :, 2] .= transpose(zzcp[1:ntnova+1, :])
-    
+
 
     # Setup bicubic spline with periodic boundary conditions (bctype=2)
-    rz_in = Spl.bicube_setup(xs, ys, fs; bctypex=2, bctypey=2)
+    rz_in = Spl.BicubicSpline(xs, ys, fs; bctypex=2, bctypey=2)
     println("--> Finished reading CHEASE equilibrium.")
     println("    Magnetic axis at (ro=$ro, zo=$zo), psio=$psio")
         return InverseRunInput(config,sq_in,rz_in,ro,zo,psio)

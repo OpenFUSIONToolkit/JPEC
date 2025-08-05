@@ -93,7 +93,7 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
 end
 
 """
-fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3},
+FourierSpline(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3},
     mband::Int; bctype::Union{String, Int}="not-a-knot", fit_method::Int=1, fit_flag::Bool=true)
 
     Creates and fits a function of two variables, f(x, y), to a cubic spline
@@ -119,7 +119,7 @@ fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3},
     ## Returns:
     - A `FourierSpline` object ready for evaluation.
 """
-function fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3},
+function FourierSpline(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3},
     mband::Int; bctype::Union{String, Int}="not-a-knot", fit_method::Int=1, fit_flag::Bool=true)
 
     @assert length(xs) == size(fs, 1) "Length of xs must match number of rows in fs"
@@ -172,7 +172,7 @@ fspline_eval(fspline::FourierSpline, x::Float64, y::Float64, derivs::Int=0)
     Evaluates a fitted Fourier-Spline at given coordinates.
 
     ## Arguments:
-    - `fspline`: A `FourierSpline` object from `fspline_setup`.
+    - `fspline`: A `FourierSpline` object.
     - `x`: A `Float64` x-coordinate.
     - `y`: A `Float64` y-coordinate.
 
@@ -219,7 +219,7 @@ fspline_eval(fspline::FourierSpline, xs::Vector{Float64}, ys::Vector{Float64}, d
     Evaluates a fitted Fourier-Spline at given coordinates.
 
     ## Arguments:
-    - `fspline`: A `FourierSpline` object from `fspline_setup`.
+    - `fspline`: A `FourierSpline` object.
     - `x`: A `Vector{Float64}` of x-coordinates.
     - `y`: A `Vector{Float64}` of y-coordinates.
 
