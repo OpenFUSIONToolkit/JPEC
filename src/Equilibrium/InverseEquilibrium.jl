@@ -108,6 +108,14 @@ function equilibrium_solver(input::InverseRunInput)
 
     deta[1, :] = JPEC.Equilibrium.inverse_extrap(r2[2:me+1, :], deta[2:me+1, :], 0.0)
 
+    rz_in_fs = zeros(Float64, mx+1, my+1, 3)
+    rz_in_fs[:, :, 1] = r2
+    rz_in_fs[:, :, 2] = deta
+
+    rz_in_xs = copy(rz_in._xs)
+    rz_in_ys = copy(rz_in._ys)
+
+    new_rz_in = Spl.bicube_setup(rz_in_xs, rz_in_ys, rz_in_fs, bctypex="periodic", bctypey="periodic")
 
     # c-----------------------------------------------------------------------
     # c     set up radial grid (only "ldp" implemented)
@@ -149,7 +157,7 @@ function equilibrium_solver(input::InverseRunInput)
         spl_xs .= rzphi_ys
         for itheta in 0:mtheta
             theta = rzphi_ys[itheta+1]
-            f_rz_in, fx_rz_in, fy_rz_in = Spl.bicube_eval(rz_in, psifac, theta, 1)
+            f_rz_in, fx_rz_in, fy_rz_in = Spl.bicube_eval(new_rz_in, psifac, theta, 1)
             f_sq_in = Spl.spline_eval(sq_in, psifac, 0)
 
             if f_rz_in[1] < 0
@@ -189,11 +197,39 @@ function equilibrium_solver(input::InverseRunInput)
             fs = Spl.spline_eval(spl, theta, 0)
             rzphi_fs[ipsi+1, itheta+1, :] = fs[1:4]
         end
-        
+
         sq_fs[ipsi+1, 1] = f_sq_in[1] * twopi
         sq_fs[ipsi+1, 2] = f_sq_in[2]
         sq_fs[ipsi+1, 3] = spl.fsi[mtheta+1, 3] * twopi * pi
         sq_fs[ipsi+1, 4] = spl.fsi[mtheta+1, 4] * sq_fs[ipsi+1, 1] / (2 * twopi * psio)
     end
+
+    sq = Spl.spline_setup(sq_xs, sq_fs; bctype="extrap")
+    sq_xs = sq.xs
+    sq_fs = sq.fs
+    
+    f_sq, f1_sq = Spl.spline_eval(sq, sq_xs, 1)
+    q0 = sq_fs[1, 4] - f1_sq[1,4] * sq_xs[1] 
+    if newq0 == -1
+        newq0 = -q0
+    end
+
+    if newq0 != 0
+        f0 = sq_fs[1, 1] - f1_sq[1,1] * sq_xs[1]
+        f0fac = f0^2 * ((newq0 / q0)^2 - 1)
+        q0 = newq0
+        for ipsi in 0:mpsi
+            ffac = sqrt(1 + f0fac / sq_fs[ipsi+1, 1]^2) * sign(newq0)
+            sq_fs[ipsi+1, 1] *= ffac
+            sq_fs[ipsi+1, 4] *= ffac
+            rzphi_fs[ipsi+1, :, 3] *= ffac
+        end
+    end
+    qa = sq_fs[mpsi+1, 4] + f1_sq[mpsi+1, 4] * (1 - sq_xs[mpsi+1])
+
+
+    rzphi = Spl.bicube_setup(rzphi_xs, rzphi_ys, rzphi_fs, bctypex="periodic", bctypey="periodic")
+
+    
 
 end
