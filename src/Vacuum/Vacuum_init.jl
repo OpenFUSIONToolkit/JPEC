@@ -38,11 +38,9 @@ function build_vacuum_globals(
 
     # 
     # Mode index arrays (lmin/lmax): get from input or compute
-    lmin = zeros(1)
-    lmax = zeros(1)
 
-    lmin[1] = input.mlow
-    lmax[1] = input.mhigh
+    lmin = [input.mlow]
+    lmax = [input.mhigh]
 
     n = input.n
     thgr = range(0, stop=2π, length=mth1)
@@ -63,11 +61,7 @@ function build_vacuum_globals(
     xwalp = zeros(mth1)
     zwalp = zeros(mth1)
 
-    if !farwal
-        if settings.Shape.a >= 10.
-            farwal = true
-        end
-    end
+    farwal = farwal || (settings.Shape.a >= 10.)
 
     delx, delz, xwal, zwal, xwalp, zwalp,
         cnqd, snqd, sinlt, coslt, snlth, 
@@ -154,14 +148,14 @@ function setuparrays!(
     itp_x = Interpolations.interpolate((theta,), xwal, Interpolations.BSpline(Interpolations.Cubic(Interpolations.Periodic(OnGrid()))))
     itp_z = Interpolations.interpolate((theta,), zwal, Interpolations.BSpline(Interpolations.Cubic(Interpolations.Periodic(OnGrid()))))
 
-    xwalp = [Interpolations.derivative(itp_x, 1, theta) for theta in thgr[:mth1]]
-    zwalp = [Interpolations.derivative(itp_z, 1, theta) for theta in thgr[:mth1]]
+    xwalp = [Interpolations.derivative(itp_x, 1, theta) for theta in thgr[1:mth1]]
+    zwalp = [Interpolations.derivative(itp_z, 1, theta) for theta in thgr[1:mth1]]
 
     itp_x = Interpolations.interpolate((theta,), xpla, Interpolations.BSpline(Interpolations.Cubic(Interpolations.Periodic(OnGrid()))))
     itp_z = Interpolations.interpolate((theta,), zpla, Interpolations.BSpline(Interpolations.Cubic(Interpolations.Periodic(OnGrid()))))
 
-    xplap = [Interpolations.derivative(itp_x, 1, theta) for theta in thgr[:mth1]]
-    zplap = [Interpolations.derivative(itp_z, 1, theta) for theta in thgr[:mth1]]
+    xplap = [Interpolations.derivative(itp_x, 1, theta) for theta in thgr[1:mth1]]
+    zplap = [Interpolations.derivative(itp_z, 1, theta) for theta in thgr[1:mth1]]
 
     push!(xplap, xwalp[1])
     push!(zplap, zwalp[1])

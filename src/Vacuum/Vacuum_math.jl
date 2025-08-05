@@ -180,16 +180,16 @@ end
 """
     trans(vecin, mth; dx0=0.0, dx1=0.0)
 
-Change input array `vecin` with Cubic Spline (Periodic) length of `mth`
+Resample the input array `vecin` using a periodic cubic spline to an output array of length `mth`.
 
-# Parameter
-- `vecin::Vector{Float64}` : input variables
-- `mth::Int`               : length of output array
-- `dx0::Float64`           : 모든 x좌표에 추가되는 전체 오프셋 (기본값 0, `x += dx0 / mthin`)
-- `dx1::Float64`           : 각 인덱스에 추가되는 미세 오프셋 (기본값 0, `ai = (i-1) + dx1`)
+# Parameters
+- `vecin::Vector{Float64}` : Input array to be resampled.
+- `mth::Int`               : Desired length of the output array.
+- `dx0::Float64`           : Global offset added to all x-coordinates (default 0, applied as `x += dx0 / mthin`).
+- `dx1::Float64`           : Fine offset added to each index (default 0, applied as `ai = (i-1) + dx1`).
 
-# 반환값
-- `vecout::Vector{Float64}` : 변환된 출력 배열 (길이 `mth`)
+# Returns
+- `vecout::Vector{Float64}` : The resampled output array (length `mth`).
 """
 function trans(vecin::Vector{Float64}, mth::Int; dx0=0.0, dx1=0.0)
     mthin = length(vecin)
@@ -322,15 +322,14 @@ end
 """
     Pn_minus_half(s, n)
 
-Chance 논문 식 (47)~(50)
-calculate Pⁿ_{-1/2}(s) with recursive
+Compute the Legendre function of the first kind of order -1/2, Pⁿ_{-1/2}(s), recursively using Chance's equations (47)-(50).
 
 # Arguments
-- `s::Real` : Legendre function factor (s > 1)
-- `n::Int` : maxinum order of n (0 이상)
+- `s::Real` : Legendre function parameter (s > 1)
+- `n::Int`  : Maximum order n (n ≥ 0)
 
 # Returns
-- `P[end]` :  P_{-1/2}^{n}(s) value in nmax 
+- `P[end]` :  Value of P_{-1/2}^{n}(s) at the highest order n
 
 """
 function Pn_minus_half(s::Real, n::Int)
@@ -390,18 +389,22 @@ end
 #############################################################
 
 """
-    green(xs, zs, xt, zt, n)
+    green(xs, zs, xt, zt, xtp, ztp, n; usechancebugs=false)
 
-input:
-- xs, zs: observation points
-- xt, zt: source points
-- xtp, ztp : ∂X'/∂θ, ∂Z'/∂θ
-- n: mode number
+Compute the Green's function and related quantities for axisymmetric geometry.
 
-return:
-- G :   2π𝒢ⁿ(θ,θ')
-- aval :    𝒥 ∇'𝒢ⁿ∇'ℒ
-- aval0:    𝒥 ∇'𝒢⁰∇'ℒ
+# Arguments
+- `xs`, `zs`: Observation point coordinates (Float64)
+- `xt`, `zt`: Source point coordinates (Float64)
+- `xtp`, `ztp`: Derivatives ∂X'/∂θ, ∂Z'/∂θ (Float64)
+- `n`: Mode number (Int)
+- `usechancebugs`: Use original Chance code bugs for comparability (default: false)
+
+# Returns
+- `G`:      2π𝒢ⁿ(θ,θ′) — Green's function value
+- `aval`:   𝒥 ∇'𝒢ⁿ∇'ℒ — Coupling term for mode n
+- `aval0`:  𝒥 ∇'𝒢⁰∇'ℒ — Coupling term for mode 0
+- `bval`:   2π𝒢ⁿ(θ,θ′) or -2π𝒢ⁿ(θ,θ′) (depends on `usechancebugs`)
 """
 function green(xs, zs, xt, zt, xtp, ztp, n, usechancebugs=false)
 
