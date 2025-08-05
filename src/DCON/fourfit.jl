@@ -31,7 +31,7 @@ named `metric` in the Fortran `fourfit_make_metric` subroutine.
 - `ys::Vector{Float64}`: Poloidal angle coordinates `θ` in radians (0 to 2π).
 - `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi+1, mtheta+1, 8)`.
   The 8 quantities are: `g¹¹`, `g²²`, `g³³`, `g²³`, `g³¹`, `g¹²`, `J`, `∂J/∂ψ`.
-- `fspline::SplinesMod.FourierSplineType`: The fitted Fourier-cubic spline object.
+- `fspline::SplinesMod.FourierSpline`: The fitted Fourier-cubic spline object.
 - `name::String`, `title::Vector{String}`, `xtitle::String`, `ytitle::String`: Metadata.
 """
 mutable struct MetricData
@@ -41,7 +41,7 @@ mutable struct MetricData
     xs::Vector{Float64}
     ys::Vector{Float64}
     fs::Array{Float64, 3}
-    fspline::Union{SplinesMod.FourierSplineType, Nothing}
+    fspline::Union{SplinesMod.FourierSpline, Nothing}
     name::String
     title::Vector{String}
     xtitle::String
