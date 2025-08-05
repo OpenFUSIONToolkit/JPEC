@@ -19,6 +19,14 @@ jobs:
         with:
           version: '1.11'
 
+      - name: Restore Julia cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.julia
+          key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}-${{ hashFiles('**/Manifest.toml') }}
+          restore-keys: |
+           ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}-${{ hashFiles('**/Manifest.toml') }}
+
       - name: Instantiate Julia environment
         run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
