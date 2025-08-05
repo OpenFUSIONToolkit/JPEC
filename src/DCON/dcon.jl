@@ -109,10 +109,18 @@ function MainProgram(in_path::String)
 
     ffit = FourFitVars()
     #metric_result = make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag) #TODO: replace this with structures once fourfit.jl fucntion is reworked
+    
+    # Compute metric tensor
+    metric_result = Fourfit.make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag)
+    
     if ctrl.verbose
       println("Computing F, G, and K Matrices")
     end
-    #matrix_result = make_matrix(metric_result, equil.sq, equil.rzphi, equil.psio) #TODO: same as above
+    
+    # Compute matrices and populate FourFitVars struct
+    Fourfit.make_matrix_populate!(ffit, equil, metric_result, 
+                                  nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, 
+                                  sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
     println("mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband), nn = $(ctrl.nn), sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
 
     # if kin_flag
