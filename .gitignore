@@ -1,9 +1,14 @@
 *.mod
 *.dylib
-.vscode
+*.dll
+*.so
 *.o
+*.i
+.vscode
 *.DS_Store
 notebooks/spline_examples.ipynb
+notebooks/*.in
 .gitattributes
-*.dll
 Manifest.toml
+build.log
+docs/build/

@@ -28,8 +28,9 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      subroutine mscvac(wv,mpert,mtheta,mthvac,complex_flag,
-     $     kernelsignin,wall_flag,farwal_flag,grrio,xzptso,op_ahgfile)
+      subroutine mscvac(wv,mpert,mtheta,mthvac,complex_flag_in,
+     $     kernelsignin,wall_flag_in,farwal_flag_in,grrio,
+     $     xzptso,op_ahgfile)
       USE vglobal_mod
       implicit real(r8) (a-h,o-z)
       implicit integer (i-n)
@@ -37,7 +38,9 @@ c-----------------------------------------------------------------------
       REAL(r8) :: kernelsignin
       integer mpert,mtheta,mthvac
       complex(r8) wv(mpert,mpert)
-      logical, intent(in) :: complex_flag,wall_flag,farwal_flag
+      integer, intent(in) :: complex_flag_in,wall_flag_in,farwal_flag_in
+      ! logical, intent(in) :: complex_flag,wall_flag,farwal_flag
+      logical :: complex_flag, wall_flag, farwal_flag
       REAL(r8) :: grrio(2*(mthvac+5),mpert*2),xzptso(mthvac+5,4)
 
       complex(r8), parameter :: ifac=(0,1)
@@ -50,6 +53,23 @@ c-----------------------------------------------------------------------
          ahgfile = 'ahg2msc.out'
       endif
 
+      if (complex_flag_in == 1) then
+         complex_flag = .TRUE.
+      else
+         complex_flag = .FALSE.
+      end if
+
+      if (wall_flag_in == 1) then
+         wall_flag = .TRUE.
+      else
+         wall_flag = .FALSE.
+      end if
+
+      if (farwal_flag_in == 1) then
+         farwal_flag = .TRUE.
+      else
+         farwal_flag = .FALSE.
+      end if
 
 c-----------------------------------------------------------------------
 c     format statements.
@@ -71,6 +91,7 @@ c-----------------------------------------------------------------------
       nths0=mthvac
       nfm=mpert
       mtot=mpert
+
       call global_alloc(nths0,nfm,mtot,ntsin0)
       farwal=.false.
       IF (farwal_flag) farwal=.true.
