@@ -8,3 +8,4 @@
 notebooks/*.in
 Manifest.toml
 build.log
+docs/build/
