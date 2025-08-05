@@ -11,7 +11,7 @@ function MainProgram(in_path::String)
   ctrl = DconControl(; (Symbol(k)=>v for (k,v) in inputs["DCON_CONTROL"])...)
   outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
   intr = DconInternal()
-  equil = setup_equilibrium(in_path*"/equil.toml")
+  equil = Equilibrium.setup_equilibrium(in_path*"/equil.toml")
 
 # -----------------------------------------------------------------------
 #     set up variables
