@@ -113,9 +113,8 @@ function equilibrium_solver(input::InverseRunInput)
     # c     set up radial grid (only "ldp" implemented)
     # c-----------------------------------------------------------------------
     if grid_type == "ldp"
-        xs = psilow .+ (psihigh - psilow) .* (sin.(range(0.0, 1.0; length=mpsi+1) .* (π/2))).^2
-        fs = zeros(Float64, mpsi+1, 4) 
-        sq = Spl.spline_setup(xs, fs; bctype="extrap")
+        sq_xs = psilow .+ (psihigh - psilow) .* (sin.(range(0.0, 1.0; length=mpsi+1) .* (π/2))).^2
+        sq_fs = zeros(Float64, mpsi+1, 4) 
     else
         error("Only 'ldp' grid_type is implemented for now.")
     end
@@ -172,9 +171,29 @@ function equilibrium_solver(input::InverseRunInput)
             spl_fs[itheta+1, 4] = spl_fs[itheta+1, 3] / (r * r)
             spl_fs[itheta+1, 5] = spl_fs[itheta+1, 3] * bp^config.control.power_bp * b^config.control.power_b / r^config.control.power_r
 
+        end
+        # c-----------------------------------------------------------------------
+        # c     fit to cubic splines and integrate.
+        # c-----------------------------------------------------------------------
 
+        spl = Spl.spline_setup(spl_xs, spl_fs; bctype="periodic")
+        Spl.spline_integrate!(spl)
+
+        spl_xs = spl.fsi[:, 5] ./ spl.fsi[mtheta+1, 5]
+        spl_fs[:, 2] .+= rzphi_ys .- spl_xs
+        spl_fs[:, 4] = (spl_fs[:, 3] ./ spl.fsi[mtheta+1, 3]) ./ (spl_fs[:, 5] ./ spl.fsi[mtheta+1, 5]) * spl.fsi[mtheta+1, 3] * twopi * pi
+        spl_fs[:, 3] = f_sq_in[1] * pi / psio * (spl.fsi[:, 4] - spl.fsi[mtheta+1, 4] .* spl_xs)
+
+        for itheta in 0:mtheta
+            theta = rzphi_ys[itheta+1]
+            fs = Spl.spline_eval(spl, theta, 0)
+            rzphi_fs[ipsi+1, itheta+1, :] = fs[1:4]
         end
         
+        sq_fs[ipsi+1, 1] = f_sq_in[1] * twopi
+        sq_fs[ipsi+1, 2] = f_sq_in[2]
+        sq_fs[ipsi+1, 3] = spl.fsi[mtheta+1, 3] * twopi * pi
+        sq_fs[ipsi+1, 4] = spl.fsi[mtheta+1, 4] * sq_fs[ipsi+1, 1] / (2 * twopi * psio)
     end
 
 end
