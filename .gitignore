@@ -2,6 +2,7 @@
 *.dylib
 .vscode
 *.o
+*.i
 *.so
 *.DS_Store
 notebooks/*.in
