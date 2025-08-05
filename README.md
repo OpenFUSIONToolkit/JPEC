@@ -2,7 +2,9 @@
 
 This is a work in progress juliafication of the Generalized Perturbed Equilibrium Code suite https://github.com/PrincetonUniversity/GPEC.
 
+## Documentation
 
+The WIP documentation can be found [here](https://openfusiontoolkit.github.io/JPEC/dev/).
 ## Developer Notes
 
 ### Commit messages
