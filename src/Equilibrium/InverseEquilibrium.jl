@@ -106,7 +106,7 @@ function equilibrium_solver(input::InverseRunInput)
         end
     end
 
-    deta[1, :] = JPEC.Equilibrium.inverse_extrap(r2[2:me+1, :], deta[2:me+1, :], 0.0)
+    deta[1, :] = inverse_extrap(r2[2:me+1, :], deta[2:me+1, :], 0.0)
 
     rz_in_fs = zeros(Float64, mx+1, my+1, 3)
     rz_in_fs[:, :, 1] = r2
@@ -139,12 +139,12 @@ function equilibrium_solver(input::InverseRunInput)
 
     # (/"  r2  "," deta "," dphi ","  jac "/)
     rzphi_fs = zeros(Float64, mpsi+1, mtheta+1, 4)
-    rzphi_xs = copy(sq.xs)
+    rzphi_xs = copy(sq_xs)
     rzphi_ys = collect(0:mtheta) ./ mtheta
 
     # (/"  b0  ","      ","      " /)
     eqfun_fs = zeros(Float64, mpsi+1, mtheta+1, 3)
-    eqfun_xs = copy(sq.xs)
+    eqfun_xs = copy(sq_xs)
     eqfun_ys = collect(0:mtheta) ./ mtheta
 
     spl_xs = zeros(Float64, mtheta+1)
@@ -205,11 +205,9 @@ function equilibrium_solver(input::InverseRunInput)
     end
 
     sq = Spl.spline_setup(sq_xs, sq_fs; bctype="extrap")
-    sq_xs = sq.xs
-    sq_fs = sq.fs
     
     f_sq, f1_sq = Spl.spline_eval(sq, sq_xs, 1)
-    q0 = sq_fs[1, 4] - f1_sq[1,4] * sq_xs[1] 
+    q0 = f_sq[1, 4] - f1_sq[1,4] * sq.xs[1] 
     if newq0 == -1
         newq0 = -q0
     end
@@ -261,19 +259,6 @@ function equilibrium_solver(input::InverseRunInput)
     eqfun = Spl.bicube_setup(eqfun_xs, eqfun_ys, eqfun_fs, bctypex="periodic", bctypey="periodic")
 
     return PlasmaEquilibrium(
-        equil_params=EquilibriumParams(
-            ro=ro,
-            zo=zo,
-            psio=psio,
-            mpsi=mpsi,
-            mtheta=mtheta,
-            psilow=psilow,
-            psihigh=psihigh,
-            newq0=newq0
-        ),
-        sq_out=sq,
-        rzphi_out=rzphi,
-        eqfun_out=eqfun
+        input.config,sq,rzphi,eqfun, ro, zo, psio
     )
-
 end
