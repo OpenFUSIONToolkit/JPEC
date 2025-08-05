@@ -78,7 +78,7 @@ end
     q_edge::Union{Nothing, Vector{Float64}} = nothing
     psi_edge::Union{Nothing, Vector{Float64}} = nothing
     dw_edge::Union{Nothing, Vector{ComplexF64}} = nothing
-    ud::Union{Nothing, Array{Float64,3} } = nothing #storage for u-derivative and xss # JMH - is there overlap with OdeState here? 
+    ud::Union{Nothing, Array{Float64,3} } = nothing #storage for u-derivative and xss # JMH - is there overlap with OdeState here?
     # JMH - changed previous line from Matrix to Array due to error - might have to modify depending on what ud looks like
 end
 
@@ -217,8 +217,8 @@ end
     dcon_kin_threads::Int = 0
 
     # kinetic ABCDEH mats for sing_mod
-    # kwmats::Vector{JPEC.SplinesMod.ComplexSplineType} = [JPEC.SplinesMod.ComplexSplineType() for _ in 1:6]
-    # ktmats::Vector{JPEC.SplinesMod.ComplexSplineType} = [JPEC.SplinesMod.ComplexSplineType() for _ in 1:6]
+    # kwmats::Vector{JPEC.SplinesMod.CubicSpline{ComplexF64}} = [JPEC.SplinesMod.CubicSpline{ComplexF64}() for _ in 1:6]
+    # ktmats::Vector{JPEC.SplinesMod.CubicSpline{ComplexF64}} = [JPEC.SplinesMod.CubicSpline{ComplexF64}() for _ in 1:6]
 end
 
 @kwdef mutable struct SingVars

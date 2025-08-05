@@ -3,7 +3,7 @@
 
 Performs output and monitoring tasks at each integration step.
 
-This function calls `ode_output_monitor` to track critical eigenvalue behavior 
+This function calls `ode_output_monitor` to track critical eigenvalue behavior
 and handle any diagnostics or logging associated with the current step.
 Additional output (e.g., eigenvalue dumps, binary solution logging) may be added later.
 """
@@ -49,7 +49,7 @@ end
 #     nn = intr.nn
 #     evals_out_unit = fNames.evals_out_unit
 #     evals_bin_unit = fNames.evals_bin_unit
-#     sq = equil.sq 
+#     sq = equil.sq
 #     psifac = intr.sing.psifac
 #     q = equil.sq.f[4]
 
@@ -61,9 +61,9 @@ end
 #     ipiv = zeros(Int, mpert)
 #     info = Ref{Int}(0)
 
-#     temp_lapack = copy(temp) # copy just renames a function pretty much 
+#     temp_lapack = copy(temp) # copy just renames a function pretty much
 #     LAPACK.zgetrf!(temp_lapack, ipiv)
-#     wp_lapack = copy(wp) 
+#     wp_lapack = copy(wp)
 #     LAPACK.zgetrs!('N', temp_lapack, ipiv, wp_lapack)
 #     wp = (wp_lapack + conj.(transpose(wp_lapack))) / 2
 
@@ -113,10 +113,10 @@ end
 """
     ode_output_monitor!(odet, intr, ctrl, equil)
 
-Monitor the evolution of a critical eigenvalue (`crit`) during ODE integration and detect zero crossings, which indicate resonant or singular behavior.  
-The function evaluates `crit` using `ode_output_get_crit`, and if a sign change is found, it estimates the crossing point via linear interpolation.  
-If the crossing satisfies sharpness and consistency conditions, it's logged and `nzero` is incremented.  
-A termination flag (`termbycross_flag`) set within DconControl can be used to stop integration upon detection.  
+Monitor the evolution of a critical eigenvalue (`crit`) during ODE integration and detect zero crossings, which indicate resonant or singular behavior.
+The function evaluates `crit` using `ode_output_get_crit`, and if a sign change is found, it estimates the crossing point via linear interpolation.
+If the crossing satisfies sharpness and consistency conditions, it's logged and `nzero` is incremented.
+A termination flag (`termbycross_flag`) set within DconControl can be used to stop integration upon detection.
 
 ### Notes
 - Zero-crossing detection is based on changes in the sign of `crit`.
@@ -158,7 +158,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
         if ctrl.termbycross_flag
             #TODO: not sure if this is really an error, or just a user specified termination condition. So the program shoudln't error out, just stop integrating
             # In fortran, these were both handled by program_stop()
-            error("Terminated by zero crossing.")  
+            error("Terminated by zero crossing.")
         end
     end
 
@@ -168,7 +168,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     # write(crit_bin_unit, Float32(psifac), Float32(logpsi1),
     #       Float32(logpsi2), Float32(q), Float32(crit))
 
-    # Update saved values 
+    # Update saved values
     odet.psi_save = odet.psifac
     odet.crit_save = crit
     odet.u_save .= odet.u
@@ -196,7 +196,7 @@ A tuple `(q, singfac, logpsi1, logpsi2, crit)` of critical data for the time ste
 # TODO: on self-contained functions like this, it feels silly to pass in these large structs when we only need one variable
 # Should we just pass in the variables we need? This seems more readable to me personally
 #function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, intr::DconInternal, odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium) # (alternate version)
-function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, m1::Int, nn::Int, sq::JPEC.SplinesMod.CubicSplineType)
+function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, m1::Int, nn::Int, sq::JPEC.SplinesMod.CubicSpline)
 
     # Compute inverse plasma response matrix
     uu = u[:, 1:mpert, :]
