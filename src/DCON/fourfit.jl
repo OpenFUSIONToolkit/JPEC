@@ -3,15 +3,6 @@
 # based on a plasma equilibrium. It is a Julia port of the `fourfit.f`
 # routines used in codes like DCON.
 
-module Fourfit
-
-# JPEC dependencies
-using ..Equilibrium
-using ..SplinesMod
-
-# Export the main data structures and functions
-export MetricData, MatrixData, make_metric, make_matrix, populate_fourfit!
-
 #-----------------------------------------------------------------------
 # 1. DATA STRUCTURES
 #-----------------------------------------------------------------------
@@ -632,6 +623,3 @@ function make_matrix_populate!(ffit, plasma_eq::Equilibrium.PlasmaEquilibrium,
     populate_fourfit!(ffit, matrix_data)
     return ffit
 end
-
-
-end # module Fourfit

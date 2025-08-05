@@ -198,7 +198,7 @@ function sing_get_ua!(ua::AbstractArray{ComplexF64,3}, intr::DconInternal, ising
     r2 = singp.r2 # Vector{Int}
 
     # Compute distance from singular surface
-    dpsi = psifac - singp.psifac
+    dpsi = odet.psifac - singp.psifac
     sqrtfac = sqrt(dpsi)
     pfac = abs(dpsi)^singp.alpha
 

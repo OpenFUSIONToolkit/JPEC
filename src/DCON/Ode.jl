@@ -41,6 +41,7 @@ including solution vectors, tolerances, and flags for the integration process.
     m1::Int = 0                 # poloidal mode number for the first singular surface (?)
     q::Float64 = 0.0            # q value at the surface
     psimax::Float64 = 0.0         # maximum psi value for the integrator (TODO: is this correct?)
+    ua::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, 2*mpert, 2) # auxiliary array for singular surface calculations
 end
 
 OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
@@ -401,7 +402,7 @@ function ode_ideal_cross!(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaE
     ipert0 = round(Int, ctrl.nn * intr.sing[ising].q, RoundFromZero) - intr.mlow + 1
     dpsi = intr.sing[ising].psifac - odet.psifac
     odet.psifac = intr.sing[ising].psifac + dpsi
-    sing_get_ua(ising, odet.psifac, ua)
+    sing_get_ua!(ising, odet.psifac, ua)
     if !ctrl.con_flag
         u[:, index[1], :] .= 0
     end
@@ -412,10 +413,10 @@ function ode_ideal_cross!(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaE
     params = (ctrl, equil, intr, ffit)
     sing_der!(du1, odet.u, params, psi_old) #TODO: where does du1 come from?
     sing_der!(du2, odet.u, params, odet.psifac)
-    u .= u .+ (du1 .+ du2) .* dpsi
+    odet.u .= odet.u .+ (du1 .+ du2) .* dpsi
     if !ctrl.con_flag
-        u[ipert0, :, :] .= 0
-        u[:, index[1], :] .= ua[:, ipert0 + mpert, :]
+        odet.u[ipert0, :, :] .= 0
+        odet.u[:, index[1], :] .= odet.ua[:, ipert0 + mpert, :]
     end
 
     # Write asymptotic coefficients after reinit

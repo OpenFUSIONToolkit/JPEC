@@ -108,52 +108,52 @@ function MainProgram(in_path::String)
     end
 
     ffit = FourFitVars()
-    #metric_result = make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag) #TODO: replace this with structures once fourfit.jl fucntion is reworked
     
     # Compute metric tensor
-    metric_result = Fourfit.make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag)
+    metric_result = make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag)
     
     if ctrl.verbose
       println("Computing F, G, and K Matrices")
     end
     
     # Compute matrices and populate FourFitVars struct
-    Fourfit.make_matrix_populate!(ffit, equil, metric_result, 
+    make_matrix_populate!(ffit, equil, metric_result, 
                                   nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, 
                                   sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
     println("mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband), nn = $(ctrl.nn), sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
 
-    # if kin_flag
-    #   fourfit_action_matrix()
-    #   if ctrl.verbose
-    #       println("Initializing PENTRC")
-    #   end
-    #   # Automatic reading and distributing of inputs
-    #   initialize_pentrc(op_kin=false, op_deq=false, op_peq=false)
-    #   # Manually set the pentrc equilibrium description
-    #   set_eq(eqfun, sq, rzphi, smats, tmats, xmats, ymats, zmats,
-    #         twopi*psio, ro, nn, jac_type, mlow, mhigh, mpert, mthvac)
-    #   # Manually set the kinetic profiles
-    #   read_kin(kinetic_file, zi, zimp, mi, mimp, nfac, tfac, wefac, wpfac, indebug)
-    #   # Manually set the perturbed equilibrium displacements
-    #   # Use false flat xi and xi' for equal weighting
-    #   psitmp = copy(sq.xs)
-    #   mtmp = collect(mlow:mhigh)
-    #   xtmp = fill(1e-4, length(psitmp), length(mtmp))
-    #   set_peq(psitmp, mtmp, xtmp, xtmp, xtmp, false, tdebug)
-    #   # No need to deallocate in Julia; garbage collection handles it
-    #   if ctrl.verbose
-    #       println("Computing Kinetic Matrices")
-    #   end
-    #   fourfit_kinetic_matrix(kingridtype, out_fund)
-    # end
-    # sing_scan()
-    # for ising in 1:msing
-    #   resist_eval(sing[ising])
-    # end
-    # if kin_flag
-    #   ksing_find()
-    # end
+    if ctrl.kin_flag
+      # fourfit_action_matrix()
+      # if ctrl.verbose
+      #     println("Initializing PENTRC")
+      # end
+      # # Automatic reading and distributing of inputs
+      # initialize_pentrc(op_kin=false, op_deq=false, op_peq=false)
+      # # Manually set the pentrc equilibrium description
+      # set_eq(eqfun, sq, rzphi, smats, tmats, xmats, ymats, zmats,
+      #       twopi*psio, ro, nn, jac_type, mlow, mhigh, mpert, mthvac)
+      # # Manually set the kinetic profiles
+      # read_kin(kinetic_file, zi, zimp, mi, mimp, nfac, tfac, wefac, wpfac, indebug)
+      # # Manually set the perturbed equilibrium displacements
+      # # Use false flat xi and xi' for equal weighting
+      # psitmp = copy(sq.xs)
+      # mtmp = collect(mlow:mhigh)
+      # xtmp = fill(1e-4, length(psitmp), length(mtmp))
+      # set_peq(psitmp, mtmp, xtmp, xtmp, xtmp, false, tdebug)
+      # # No need to deallocate in Julia; garbage collection handles it
+      # if ctrl.verbose
+      #     println("Computing Kinetic Matrices")
+      # end
+      # fourfit_kinetic_matrix(kingridtype, out_fund)
+    end
+    # TODO: these functions need to be converted
+    sing_scan()
+    for ising in 1:msing
+      resist_eval(sing[ising])
+    end
+    if ctrl.kin_flag
+      # ksing_find()
+    end
   end
       
 # -----------------------------------------------------------------------
