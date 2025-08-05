@@ -38,5 +38,6 @@ makedocs(
 deploydocs(
     repo = "github.com/OpenFUSIONToolkit/JPEC.git",
     branch = "gh-pages",
-    devbranch = "main"
+    devbranch = "main",
+    push_preview = true
 )
