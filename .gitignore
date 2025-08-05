@@ -4,3 +4,4 @@
 *.o
 *.DS_Store
 notebooks/*.in
+Manifest.toml
