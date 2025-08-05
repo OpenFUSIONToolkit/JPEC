@@ -146,14 +146,15 @@ function MainProgram(in_path::String)
       # end
       # fourfit_kinetic_matrix(kingridtype, out_fund)
     end
-    # TODO: these functions need to be converted
-    sing_scan()
-    for ising in 1:msing
-      resist_eval(sing[ising])
-    end
-    if ctrl.kin_flag
-      # ksing_find()
-    end
+    # TODO: these functions need to be converted, need this for con_flag = false
+    # Leave commented for now
+    # sing_scan()
+    # for ising in 1:msing
+    #   resist_eval(sing[ising])
+    # end
+    # if ctrl.kin_flag
+    #   # ksing_find()
+    # end
   end
       
 # -----------------------------------------------------------------------

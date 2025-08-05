@@ -402,9 +402,10 @@ function ode_ideal_cross!(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaE
     ipert0 = round(Int, ctrl.nn * intr.sing[ising].q, RoundFromZero) - intr.mlow + 1
     dpsi = intr.sing[ising].psifac - odet.psifac
     odet.psifac = intr.sing[ising].psifac + dpsi
-    sing_get_ua!(ising, odet.psifac, ua)
+    # TODO: uncomment this once sing_get_ua! is implemented
+    # sing_get_ua!(ising, odet.psifac, ua)
     if !ctrl.con_flag
-        u[:, index[1], :] .= 0
+        u[:, index[1], :] .= 0 #TODO: need to add index to odet
     end
 
     # Update solution vectors
@@ -415,6 +416,7 @@ function ode_ideal_cross!(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaE
     sing_der!(du2, odet.u, params, odet.psifac)
     odet.u .= odet.u .+ (du1 .+ du2) .* dpsi
     if !ctrl.con_flag
+        error("con_flag = false not implemented yet!")
         odet.u[ipert0, :, :] .= 0
         odet.u[:, index[1], :] .= odet.ua[:, ipert0 + mpert, :]
     end
@@ -713,37 +715,38 @@ function ode_test(odet::OdeState, intr::DconInternal, ctrl::DconControl, ising::
         return flag
     end
 
+    @error "ode_test with res_flag = true not implemented yet!"
     # TODO: none of this has been checked, wait until we implement res_flag = true
-    ca_old .= ca           # Save previous surface ca
-    sing_get_ca(ising, psifac, u, ca)    # Updates global ca
-    dca = ca .- ca_old
-    dsingfac = abs((singfac - singfac_old)/singfac)
-    singfac_old = singfac
+    # ca_old .= ca           # Save previous surface ca
+    # sing_get_ca(ising, psifac, u, ca)    # Updates global ca
+    # dca = ca .- ca_old
+    # dsingfac = abs((singfac - singfac_old)/singfac)
+    # singfac_old = singfac
 
-    power = zeros(Float64, msol)
-    powmax_old = powmax
-    for isol in 1:msol
-        # ca[:,isol,:]::matrix of size (mpert,2)
-        # Flatten the relevant slice for norm calculation
-        ca_isol = ca[:, isol, :]           # mpert × 2
-        dca_isol = dca[:, isol, :]
-        norm = abs(sum(conj.(ca_isol) .* ca_isol))
-        dnorm = abs(sum(conj.(ca_isol) .* dca_isol))
-        power[isol] = dnorm / (norm * dsingfac)
-    end
-    powmax = maximum(power)
+    # power = zeros(Float64, msol)
+    # powmax_old = powmax
+    # for isol in 1:msol
+    #     # ca[:,isol,:]::matrix of size (mpert,2)
+    #     # Flatten the relevant slice for norm calculation
+    #     ca_isol = ca[:, isol, :]           # mpert × 2
+    #     dca_isol = dca[:, isol, :]
+    #     norm = abs(sum(conj.(ca_isol) .* ca_isol))
+    #     dnorm = abs(sum(conj.(ca_isol) .* dca_isol))
+    #     power[isol] = dnorm / (norm * dsingfac)
+    # end
+    # powmax = maximum(power)
 
-    odet.flag_count += 1
-    if odet.flag_count < 3
-        return flag
-    end
-    flag = flag || ((singfac < singfac_max) && (powmax > powmax_old))
+    # odet.flag_count += 1
+    # if odet.flag_count < 3
+    #     return flag
+    # end
+    # flag = flag || ((singfac < singfac_max) && (powmax > powmax_old))
 
-    if ising == ksing
-        println(err_unit, float(log10(singfac)), "  ", float(log10(powmax)))
-    end
+    # if ising == ksing
+    #     println(err_unit, float(log10(singfac)), "  ", float(log10(powmax)))
+    # end
 
-    return flag
+    # return flag
 end
 
 """
