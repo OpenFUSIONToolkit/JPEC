@@ -83,6 +83,7 @@ c-----------------------------------------------------------------------
       open (iotty,file='mscvac.out',status='unknown')
       open (outpest,file='pestotv',status='unknown',form='formatted')
       IF (wall_flag) THEN
+         WRITE(*,*) "wall_flag: ", wall_flag
          open (inmode,file='vac_wall.in',status='old', form='formatted')
       ELSE
          open (inmode,file='vac.in',status='old', form='formatted' )
