@@ -129,15 +129,52 @@ function equilibrium_solver(input::InverseRunInput)
     if mtheta == 0
         mtheta = rz_in.my
     end
-    rzphi_fs = zeros(Float64, mpsi+1, mtheta+1, 4)
-    eqfun_fs = zeros(Float64, mpsi+1, mtheta+1, 3)
 
+    # (/"  r2  "," deta "," dphi ","  jac "/)
+    rzphi_fs = zeros(Float64, mpsi+1, mtheta+1, 4)
     rzphi_xs = copy(sq.xs)
     rzphi_ys = collect(0:mtheta) ./ mtheta
+
+    # (/"  b0  ","      ","      " /)
+    eqfun_fs = zeros(Float64, mpsi+1, mtheta+1, 3)
     eqfun_xs = copy(sq.xs)
     eqfun_ys = collect(0:mtheta) ./ mtheta
 
-    rzphi = Spl.bicube_setup(copy(sq.xs), collect(0:mtheta) ./ mtheta, rzphi_fs)
-    eqfun = Spl.bicube_setup(copy(sq.xs), collect(0:mtheta) ./ mtheta, eqfun_fs)
+    spl_xs = zeros(Float64, mtheta+1)
+    spl_fs = zeros(Float64, mtheta+1, 5)
+
+
+    for ipsi in 0:mpsi
+        psifac = rzphi_xs[ipsi+1]
+        f_sq_in = Spl.spline_eval(sq_in, psifac, 0 )
+        spl_xs .= rzphi_ys
+        for itheta in 0:mtheta
+            theta = rzphi_ys[itheta+1]
+            f_rz_in, fx_rz_in, fy_rz_in = Spl.bicube_eval(rz_in, psifac, theta, 1)
+            f_sq_in = Spl.spline_eval(sq_in, psifac, 0)
+
+            if f_rz_in[1] < 0
+                error("Invalid extrapolation near axis, rerun with larger value of psilow")
+            end
+
+            rfac = sqrt(f_rz_in[1])
+            r = ro + rfac * cos(twopi * (theta + f_rz_in[2]))
+            jacfac = fx_rz_in[1] * (1 + fy_rz_in[2]) - fy_rz_in[1] * fx_rz_in[2]
+            w11 = (1 + fy_rz_in[2]) * twopi^ 2 * rfac / jacfac
+            w12 = -fy_rz_in[1] * pi / (rfac * jacfac)
+            bp = psio * sqrt(w11*w11 + w12*w12) / r
+            bt = f_sq_in[1] / r
+            b = sqrt(bp*bp + bt*bt)
+
+            spl_fs[itheta+1, 1] = f_rz_in[1]
+            spl_fs[itheta+1, 2] = f_rz_in[2]
+            spl_fs[itheta+1, 3] = r * jacfac
+            spl_fs[itheta+1, 4] = spl_fs[itheta+1, 3] / (r * r)
+            spl_fs[itheta+1, 5] = spl_fs[itheta+1, 3] * bp^config.control.power_bp * b^config.control.power_b / r^config.control.power_r
+
+
+        end
+        
+    end
 
 end
