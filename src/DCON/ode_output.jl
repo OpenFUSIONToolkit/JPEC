@@ -183,7 +183,7 @@ array `u`, symmetrizing it, computing its Hermitian eigenvalues, and using the s
 inverse eigenvalue in combination with the equilibrium profiles to form `crit`.
 
 This uses Julia’s built-in linear algebra:
-lu(temp) = zgetrf, temp_fact \ wp = zgetrs
+`lu(temp) = zgetrf`, `temp_fact \\ wp = zgetrs`
 Under the hood, Julia calls optimized LAPACK routines via the LinearAlgebra standard library.
 
 ### Main Arguments (others defined in main structs)

@@ -22,7 +22,7 @@ including solution vectors, tolerances, and flags for the integration process.
     istep::Int= 0               # integration step count
     ix::Int= 0                  # index for psiout in spline
     atol0::Float64 = 1e-10       # absolute tolerance # TODO: I'm not convinced this and atol need to be a member of a struct. I think its calculated and used only once per step in ode_step
-    atol::Array{Float64,2} = zeros(Float64, msol, msol)       #  tolerance
+    atol::Array{ComplexF64,3} = zeros(ComplexF64, mpert, msol, 2)       #  tolerance
     singfac::Float64 = 0.0      # separation from singular surface
     psifac::Float64 = 0.0       # normalized flux coordinate
     neq::Int = 0                # number of equations
@@ -59,7 +59,7 @@ nzero: number of zero crossings of the critical determinant detected during the 
 """
 # TODO: We pass the same structs into most functions; however, do to our use of multiple ! functions that modify the structs
 # and the convention that the modified struct comes first, the struct order is never consistent. Is there a better way? 
-function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ffit::FourFitVars)
     # Initialization
     odet = OdeState(intr.mpert, intr.mpert)
 
@@ -91,7 +91,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
             ode_output_step(odet, intr, ctrl, equil; force=force_output)
             ode_record_edge!(intr, odet, ctrl, equil)
             test && break # break out of loop if ode_test returns true
-            ode_step(ising, ctrl, equil, intr, odet)
+            ode_step(ising, odet, equil, intr, ctrl, ffit)
             first = false
         end
 
@@ -448,7 +448,7 @@ function ode_resist_cross()
     return
 end
 
-function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
+function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl, ffit::FourFitVars)
 
     # TODO: is there better relative/absolute tolerance handling for Julia? This might be specific to lsode
     
@@ -494,7 +494,7 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
 
     # Advance differential equation
     odet.istep += 1    
-    prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, fourfit))
+    prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, ffit))
     sol = solve(prob, abstol=vec(abs.(odet.atol)), reltol=rtol) #TODO: add flag for DiffEq solver here? 
 
     # Update u and psifac with the solution at the end of the interval

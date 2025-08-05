@@ -107,11 +107,12 @@ function MainProgram(in_path::String)
       println(" Fourier analysis of metric tensor components")
     end
 
-    metric_result = fourfit_make_metric(equil.rzphi, equil.sq) #TODO: replace this with structures once fourfit.jl fucntion is reworked
+    ffit = FourFitVars()
+    #metric_result = make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag) #TODO: replace this with structures once fourfit.jl fucntion is reworked
     if ctrl.verbose
       println("Computing F, G, and K Matrices")
     end
-    matrix_result = fourfit_make_matrix(metric_result, equil.sq, equil.rzphi, equil.psio) #TODO: same as above
+    #matrix_result = make_matrix(metric_result, equil.sq, equil.rzphi, equil.psio) #TODO: same as above
     println("mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband), nn = $(ctrl.nn), sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
 
     # if kin_flag
@@ -154,7 +155,7 @@ function MainProgram(in_path::String)
       if ctrl.verbose
           println("Starting integration of ODE's")
       end
-      nzero = ode_run(ctrl, equil, intr)
+      nzero = ode_run(ctrl, equil, intr, ffit)
       if intr.size_edge > 0
           # Find peak index in dw_edge[pre_edge:i_edge]
           dw_slice = real.(intr.dw_edge[intr.pre_edge:intr.i_edge])
@@ -169,7 +170,7 @@ function MainProgram(in_path::String)
           # if outp.bin_euler
           #     bin_close(euler_bin_unit) # TODO: Need to decide ho we're handling io
           # end
-          ode_run(ctrl, equil, intr)
+          ode_run(ctrl, equil, intr, ffit)
       end
   end
 

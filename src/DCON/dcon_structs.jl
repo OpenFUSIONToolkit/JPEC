@@ -179,39 +179,39 @@ end
 @kwdef struct FourFitVars
 
     # Spline matrices
-    amats::JPEC.SplinesMod.ComplexSplineType
-    bmats::JPEC.SplinesMod.ComplexSplineType
-    cmats::JPEC.SplinesMod.ComplexSplineType
-    dmats::JPEC.SplinesMod.ComplexSplineType
-    emats::JPEC.SplinesMod.ComplexSplineType
-    hmats::JPEC.SplinesMod.ComplexSplineType
-    dbats::JPEC.SplinesMod.ComplexSplineType
-    ebats::JPEC.SplinesMod.ComplexSplineType
-    fbats::JPEC.SplinesMod.ComplexSplineType
-    fmats::JPEC.SplinesMod.ComplexSplineType
-    kmats::JPEC.SplinesMod.ComplexSplineType
-    gmats::JPEC.SplinesMod.ComplexSplineType
-    kaats::JPEC.SplinesMod.ComplexSplineType
-    gaats::JPEC.SplinesMod.ComplexSplineType
-    f0mats::JPEC.SplinesMod.ComplexSplineType
-    pmats::JPEC.SplinesMod.ComplexSplineType
-    paats::JPEC.SplinesMod.ComplexSplineType
-    kkmats::JPEC.SplinesMod.ComplexSplineType
-    kkaats::JPEC.SplinesMod.ComplexSplineType
-    r1mats::JPEC.SplinesMod.ComplexSplineType
-    r2mats::JPEC.SplinesMod.ComplexSplineType
-    r3mats::JPEC.SplinesMod.ComplexSplineType
-    akmats::JPEC.SplinesMod.ComplexSplineType
-    bkmats::JPEC.SplinesMod.ComplexSplineType
-    ckmats::JPEC.SplinesMod.ComplexSplineType
+    amats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    bmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    cmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    dmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    emats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    hmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    dbats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    ebats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    fbats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    fmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    kmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    gmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    kaats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    gaats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    f0mats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    pmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    paats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    kkmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    kkaats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    r1mats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    r2mats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    r3mats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    akmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    bkmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
+    ckmats::Union{Nothing,JPEC.SplinesMod.ComplexSplineType} = nothing
 
     # k0s::JPEC.SplinesMod.SplineType
 
-    ipiva::Vector{Int}
-    asmat::Array{ComplexF64,2}
-    bsmat::Array{ComplexF64,2}
-    csmat::Array{ComplexF64,2}
-    jmat::Vector{ComplexF64}
+    ipiva::Union{Nothing,Vector{Int}} = nothing
+    asmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    bsmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    csmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    jmat::Union{Nothing,Vector{ComplexF64}} = nothing
 
     parallel_threads::Int = 0
     dcon_kin_threads::Int = 0
