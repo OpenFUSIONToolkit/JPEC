@@ -6,7 +6,7 @@ export mscvac, set_dcon_params
 const libdir = joinpath(@__DIR__, "..", "..", "deps")
 const libvac = joinpath(libdir, "libvac")
 
-function set_dcon_params(mthin::Int32, lmin::Int32, lmax::Int32, nnin::Int32,
+function set_dcon_params(mthin::Integer, lmin::Integer, lmax::Integer, nnin::Integer,
                         qa1in::Float64,
                         xin::Vector{Float64}, zin::Vector{Float64}, deltain::Vector{Float64})
 
@@ -15,7 +15,7 @@ function set_dcon_params(mthin::Int32, lmin::Int32, lmax::Int32, nnin::Int32,
           (Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Cint},
            Ref{Cdouble},
            Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}),
-          Ref(mthin), Ref(lmin), Ref(lmax), Ref(nnin),
+          Ref(Int32(mthin)), Ref(Int32(lmin)), Ref(Int32(lmax)), Ref(Int32(nnin)),
           Ref(qa1in),
           pointer(xin), pointer(zin), pointer(deltain))
 end
@@ -24,9 +24,9 @@ end
 
 function mscvac(
     wv::Array{ComplexF64,2},
-    mpert::Int32,
-    mtheta::Int32,
-    mthvac::Int32,
+    mpert::Integer,
+    mtheta::Integer,
+    mthvac::Integer,
     complex_flag::Bool,
     kernelsignin::Float64,
     wall_flag::Bool,
@@ -56,9 +56,9 @@ function mscvac(
          Ptr{Cdouble},         # xzptso(:,:)
          Ptr{UInt8}),          # op_ahgfile (optional)
         pointer(wv),
-        Ref(mpert),
-        Ref(mtheta),
-        Ref(mthvac),
+        Ref(Int32(mpert)),
+        Ref(Int32(mtheta)),
+        Ref(Int32(mthvac)),
         Ref(Int32(complex_flag)),
         Ref(kernelsignin),
         Ref(Int32(wall_flag)),

@@ -11,9 +11,9 @@
         @info "set_dcon_params OK!"
 
         @info "Testing mscvac…"
-        mpert    = Int32(5)
-        mtheta   = Int32(256)
-        mthvac   = Int32(256)
+        mpert    = 5
+        mtheta   = 256
+        mthvac   = 256
         wv       = zeros(ComplexF64, mpert, mpert)        
         complex_flag = true                               
         kernelsignin = -1.0
@@ -22,10 +22,6 @@
         grrio    = rand(Float64, 2*(mthvac+5), mpert*2)
         xzptso   = rand(Float64, mthvac+5, 4)
         op_ahgfile = "aaaa"
-
-        # Print working directory and file existence
-        @info "Current working directory: $(pwd())"
-        @info "Checking if vac.in exists: $(isfile("vac.in"))"
 
         # print wall_flag value
         @info "wall_flag value: $wall_flag"
