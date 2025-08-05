@@ -23,6 +23,10 @@
         xzptso   = rand(Float64, mthvac+5, 4)             
         op_ahgfile = "aaaa"
 
+        # Print working directory and file existence
+        @info "Current working directory: $(pwd())"
+        @info "Checking if vac.in exists: $(isfile("vac.in"))"
+
         JPEC.VacuumMod.mscvac(
             wv, mpert, mtheta, mthvac,
             complex_flag, kernelsignin,
