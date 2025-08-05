@@ -25,8 +25,8 @@ function _destroy_bicubic_spline(bicube::BicubicSpline)
 end
 
 function BicubicSpline(mx::Int, my::Int, nqty::Int, bctypex::Integer, bctypey::Integer;
-					   xs::Vector{Float64} = Vector{Float64}(undef, 0),
-					   ys::Vector{Float64} = Vector{Float64}(undef, 0),
+					   xs::Vector{Float64} = Float64[],
+					   ys::Vector{Float64} = Float64[],
 					   fs::Array{Float64, 3} = Array{Float64}(undef, 0, 0, 0),
 					   fsx = similar(fs), fsy = similar(fs), fsxy = similar(fs))
 	h = Ref{Ptr{Cvoid}}()
