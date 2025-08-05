@@ -1,21 +1,33 @@
-name: Build documentation
+name: Documentation
 
 on:
-  pull_request:
   push:
     branches:
       - main
+    tags: 
+      - '*'
+  pull_request:
+
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  build:
+  docs:
+    name: Documentation
     runs-on: ubuntu-latest
-
+    permissions:
+      actions: write
+      contents: write
+      statuses: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Julia
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
           version: '1.11'
 
@@ -33,5 +45,8 @@ jobs:
 
       - name: Build package
         run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
-      - name: Run tests
-        run: julia --project=. -e 'using Pkg; Pkg.test("JPEC")'
+
+      - name: Build and deploy documentation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: julia --project=docs docs/make.jl

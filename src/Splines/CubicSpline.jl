@@ -134,21 +134,36 @@ function _spline_setup(xs::Vector{Float64}, fs::Matrix{ComplexF64}, bctype::Int3
 	return spline
 end
 
+"""
+    spline_setup(xs, fs, bctype=1)
+
+Set up a cubic spline interpolation.
+
+# Arguments
+- `xs`: A vector of Float64 values representing the x-coordinates (must be monotonically increasing)
+- `fs`: A vector or matrix of Float64/ComplexF64 values representing the function values at the x-coordinates
+- `bctype`: An integer specifying the boundary condition type (default is 1):
+    - 1: Natural spline (zero second derivative at endpoints)
+    - 2: Periodic spline
+    - 3: Extrapolated spline  
+    - 4: Not-a-knot spline
+
+# Returns
+- A `CubicSplineType` object that can be used for evaluation
+
+# Examples
+```julia
+# 1D spline
+xs = collect(range(0.0, stop=2π, length=21))
+fs = sin.(xs)
+spline = spline_setup(xs, fs, 1)
+
+# Multi-quantity spline
+fs_matrix = hcat(sin.(xs), cos.(xs))
+spline = spline_setup(xs, fs_matrix, 1)
+```
+"""
 function spline_setup(xs, fs, bctype::Int=1)
-    """
-    # spline_setup(xs, fs, bctype=0)
-    ## Arguments:
-    - `xs`: A vector of Float64 values representing the x-coordinates.
-    - `fs`: A vector or matrix of Float64/ComplexF64 values representing the function values at the x-coordinates.
-    - `bctype`: An integer specifying the boundary condition type (default is 0):
-        - 1: Natural spline (default)
-        - 2: Periodic spline
-        - 3: Extrapolated spline
-        - 4: not-a-knot spline
-    ## Returns:
-    - A `Spline` object containing the spline handle, x-coordinates, function values,
-      number of x-coordinates, number of quantities, and index of x position in the spline.
-    """
 	if !isa(xs, Vector{Float64})
 		error("xs must be a vector of Float64")
 	end
@@ -349,18 +364,39 @@ function _spline_eval(spline::ComplexSplineType, xs::Vector{Float64}, derivs::In
 	end
 end
 
+"""
+    spline_eval(spline, x, derivs=0)
+
+Evaluate a cubic spline at given points.
+
+# Arguments
+- `spline`: A `CubicSplineType` object created by `spline_setup`
+- `x`: A Float64 value or vector of Float64 values representing the x-coordinates to evaluate
+- `derivs`: Integer specifying derivative level (default is 0):
+    - 0: Function values only
+    - 1: Function values and first derivatives
+    - 2: Function values, first and second derivatives
+
+# Returns
+- If `derivs=0`: Matrix of function values (length(x) × nqty)
+- If `derivs=1`: Tuple of (values, first_derivatives)  
+- If `derivs=2`: Tuple of (values, first_derivatives, second_derivatives)
+
+# Examples
+```julia
+# Evaluate at single point
+spline = spline_setup(xs, fs, 1)
+f_vals = spline_eval(spline, π/2)
+
+# Evaluate at multiple points
+x_eval = [π/4, π/2, 3π/4]
+f_vals = spline_eval(spline, x_eval)
+
+# Get derivatives
+f_vals, f_derivs = spline_eval(spline, x_eval, 1)
+```
+"""
 function spline_eval(spline::CubicSplineType, x, derivs::Int=0)
-	"""
-	# spline_eval(spline, x)
-	## Arguments:
-	- `spline`: A `Spline` object created by `spline_setup`.
-	- `x`: A Float64 value or a vector of Float64 values representing the x-coordinates to evaluate the spline at.
-	## Returns:
-	- If `x` is a single Float64 value, returns a vector of Float64 values representing the function values at that x-coordinate.
-	- If `x` is a vector of Float64 values, returns a matrix of Float64 values where each row corresponds to the function values at
-	  the respective x-coordinate in `x`.
-	- Depending on the derivatives requested, it may return additional vectors for the first, second, or third derivatives.
-	"""
 	return _spline_eval(spline, x, derivs)
 end
 
