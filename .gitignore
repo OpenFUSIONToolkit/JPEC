@@ -2,4 +2,9 @@
 *.dylib
 .vscode
 *.o
+*.i
+*.so
 *.DS_Store
+notebooks/*.in
+Manifest.toml
+build.log
