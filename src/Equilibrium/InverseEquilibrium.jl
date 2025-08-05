@@ -230,6 +230,50 @@ function equilibrium_solver(input::InverseRunInput)
 
     rzphi = Spl.bicube_setup(rzphi_xs, rzphi_ys, rzphi_fs, bctypex="periodic", bctypey="periodic")
 
-    
+    for ipsi in 0:mpsi
+        f_sq= Spl.spline_eval(sq, sq_xs[ipsi+1])
+        for itheta in 0:mtheta
+            f_rzphi,fx_rzphi, fy_rzphi = Spl.bicube_eval(rzphi, sq_xs[ipsi+1], rzphi_ys[itheta+1], 1)
+            rfac = sqrt(f_rzphi[1])
+            eta = twopi * (itheta / mtheta + f_rzphi[2])
+            r = ro + rfac * cos(eta)
+            jacfac = fx_rzphi[4]
+
+            v = zeros(Float64, 3, 3)
+            v[1, 1] = fx_rzphi[1] / (2 * rfac)
+            v[1, 2] = fx_rzphi[2] * twopi * rfac
+            v[1, 3] = fx_rzphi[3] * r
+            v[2, 1] = fy_rzphi[1] / (2 * rfac)
+            v[2, 2] = (1 + fy_rzphi[2]) * twopi * rfac
+            v[2, 3] = fy_rzphi[3] * r   
+            v[3, 3] = twopi * r
+
+            w11 = (1 + fy_rzphi[2]) * twopi^2 * rfac * r / jacfac
+            w12 = -fy_rzphi[1] * pi * r / (rfac * jacfac)
+
+            delpsi = sqrt(w11^2 + w12^2)
+            eqfun_fs[ipsi+1, itheta+1, 1] = sqrt(((twopi * psio * delpsi)^2 + f_sq[1]^2) / (twopi * r)^2)
+            eqfun_fs[ipsi+1, itheta+1, 2] = (sum(v[1, :] .* v[2, :]) + f_sq[4] * v[3, 3] * v[1, 3]) / (jacfac * eqfun_fs[ipsi+1, itheta+1, 1]^2)
+            eqfun_fs[ipsi+1, itheta+1, 3] = (v[2, 3] * v[3, 3] + f_sq[4] * v[3, 3]^2) / (jacfac * eqfun_fs[ipsi+1, itheta+1, 1]^2)  
+        end
+    end
+
+    eqfun = Spl.bicube_setup(eqfun_xs, eqfun_ys, eqfun_fs, bctypex="periodic", bctypey="periodic")
+
+    return PlasmaEquilibrium(
+        equil_params=EquilibriumParams(
+            ro=ro,
+            zo=zo,
+            psio=psio,
+            mpsi=mpsi,
+            mtheta=mtheta,
+            psilow=psilow,
+            psihigh=psihigh,
+            newq0=newq0
+        ),
+        sq_out=sq,
+        rzphi_out=rzphi,
+        eqfun_out=eqfun
+    )
 
 end
