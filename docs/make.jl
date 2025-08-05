@@ -1,5 +1,17 @@
 using Documenter
-using JPEC
+
+# Try to load JPEC package
+try
+    using JPEC
+    @info "Successfully loaded JPEC package"
+catch e
+    @error "Failed to load JPEC package" exception=e
+    # Try to provide helpful debugging info
+    using Pkg
+    @info "Current project:" Pkg.project().path
+    @info "Installed packages:" keys(Pkg.dependencies())
+    rethrow()
+end
 
 makedocs(
     sitename = "JPEC.jl",

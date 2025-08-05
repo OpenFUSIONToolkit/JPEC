@@ -46,6 +46,12 @@ jobs:
       - name: Build package
         run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
 
+      - name: Instantiate docs environment
+        run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Add local package to docs environment
+        run: julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path="."))'
+
       - name: Build and deploy documentation
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
