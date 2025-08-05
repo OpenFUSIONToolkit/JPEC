@@ -78,7 +78,7 @@ end
     q_edge::Union{Nothing, Vector{Float64}} = nothing
     psi_edge::Union{Nothing, Vector{Float64}} = nothing
     dw_edge::Union{Nothing, Vector{ComplexF64}} = nothing
-    ud::Union{Nothing, Array{Float64,3} } = nothing #storage for u-derivative and xss # JMH - is there overlap with OdeState here? 
+    ud::Union{Nothing, Array{Float64,3} } = nothing #storage for u-derivative and xss # JMH - is there overlap with OdeState here?
     # JMH - changed previous line from Matrix to Array due to error - might have to modify depending on what ud looks like
 end
 
@@ -179,31 +179,31 @@ end
 @kwdef struct FourFitVars
 
     # Spline matrices
-    amats::JPEC.SplinesMod.ComplexSplineType
-    bmats::JPEC.SplinesMod.ComplexSplineType
-    cmats::JPEC.SplinesMod.ComplexSplineType
-    dmats::JPEC.SplinesMod.ComplexSplineType
-    emats::JPEC.SplinesMod.ComplexSplineType
-    hmats::JPEC.SplinesMod.ComplexSplineType
-    dbats::JPEC.SplinesMod.ComplexSplineType
-    ebats::JPEC.SplinesMod.ComplexSplineType
-    fbats::JPEC.SplinesMod.ComplexSplineType
-    fmats::JPEC.SplinesMod.ComplexSplineType
-    kmats::JPEC.SplinesMod.ComplexSplineType
-    gmats::JPEC.SplinesMod.ComplexSplineType
-    kaats::JPEC.SplinesMod.ComplexSplineType
-    gaats::JPEC.SplinesMod.ComplexSplineType
-    f0mats::JPEC.SplinesMod.ComplexSplineType
-    pmats::JPEC.SplinesMod.ComplexSplineType
-    paats::JPEC.SplinesMod.ComplexSplineType
-    kkmats::JPEC.SplinesMod.ComplexSplineType
-    kkaats::JPEC.SplinesMod.ComplexSplineType
-    r1mats::JPEC.SplinesMod.ComplexSplineType
-    r2mats::JPEC.SplinesMod.ComplexSplineType
-    r3mats::JPEC.SplinesMod.ComplexSplineType
-    akmats::JPEC.SplinesMod.ComplexSplineType
-    bkmats::JPEC.SplinesMod.ComplexSplineType
-    ckmats::JPEC.SplinesMod.ComplexSplineType
+    amats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    bmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    cmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    dmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    emats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    hmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    dbats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    ebats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    fbats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    fmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    kmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    gmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    kaats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    gaats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    f0mats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    pmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    paats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    kkmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    kkaats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    r1mats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    r2mats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    r3mats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    akmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    bkmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
+    ckmats::JPEC.SplinesMod.CubicSpline{ComplexF64}
 
     # k0s::JPEC.SplinesMod.SplineType
 
@@ -217,8 +217,8 @@ end
     dcon_kin_threads::Int = 0
 
     # kinetic ABCDEH mats for sing_mod
-    # kwmats::Vector{JPEC.SplinesMod.ComplexSplineType} = [JPEC.SplinesMod.ComplexSplineType() for _ in 1:6]
-    # ktmats::Vector{JPEC.SplinesMod.ComplexSplineType} = [JPEC.SplinesMod.ComplexSplineType() for _ in 1:6]
+    # kwmats::Vector{JPEC.SplinesMod.CubicSpline{ComplexF64}} = [JPEC.SplinesMod.CubicSpline{ComplexF64}() for _ in 1:6]
+    # ktmats::Vector{JPEC.SplinesMod.CubicSpline{ComplexF64}} = [JPEC.SplinesMod.CubicSpline{ComplexF64}() for _ in 1:6]
 end
 
 @kwdef mutable struct SingVars

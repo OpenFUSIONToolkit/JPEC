@@ -31,7 +31,7 @@ named `metric` in the Fortran `fourfit_make_metric` subroutine.
 - `ys::Vector{Float64}`: Poloidal angle coordinates `θ` in radians (0 to 2π).
 - `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi+1, mtheta+1, 8)`.
   The 8 quantities are: `g¹¹`, `g²²`, `g³³`, `g²³`, `g³¹`, `g¹²`, `J`, `∂J/∂ψ`.
-- `fspline::SplinesMod.FourierSplineType`: The fitted Fourier-cubic spline object.
+- `fspline::SplinesMod.FourierSpline`: The fitted Fourier-cubic spline object.
 - `name::String`, `title::Vector{String}`, `xtitle::String`, `ytitle::String`: Metadata.
 """
 mutable struct MetricData
@@ -41,7 +41,7 @@ mutable struct MetricData
     xs::Vector{Float64}
     ys::Vector{Float64}
     fs::Array{Float64, 3}
-    fspline::Union{SplinesMod.FourierSplineType, Nothing}
+    fspline::Union{SplinesMod.FourierSpline, Nothing}
     name::String
     title::Vector{String}
     xtitle::String
@@ -76,9 +76,9 @@ mutable struct MatrixData
     xs::Vector{Float64} # Radial coordinates (normalized poloidal flux `ψ_norm`)
 
     # Spline representations of the F, G, and K matrices
-    fmats::Union{SplinesMod.ComplexSplineType, Nothing}
-    gmats::Union{SplinesMod.ComplexSplineType, Nothing}
-    kmats::Union{SplinesMod.ComplexSplineType, Nothing}
+    fmats::Union{SplinesMod.CubicSpline{ComplexF64}, Nothing}
+    gmats::Union{SplinesMod.CubicSpline{ComplexF64}, Nothing}
+    kmats::Union{SplinesMod.CubicSpline{ComplexF64}, Nothing}
 
     amat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
     bmat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
@@ -204,13 +204,13 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium;
             # The final multiplication by `jac` is part of the original DCON formulation.
             g11 = sum(v[1, :] .^ 2) * jac
             g12 = sum(v[1, :] .* v[2, :]) * jac
-            g31 = v[3, 3] * v[1, 3] * jac 
+            g31 = v[3, 3] * v[1, 3] * jac
             g22 = sum(v[2, :] .^ 2) * jac
             g23 = v[2, 3] * v[3, 3] * jac
             g33 = v[3, 3] * v[3, 3] * jac
-            
-            
-            
+
+
+
 
             # Store results
             metric.fs[i, j, 1] = g11
@@ -230,7 +230,7 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium;
             #    println("v[1]: $(v[1,1]) $(v[1,2]) $(v[1,3])")
             #    println("v[2]: $(v[2,1]) $(v[2,2]) $(v[2,3])")
             #    println("v[3,3] $(v[3,3])")
-            #    
+            #
             #    println("--- g_ij values BEFORE storing ---")
             #    g11_val = sum(v[1, :] .^ 2) * jac
             #    g22_val = sum(v[2, :] .^ 2) * jac
@@ -238,8 +238,8 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium;
             #    g23_val = v[2, 3] * v[3, 3] * jac
             #    g31_val = v[3, 3] * v[1, 3] * jac
             #    g12_val = sum(v[1, :] .* v[2, :]) * jac
-            #    
-            #    
+            #
+            #
             #    println("g11, $g11_val")
             #    println("g22, $g22_val")
             #    println("g33, $g33_val")
@@ -249,7 +249,7 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium;
             #    println("---------------------------------------")
             #end
         end
-        
+
 
     end
     println("✅ Grid computation complete.")
@@ -265,20 +265,20 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium;
     # The poloidal (y) dimension is handled implicitly as periodic by the Fourier transform.
     metric.fspline = SplinesMod.fspline_setup(
         metric.xs,
-        metric.ys, 
+        metric.ys,
         metric.fs,
         mband;
         bctype=bctype_x,
         fit_method=fit_method
     )
     println("✅ Fourier-spline fitting successful.")
-    
+
     #if metric.fspline !== nothing && metric.fspline.cs !== nothing
     #    cs_spline = metric.fspline.cs
     #    # The fs field is a matrix of size (N x nqty)
     #    n_psi_points, n_quantities = size(cs_spline.fs)
     #    println("\n--- DEBUG INFO from make_metric ---")
-    #    println("Generated ComplexSplineType (cs) information:")
+    #    println("Generated CubicSpline{ComplexF64} (cs) information:")
     #    println("  Number of quantities (nqty): ", n_quantities)
     #    println("  Expected number of quantities: ", 8 * (mband + 1))
     #    println("  Shape of cs_spline.fs matrix: ", size(cs_spline.fs))
@@ -345,7 +345,7 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
 
     println("🔧 Starting MHD matrix calculation...")
 
-    
+
 
     # --- Extract inputs ---
     sq    = plasma_eq.sq
@@ -361,7 +361,7 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
     # Initialize result structures
     matrix_data = MatrixData(mpsi, mpert, mband, mlow, mhigh, nn)
     matrix_data.xs .= metric.xs
-    
+
     # Allocate banded storage
     n_fg_qty = div((mband + 1) * (2*mpert - mband), 2)
     fmats_fs = zeros(ComplexF64, mpsi+1, n_fg_qty)
@@ -460,12 +460,12 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
                 dmidx  = dm + mband + 1
                 # extract mode coefficients
 
-                
+
 
                 g11_d = g11[dmidx]; g22_d = g22[dmidx]; g33_d = g33[dmidx]
                 g23_d = g23[dmidx]; g31_d = g31[dmidx]; g12_d = g12[dmidx]
                 jm_d  = jmat[dmidx]; jm1_d = jmat1[dmidx]
-                
+
                 amat[ipert,jpert]     = (2π)^2 * (nn^2*g22_d + nn*(m1+m2)*g23_d + m1*m2*g33_d)
                 bmat[ipert,jpert]     = -2π*im*chi1*(nn*g22_d + (m1+nq)*g23_d + m1*q*g33_d)
                 cmat[ipert,jpert]     = 2π*im*((2π*im*chi1*sing2*(nn*g12_d + m1*g31_d))
@@ -496,8 +496,8 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
                 #    println("23 ",g23[dmidx])
                 #    println("33 ",g33[dmidx])
                 #    println("imat= ", imat[dmidx])
-                #    
-                #    
+                #
+                #
                 #    println("cmat_val = ", cmat[ipert,jpert])
                 #    println("---------------------------------------")
                 #end
@@ -506,7 +506,7 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
 
             end
         end
-        
+
         # 5️⃣  Factorize A and build composite F, G, K
         amat_fact = cholesky(Hermitian(amat), check=false)
         temp1 = amat_fact \ transpose(dmat)
