@@ -1,11 +1,14 @@
 *.mod
 *.dylib
-.vscode
+*.dll
+*.so
 *.o
 *.i
-*.so
+.vscode
 *.DS_Store
+notebooks/spline_examples.ipynb
 notebooks/*.in
+.gitattributes
 Manifest.toml
 build.log
 docs/build/
