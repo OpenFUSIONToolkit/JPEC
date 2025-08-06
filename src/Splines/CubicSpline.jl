@@ -106,7 +106,7 @@ end
 """
 spline_eval(spline::CubicSpline{T}, x, derivs::Int=0) where {T<:Union{Float64, ComplexF64}}
 	## Arguments:
-	- `spline`: A `Spline` object created by `spline_setup`.
+	- `spline`: A `Spline` object created by `CubicSpline`.
 	- `x`: A Float64 value or a vector of Float64 values representing the x-coordinates to evaluate the spline at.
 	## Returns:
 	- If `x` is a single Float64 value, returns a vector of Float64 values representing the function values at that x-coordinate.

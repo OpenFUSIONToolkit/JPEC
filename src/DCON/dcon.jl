@@ -1,5 +1,5 @@
 function MainProgram(in_path::String)
-    
+
   println("DCON START -> v$(Version)")
   println("----------------------------------")
   timer_start()   # Timer stub
@@ -10,13 +10,13 @@ function MainProgram(in_path::String)
   inputs = TOML.parsefile(in_path*"/dcon.toml")
   ctrl = DconControl(; (Symbol(k)=>v for (k,v) in inputs["DCON_CONTROL"])...)
   outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
-  intr = DconInternal() 
-  equil = setup_equilibrium(in_path*"/equil.toml")
+  intr = DconInternal()
+  equil = Equilibrium.setup_equilibrium(in_path*"/equil.toml")
 
 # -----------------------------------------------------------------------
 #     set up variables
 # -----------------------------------------------------------------------
-  # dcon_kin_threads logic? 
+  # dcon_kin_threads logic?
   ctrl.delta_mhigh *= 2   # for consistency with Fortran DCON
 
 #  -----------------------------------------------------------------------
@@ -33,7 +33,7 @@ function MainProgram(in_path::String)
 
 # -----------------------------------------------------------------------
 #  record the equilibrium properties (EQUIL TEAM)
-#  #TODO: is any of this necessary with the new equilibrium setup? 
+#  #TODO: is any of this necessary with the new equilibrium setup?
 # -----------------------------------------------------------------------
 #      CALL equil_out_diagnose(.FALSE.,out_unit)
 #      CALL equil_out_write_2d
@@ -54,7 +54,7 @@ function MainProgram(in_path::String)
 # -----------------------------------------------------------------------
 # TODO:    output surface quantities.
 # -----------------------------------------------------------------------
-#  TODO: what files do we want to put these in? 
+#  TODO: what files do we want to put these in?
     #   DO ipsi=0,mpsi
     #      WRITE(out_unit,20)ipsi,sq%xs(ipsi),sq%fs(ipsi,1)/twopi,
     #  $        sq%fs(ipsi,2),sq%fs(ipsi,3),sq%fs(ipsi,4),
@@ -115,7 +115,7 @@ function MainProgram(in_path::String)
     if ctrl.verbose
       println("Computing F, G, and K Matrices")
     end
-    
+
     # Compute matrices and populate FourFitVars struct
     make_matrix_populate!(ffit, equil, metric_result, 
                                   nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, 
@@ -156,7 +156,7 @@ function MainProgram(in_path::String)
     #   # ksing_find()
     # end
   end
-      
+
 # -----------------------------------------------------------------------
 #  TODO     integrate main ODE's.
 # -----------------------------------------------------------------------
@@ -187,7 +187,7 @@ function MainProgram(in_path::String)
 #      compute free boundary energies.
 # -----------------------------------------------------------------------
 # TODO: The initial set up in Julia will only handle psiedge = psilim and vac_flag=false
-# and no free boundary modes. This will need to be expanded to handle free boundary 
+# and no free boundary modes. This will need to be expanded to handle free boundary
 # conditions.
     # if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
     #   if ctrl.verbose
@@ -213,7 +213,7 @@ function MainProgram(in_path::String)
     # if outp.bin_euler
     #   bin_close(euler_bin_unit) # We have to decide how we're handling the file io
     # end
-    
+
 # -----------------------------------------------------------------------
 #      the bottom line.
 # -----------------------------------------------------------------------

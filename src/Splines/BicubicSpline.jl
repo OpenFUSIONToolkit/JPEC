@@ -59,7 +59,7 @@ function _bicube_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
 end
 
 """
-bicube_setup(xs, ys, fs;
+BicubicSpline(xs, ys, fs;
 	bctypex::Union{String, Int}="not-a-knot", bctypey::Union{String, Int}="not-a-knot")
 
 	## Arguments:
@@ -75,7 +75,7 @@ bicube_setup(xs, ys, fs;
 	and boundary condition types.
 """
 
-function bicube_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3};
+function BicubicSpline(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3};
 	bctypex::Union{String, Int}="not-a-knot", bctypey::Union{String, Int}="not-a-knot")
 
 	bctype_code_x = parse_bctype(bctypex)
@@ -107,7 +107,7 @@ end
 """
 bicube_eval(bicube::BicubicSpline, x, y, derivs::Int=0)
 	## Arguments:
-	- `bicube`: A `BicubicSpline` object created by `bicube_setup`.
+	- `bicube`: A `BicubicSpline` object.
 	- `x`: A Float64 value or a vector of Float64 values representing the x-coordinates to evaluate the bicubic spline at.
 	- `y`: A Float64 value or a vector of Float64 values representing the y-coordinates to evaluate the bicubic spline at.
 	## Returns:
