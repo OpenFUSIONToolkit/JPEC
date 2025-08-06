@@ -57,7 +57,7 @@ function setup_equilibrium(eq_config::EquilibriumConfig, additional_input=nothin
     elseif eq_type == "sol"
 
         if additonal_input === nothing
-            additional_input = SolevevConfig(eq_config.control.eq_filename) 
+            additional_input = SolevevConfig(eq_config.control.eq_filename)
         end
 
         eq_input = sol_run(eq_config, additional_input)
@@ -65,13 +65,13 @@ function setup_equilibrium(eq_config::EquilibriumConfig, additional_input=nothin
         # Example 1D spline setup
         xs = collect(0.0:0.1:1.0)
         fs = sin.(2π .* xs)  # vector of Float64
-        spline_ex = Spl.spline_setup(xs, fs)
+        spline_ex = Spl.CubicSpline(xs, fs)
         #println(spline_ex)
         # Example 2D bicubic spline setup
         xs = 0.0:0.1:1.0
         ys = 0.0:0.2:1.0
         fs = [sin(2π*x)*cos(2π*y) for x in xs, y in ys, _ in 1:1]
-        bicube_ex = Spl.bicube_setup(collect(xs), collect(ys), fs)
+        bicube_ex = Spl.BicubicSpline(collect(xs), collect(ys), fs)
         #println(bicube_ex)
         eq_input = InverseRunInput(
             eq_config,
@@ -403,30 +403,30 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
         r[ipsi+1, :] .= ro .+ rfac .* cos.(angle)
         z[ipsi+1, :] .= zo .+ rfac .* sin.(angle)
     end
-    
+
     flux_fs = zeros(Float64, mpsi+1, mtheta+1, 2)
     for ipsi in 0:mpsi
         for itheta in 0:mtheta
             f, fx, fy = Spl.bicube_eval(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1], 1)
             f1, f2, f4 = f[1], f[2], f[4]
-    
+
             fy1 = rzphi._fsy[ipsi+1, itheta+1, 1]
             fy2 = rzphi._fsy[ipsi+1, itheta+1, 2]
             fx1 = rzphi._fsx[ipsi+1, itheta+1, 1]
             fx2 = rzphi._fsx[ipsi+1, itheta+1, 2]
-    
+
             flux_fs[ipsi+1, itheta+1, 1] = fy1^2 / (4π^2 * f1) + (1 + fy2)^2 * 4 * f1
             flux_fs[ipsi+1, itheta+1, 2] = fx1 * fy1 / (4π^2 * f1) + fx2 * (1 + fy2) * 4 * f1
-    
+
             for iqty in 1:2
                 flux_fs[ipsi+1, itheta+1, iqty] *= 2π * psio / f4
             end
         end
     end
-    
-    
-    
-    flux = Spl.bicube_setup(collect(rzphi.xs), collect(rzphi.ys), flux_fs; bctypex=2, bctypey=2)
+
+
+
+    flux = Spl.BicubicSpline(collect(rzphi.xs), collect(rzphi.ys), flux_fs; bctypex=2, bctypey=2)
 
     source = zeros(Float64, mpsi+1, mtheta+1)
     for ipsi in 0:mpsi
@@ -464,7 +464,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
         fs_matrix[:, 1] = flux.fsx[ipsi+1, :, 1]
         fs_matrix[:, 2] = source[ipsi+1, :]
 
-        spline = Spl.spline_setup(Vector(flux.ys), fs_matrix; bctype=2)
+        spline = Spl.CubicSpline(Vector(flux.ys), fs_matrix; bctype=2)
         Spl.spline_integrate!(spline)
 
         term[ipsi+1, :] .= spline.fsi[end, :]
@@ -477,7 +477,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
 
     if diagnose_src
         println("Writing diagnostics to HDF5 files...")
-    
+
         # Write contour data
         h5open("gsec.h5", "w") do file
             file["mpsi"] = mpsi
@@ -491,7 +491,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
             file["error"] = Float32.(error)
             file["errlog"] = Float32.(errlog)
         end
-    
+
         # Write xy plot data
         h5open("gse.h5", "w") do file
             gse_data = Array{Float32, 3}(undef, mpsi+1, mtheta+1, 7)
@@ -508,7 +508,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
             end
             file["gse_data"] = gse_data
         end
-    
+
         # Write integrated error criterion
         h5open("gsei.h5", "w") do file
             file["xs"] = Float32.(flux.xs)
@@ -518,7 +518,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
             file["errlogi"] = Float32.(errlogi)
         end
     end
-    
+
 
     return equil
 

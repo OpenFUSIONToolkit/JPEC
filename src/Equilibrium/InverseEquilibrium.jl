@@ -1,7 +1,7 @@
 """
 Converts inverse equilibrium to straight-fieldline coordinates. Based on inverse.f
 Of the entries we need to return: PlasmaEquilibrium(equil_params, sq_out, rzphi_out, eqfun_out, ro, zo, psio),
-we only need to generate: sq_out, rzphi_out, eqfun_out. This is because we pass in InverseRunInput(equil_in, 
+we only need to generate: sq_out, rzphi_out, eqfun_out. This is because we pass in InverseRunInput(equil_in,
 sq_in, rz_in, ro, zo, psio).
 
 """
@@ -22,7 +22,7 @@ Performs component-wise Lagrange extrapolation for a vector-valued function.
 function inverse_extrap(xx::Matrix{Float64}, ff::Matrix{Float64}, x::Float64)::Vector{Float64}
     m, n = size(ff)             # m = number of data points, n = number of components
     f = zeros(Float64, n)       # Output vector
-    
+
     for i in 1:m
         term = copy(ff[i, :])   # Start with f_i (vector)
         for j in 1:m
@@ -33,7 +33,7 @@ function inverse_extrap(xx::Matrix{Float64}, ff::Matrix{Float64}, x::Float64)::V
         end
         f .+= term              # Accumulate to output
     end
-    
+
     return f
 end
 
@@ -112,7 +112,7 @@ function equilibrium_solver(input::InverseRunInput)
     rz_[:, :, 1] .= r2
     rz_[:, :, 2] .= deta
 
-    rz_spline = Spl.bicube_setup(rz_, rz_in.xs, rz_in.ys; bctypex="extrap", bctypey="periodic")
+    rz_spline = Spl.BicubicSpline(rz_, rz_in.xs, rz_in.ys; bctypex="extrap", bctypey="periodic")
 
     # c-----------------------------------------------------------------------
     # c     prepare new spline type for surface quantities.
@@ -127,8 +127,8 @@ function equilibrium_solver(input::InverseRunInput)
     # c-----------------------------------------------------------------------
     if grid_type == "ldp"
         xs = psilow .+ (psihigh - psilow) .* (sin.(range(0.0, 1.0; length=mpsi+1) .* (π/2))).^2
-        fs = zeros(Float64, mpsi+1, 4) 
-        sq = Spl.spline_setup(xs, fs; bctype="extrap")
+        fs = zeros(Float64, mpsi+1, 4)
+        sq = Spl.CubicSpline(xs, fs; bctype="extrap")
     else
         error("Only 'ldp' grid_type is implemented for now.")
     end
@@ -144,13 +144,13 @@ function equilibrium_solver(input::InverseRunInput)
     eqfun_xs = copy(sq.xs)
     eqfun_ys = collect(0:mtheta) ./ mtheta
 
-    rzphi = Spl.bicube_setup(copy(sq.xs), collect(0:mtheta) ./ mtheta, rzphi_fs)
-    eqfun = Spl.bicube_setup(copy(sq.xs), collect(0:mtheta) ./ mtheta, eqfun_fs)
+    rzphi = Spl.BicubicSpline(copy(sq.xs), collect(0:mtheta) ./ mtheta, rzphi_fs)
+    eqfun = Spl.BicubicSpline(copy(sq.xs), collect(0:mtheta) ./ mtheta, eqfun_fs)
 
 
     # spl_xs = zeros(Float64,mtheta+1)
     # spl_fs = zeros(Float64,mtheta+1, 5)
-    # spl = Spl.spline_setup(spl_xs, spl_fs; bctype="extrap")
+    # spl = Spl.CubicSpline(spl_xs, spl_fs; bctype="extrap")
 
     # for ipsi in 0:mpsi
     #     psifac = rzphi.xs[ipsi+1]
@@ -185,7 +185,7 @@ function equilibrium_solver(input::InverseRunInput)
     #     spl.fs[:, 2] .= spl.fs[:, 2] .+ rzphi.ys .- spl.xs
     #     spl.fs[:, 4] .= (spl.fs[:, 3] ./ spl.fsi[end, 3]) ./ (spl.fs[:, 5] ./ spl.fsi[end, 5]) .* spl.fsi[end, 3] * twopi * pi
     #     spl.fs[:, 3] .= f_sq[1] * pi / psio .* (spl.fsi[:, 4] .- spl.fsi[end, 4] .* spl.xs)
-    #     # spl.xs = Spl.spline_setup(spl.xs, spl.fs; bctype="periodic").integral!()
+    #     # spl.xs = Spl.CubicSpline(spl.xs, spl.fs; bctype="periodic").integral!()
 
     #     for itheta in 0:mtheta
     #         theta = rzphi.ys[itheta+1]
@@ -199,7 +199,7 @@ function equilibrium_solver(input::InverseRunInput)
     #     sq.fs[ipsi+1, 4] = spl.fsi[end, 4] * sq.fs[ipsi+1, 1] / (2 * twopi * psio)
     # end
 
-    # # sq = Spl.spline_setup(sq.xs, sq.fs; bctype="extrap")
+    # # sq = Spl.CubicSpline(sq.xs, sq.fs; bctype="extrap")
     # f = Spl.spline_eval(sq, sq.xs[1], 0)
     # _, f1 = Spl.spline_eval(sq, sq.xs[1], 1)
     # q0 = f[4] - f1[4] * sq.xs[1]

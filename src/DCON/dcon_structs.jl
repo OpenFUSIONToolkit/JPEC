@@ -176,34 +176,34 @@ end
     out_ahg2msc::Bool = true
 end
 
-@kwdef struct FourFitVars
+@kwdef mutable struct FourFitVars
 
     # Spline matrices
-    amats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    bmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    cmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    dmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    emats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    hmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    dbats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    ebats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    fbats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    fmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    kmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    gmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    kaats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    gaats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    f0mats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    pmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    paats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    kkmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    kkaats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    r1mats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    r2mats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    r3mats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    akmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    bkmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
-    ckmats::Union{Nothing,SplinesMod.FourierSpline} = nothing
+    amats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    bmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    cmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    dmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    emats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    hmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    dbats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    ebats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    fbats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    fmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    kmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    gmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    kaats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    gaats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    f0mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    pmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    paats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    kkmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    kkaats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    r1mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    r2mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    r3mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    akmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    bkmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    ckmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
 
     # k0s::JPEC.SplinesMod.SplineType
 

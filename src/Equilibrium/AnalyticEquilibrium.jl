@@ -152,7 +152,7 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
 
     xs_r = temp[:, 1]
     fs_r = temp[:, 2:9]
-    spl = Spl.spline_setup(xs_r, fs_r, bctype=4)
+    spl = Spl.CubicSpline(xs_r, fs_r, bctype=4)
 
     dr = lar_a / (ma + 1)
     r = 0.0
@@ -178,7 +178,7 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
         sq_fs[ia, 3] = qval
     end
 
-    sq_in = Spl.spline_setup(sq_xs, sq_fs, bctype=4)
+    sq_in = Spl.CubicSpline(sq_xs, sq_fs, bctype=4)
 
     rzphi_y_nodes = range(0.0, 2π, length=mtau + 1)
     rzphi_fs_nodes = zeros(ma + 1, mtau + 1, 2)
@@ -203,10 +203,10 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
         end
     end
 
-    rz_in = Spl.bicube_setup(r_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
+    rz_in = Spl.BicubicSpline(r_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
 
     return InverseRunInput(equil_input, sq_in, rz_in, lar_r0, 0.0, psio)
-    
+
 end
 
 
@@ -290,14 +290,14 @@ function sol_run(
     sqfs[:, 2] = pfac .* (1 * p0fac .- psis)
     sqfs[:, 3] .= 0.0
 
-    sq_in = Spl.spline_setup(psis, sqfs; bctype=3)
+    sq_in = Spl.CubicSpline(psis, sqfs; bctype=3)
     #-----------------------------------------------------------------------
     # compute 2D data
     #-----------------------------------------------------------------------
     for ir in 1:(mr)
         r[ir] = rmin + (ir-1) * (rmax - rmin) / mr
     end
-    
+
     for iz in 1:(mz)
         z[iz] = zmin + (iz-1) * (zmax - zmin) / mz
     end
@@ -310,7 +310,7 @@ function sol_run(
         end
     end
 
-    psi_in = Spl.bicube_setup(r, z, psifs; bctypex=3, bctypey=3)
+    psi_in = Spl.BicubicSpline(r, z, psifs; bctypex=3, bctypey=3)
     #-----------------------------------------------------------------------
     # process equilibrium
     #-----------------------------------------------------------------------
@@ -318,7 +318,7 @@ function sol_run(
     println("  mr=$mr, mz=$mz, ma=$ma")
     println("  e=$e, a=$a, r0=$r0")
     println("  q0=$q0, p0fac=$p0fac, b0fac=$b0fac, f0fac=$f0fac")
-    
+
     return DirectRunInput(equil_inputs, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
 
 end

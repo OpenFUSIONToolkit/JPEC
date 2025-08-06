@@ -257,13 +257,13 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium;
     # --- Fit the grid data to a Fourier-cubic spline ---
     println("🔧 Fitting Fourier-spline representation...")
     fit_method = fft_flag ? 2 : 1
-    # In Fortran, `bctype` was set for the periodic `y` dimension. Here, the `fspline_setup`
+    # In Fortran, `bctype` was set for the periodic `y` dimension. Here, the `FourierSpline`
     # `bctype` argument applies to the non-periodic `x` dimension. The Fortran
     # code used "extrap" for this.
     bctype_x = "not-a-knot"
 
     # The poloidal (y) dimension is handled implicitly as periodic by the Fourier transform.
-    metric.fspline = SplinesMod.fspline_setup(
+    metric.fspline = SplinesMod.FourierSpline(
         metric.xs,
         metric.ys,
         metric.fs,
@@ -550,9 +550,9 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
     println("✅ Grid computation complete.")
 
     # Final spline fits
-    matrix_data.fmats = SplinesMod.spline_setup(matrix_data.xs, fmats_fs; bctype="extrap")
-    matrix_data.gmats = SplinesMod.spline_setup(matrix_data.xs, gmats_fs; bctype="extrap")
-    matrix_data.kmats = SplinesMod.spline_setup(matrix_data.xs, kmats_fs; bctype="extrap")
+    matrix_data.fmats = SplinesMod.CubicSpline(matrix_data.xs, fmats_fs; bctype="extrap")
+    matrix_data.gmats = SplinesMod.CubicSpline(matrix_data.xs, gmats_fs; bctype="extrap")
+    matrix_data.kmats = SplinesMod.CubicSpline(matrix_data.xs, kmats_fs; bctype="extrap")
     println("🔧 Spline fitting complete.")
 
     return matrix_data
@@ -562,7 +562,7 @@ end
     populate_fourfit!(ffit::JPEC.DCON.FourFitVars, matrix_data::MatrixData)
 
 Populates a FourFitVars struct with the computed matrix data from make_matrix.
-This function bridges the gap between the fourfit.jl module outputs and the 
+This function bridges the gap between the fourfit.jl module outputs and the
 DCON workflow that uses FourFitVars.
 
 # Arguments
@@ -575,19 +575,19 @@ DCON workflow that uses FourFitVars.
 function populate_fourfit!(ffit, matrix_data::MatrixData)
     # Store the main spline matrices
     ffit.fmats = matrix_data.fmats
-    ffit.gmats = matrix_data.gmats  
+    ffit.gmats = matrix_data.gmats
     ffit.kmats = matrix_data.kmats
-    
+
     # Store diagnostic matrices if they exist (from verbose=true)
     if matrix_data.amat_diagnostics !== nothing
         # Convert 3D diagnostic arrays to splines
         mpsi = matrix_data.mpsi
         xs = matrix_data.xs
-        
+
         # Reshape the 3D arrays (mpsi+1, mpert, mpert) to 2D for spline fitting
         # Each column represents one matrix element flattened across ψ
         mpert = matrix_data.mpert
-        
+
         # Flatten the matrix dimensions: (mpsi+1, mpert*mpert)
         amat_flat = reshape(matrix_data.amat_diagnostics, mpsi+1, mpert*mpert)
         bmat_flat = reshape(matrix_data.bmat_diagnostics, mpsi+1, mpert*mpert)
@@ -595,21 +595,21 @@ function populate_fourfit!(ffit, matrix_data::MatrixData)
         dmat_flat = reshape(matrix_data.dmat_diagnostics, mpsi+1, mpert*mpert)
         emat_flat = reshape(matrix_data.emat_diagnostics, mpsi+1, mpert*mpert)
         hmat_flat = reshape(matrix_data.hmat_diagnostics, mpsi+1, mpert*mpert)
-        
+
         # Create splines for each diagnostic matrix
-        ffit.amats = SplinesMod.spline_setup(xs, amat_flat; bctype="extrap")
-        ffit.bmats = SplinesMod.spline_setup(xs, bmat_flat; bctype="extrap")
-        ffit.cmats = SplinesMod.spline_setup(xs, cmat_flat; bctype="extrap")
-        ffit.dmats = SplinesMod.spline_setup(xs, dmat_flat; bctype="extrap")
-        ffit.emats = SplinesMod.spline_setup(xs, emat_flat; bctype="extrap")
-        ffit.hmats = SplinesMod.spline_setup(xs, hmat_flat; bctype="extrap")
+        ffit.amats = SplinesMod.CubicSpline(xs, amat_flat; bctype="extrap")
+        ffit.bmats = SplinesMod.CubicSpline(xs, bmat_flat; bctype="extrap")
+        ffit.cmats = SplinesMod.CubicSpline(xs, cmat_flat; bctype="extrap")
+        ffit.dmats = SplinesMod.CubicSpline(xs, dmat_flat; bctype="extrap")
+        ffit.emats = SplinesMod.CubicSpline(xs, emat_flat; bctype="extrap")
+        ffit.hmats = SplinesMod.CubicSpline(xs, hmat_flat; bctype="extrap")
     end
-    
+
     return ffit
 end
 
 """
-    make_matrix_populate!(ffit::JPEC.DCON.FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibrium, 
+    make_matrix_populate!(ffit::JPEC.DCON.FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibrium,
                           metric::MetricData; kwargs...)
 
 Convenience function that combines make_matrix and populate_fourfit! into a single call.
@@ -626,7 +626,7 @@ Same as make_matrix: nn, mlow, mhigh, sas_flag, verbose
 # Returns
 - The modified `ffit` struct
 """
-function make_matrix_populate!(ffit, plasma_eq::Equilibrium.PlasmaEquilibrium, 
+function make_matrix_populate!(ffit, plasma_eq::Equilibrium.PlasmaEquilibrium,
                               metric::MetricData; kwargs...)
     matrix_data = make_matrix(plasma_eq, metric; kwargs...)
     populate_fourfit!(ffit, matrix_data)
