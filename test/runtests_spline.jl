@@ -3,7 +3,7 @@
         # Test the spline setup and evaluation functions
         @info "Testing spline setup and evaluation"
         # Make sine and cosine spline
-        xs = range(0.0, stop=2*pi, length=21)
+        xs = range(0.0; stop=2 * pi, length=21)
         xs = collect(xs)
         fs = sin.(xs)
         fc = cos.(xs)
@@ -11,27 +11,27 @@
         fs_matrix = hcat(fs, fc)
 
         # print(xs)
-        spline = JPEC.SplinesMod.spline_setup(xs, fs_matrix, 2);
+        spline = JPEC.SplinesMod.spline_setup(xs, fs_matrix, 2)
 
-        xs_fine = collect(range(0.0, stop=2*pi, length=100));
-        fs_fine = JPEC.SplinesMod.spline_eval(spline, xs_fine);
+        xs_fine = collect(range(0.0; stop=2 * pi, length=100))
+        fs_fine = JPEC.SplinesMod.spline_eval(spline, xs_fine)
 
         # Make e^-ix and e^ix complex valued spline
-        xs = range(0.0, stop=2*pi, length=20)
+        xs = range(0.0; stop=2 * pi, length=20)
         xs = collect(xs)
         fm = exp.(-im .* xs)
         fp = exp.(im .* xs)
         # Make a vector of vectors of (100,2) for the spline
         fs_matrix = hcat(fm, fp)
 
-        spline = JPEC.SplinesMod.spline_setup(xs, fs_matrix, 2);
+        spline = JPEC.SplinesMod.spline_setup(xs, fs_matrix, 2)
 
-        xs_fine = collect(range(0.0, stop=2*pi, length=100))
+        xs_fine = collect(range(0.0; stop=2 * pi, length=100))
         fs_fine = JPEC.SplinesMod.spline_eval(spline, xs_fine)
 
         # make a bicubic spline of a 2d periodic function
-        xs = range(0.0, stop=2*pi, length=20)
-        ys = range(0.0, stop=2*pi, length=20)
+        xs = range(0.0; stop=2 * pi, length=20)
+        ys = range(0.0; stop=2 * pi, length=20)
         xs = collect(xs)
         ys = collect(ys)
         fs1 = sin.(xs') .* cos.(ys) .+ 1.0
@@ -44,8 +44,8 @@
         bcspline = JPEC.SplinesMod.bicube_setup(xs, ys, fs, 2, 2)
 
         # Evaluate the bicubic spline
-        xs_fine = collect(range(0.0, stop=2*pi, length=100))
-        ys_fine = collect(range(0.0, stop=2*pi, length=100))
+        xs_fine = collect(range(0.0; stop=2 * pi, length=100))
+        ys_fine = collect(range(0.0; stop=2 * pi, length=100))
         # fs_fine, fsx_fine, fsy_fine, fsxx_fine, fsxy_fine, fsyy_fine = JPEC.SplinesMod.bicube_eval(bcspline, xs_fine, ys_fine, 2)
         fs_fine, fsx_fine, fsy_fine = JPEC.SplinesMod.bicube_eval(bcspline, xs_fine, ys_fine, 1)
         @test true
