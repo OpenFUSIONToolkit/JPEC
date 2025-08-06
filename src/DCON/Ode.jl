@@ -553,10 +553,15 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
         psiout = odet.psimax
     end
 
+    # test
+    du = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
+    params = (ctrl, equil, intr, odet, ffit)
+    sing_der!(du, odet.u, params, odet.psifac)    
+    
     # Advance differential equation
-    odet.istep += 1    
-    prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, ffit))
-    sol = solve(prob, abstol=vec(abs.(odet.atol)), reltol=rtol) #TODO: add flag for DiffEq solver here? 
+    odet.istep += 1
+    prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, odet, ffit))
+    sol = solve(prob, abstol=vec(abs.(odet.atol)), reltol=rtol) #TODO: add flag for DiffEq solver here?
 
     # Update u and psifac with the solution at the end of the interval
     odet.u .= sol.u[end]

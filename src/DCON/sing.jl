@@ -306,18 +306,18 @@ Fills `du` with the derivatives for the specified state and flux surface.
 # By doing this, DifferentialEquations.jl's solver packages are able to reduce the 
 # amount of array allocations and achieve better performance."
 """
-function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, FourFitVars}, psieval::Float64)
+function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, OdeState, FourFitVars}, psieval::Float64)
 
-    ctrl, equil, intr, ffit = params
+    ctrl, equil, intr, odet, ffit = params
     # Workspace
-    fmatb = zeros(eltype(fmats.f), mband+1, intr.mpert)
-    gmatb = zeros(eltype(gmats.f), mband+1, intr.mpert)
-    kmatb = zeros(eltype(kmats.f), 2*mband+1, intr.mpert)
-    du_temp = zeros(eltype(du), intr.mpert, intr.msol, 2)
+    fmatb = zeros(eltype(ffit.fmats.fs), intr.mband+1, intr.mpert)
+    gmatb = zeros(eltype(ffit.gmats.fs), intr.mband+1, intr.mpert)
+    kmatb = zeros(eltype(ffit.kmats.fs), 2*intr.mband+1, intr.mpert)
+    du_temp = zeros(eltype(du), intr.mpert, odet.msol, 2)
     
     # Spline evaluation
-    q = SplinesMod.spline_eval(equil.sq, psifac, 0)[4]
-    singfac .= intr.mlow .- ctrl.nn*q .+ collect(0:intr.mpert-1)
+    q = SplinesMod.spline_eval(equil.sq, psieval, 0)[4]
+    singfac = intr.mlow .- ctrl.nn*q .+ collect(0:intr.mpert-1)
     singfac .= 1.0 ./ singfac
     chi1 = 2π * equil.psio
 
@@ -405,9 +405,9 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         cmat = reshape(SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
 
         # TODO: double check this too. I changed the matrix copies below from fmats -> fmat, etc. 
-        fmat = SplinesMod.spline_eval(ffit.fmats, psieval, 0), intr.mpert, intr.mpert
-        kmat = SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert
-        gmat = SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert
+        fmat = SplinesMod.spline_eval(ffit.fmats, psieval, 0)
+        kmat = SplinesMod.spline_eval(ffit.kmats, psieval, 0)
+        gmat = SplinesMod.spline_eval(ffit.gmats, psieval, 0)
 
         #TODO: is this right? ChatGPT says it is equivalent so that is probably true
         # Says this will work if amat is Hermitian and positive definite - is it? 
@@ -419,9 +419,9 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         # copy ideal Hermitian banded matrices F and G
         iqty = 1
         @inbounds for jpert in 1:intr.mpert
-            for ipert in jpert:min(intr.mpert, jpert + mband)
-                fmatb[1 + ipert - jpert, jpert] = fmat.f[iqty]
-                gmatb[1 + ipert - jpert, jpert] = gmat.f[iqty]
+            for ipert in jpert:min(intr.mpert, jpert + intr.mband)
+                fmatb[1 + ipert - jpert, jpert] = fmat[iqty]
+                gmatb[1 + ipert - jpert, jpert] = gmat[iqty]
                 iqty += 1
             end
         end
@@ -429,8 +429,8 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         # copy ideal non-Hermitian banded matrix K
         iqty = 1
         @inbounds for jpert in 1:intr.mpert
-            for ipert in max(1, jpert - mband):min(intr.mpert, jpert + mband)
-                kmatb[1 + mband + ipert - jpert, jpert] = kmat.f[iqty]
+            for ipert in max(1, jpert - intr.mband):min(intr.mpert, jpert + intr.mband)
+                kmatb[1 + intr.mband + ipert - jpert, jpert] = kmat[iqty]
                 iqty += 1
             end
         end
@@ -450,10 +450,10 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         #     du[:,isol,2] .+= gaatb * u[:,isol,1] + kaatb * du[:,isol,1]
         # end
     else
-        K = BandedMatrix(kmatb, (mband, mband))
+        K = BandedMatrix(kmatb, (intr.mband, intr.mband))
         K_adj = adjoint(K)
-        Ffact = cholesky(Hermitian(BandedMatrix(fmatb, (0, mband)), :L))
-        Gmat = Hermitian(BandedMatrix(gmatb, (0, mband)), :L)
+        Ffact = cholesky(Hermitian(BandedMatrix(fmatb, (0, intr.mband)), :L))
+        Gmat = Hermitian(BandedMatrix(gmatb, (0, intr.mband)), :L)
 
         # 1. Compute du_temp[:,:,1] = u[:,:,2]*singfac - K * u[:,:,1]
         for isol in 1:msol
@@ -469,7 +469,7 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
 
         # 3. Compute du_temp[:,:,2] = Gmat * u[:,:,1] + K_adj * du_temp[:,:,1]
         # TODO: Apparently this can run into issues if gmat has complex diagonal entries
-        for isol in 1:msol
+        for isol in 1:odet.msol
             # du(:, isol, 2) += gmatb * u(:, isol, 1) + kmatb' * du(:, isol, 1)
             mul!(du_temp[:, isol, 2], Gmat, u[:, isol, 1], 1.0, 0.0)
             mul!(du_temp[:, isol, 2], K_adj, du_temp[:, isol, 1], 1.0, 1.0)
