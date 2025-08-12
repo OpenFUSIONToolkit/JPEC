@@ -47,4 +47,4 @@ Code
     julia> ]
     pkg> add Revise
 
-Now, in the top of each Jupyter notebook, you can call `using Revise` at the top of any Jupyter notebook to speed up compile times as you develop and test.
+Now, in the top of each Jupyter notebook, you can call `using Revise` at the top of any Jupyter notebook to speed up compile times as you develop and test. Better yet, set up your environement to [use Revise by default](https://timholy.github.io/Revise.jl/stable/config/#Using-Revise-by-default)
