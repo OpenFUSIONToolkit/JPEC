@@ -46,13 +46,12 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
     my = length(ys) - 1
     nqty = size(fs, 3)
 
-    h = Ref{Ptr{Cvoid}}()
+    h = Ref{Ptr{Cvoid}}()  
     ccall((:fspline_c_create, libspline), Cvoid,
           (Int64, Int64, Int64, Int64, Ref{Ptr{Cvoid}}),
           mx, my, mband, nqty, h)
 
     handle = h[]
-
     ccall((:fspline_c_setup, libspline), Cvoid,
           (Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
           handle, xs, ys, fs)
@@ -71,7 +70,6 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
     # 1. Get the handle to the embedded cspline object
 
     cs_handle_ref = Ref{Ptr{Cvoid}}()
-
     ccall((:fspline_c_get_cspline_handle, libspline), Cvoid,
           (Ptr{Cvoid}, Ref{Ptr{Cvoid}}),
           handle, cs_handle_ref)
@@ -81,11 +79,9 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
     cs_mx = mx
     cs_nqty = (mband + 1) * nqty
     cs_fs = Matrix{ComplexF64}(undef, cs_mx + 1, cs_nqty)
-
     ccall((:fspline_c_get_cspline_fs, libspline), Cvoid,
           (Ptr{Cvoid}, Ptr{ComplexF64}),
-          cs_handle, cs_fs)
-
+          handle, cs_fs)
     unmanaged_cspline = CubicSpline(cs_handle, xs, cs_fs, cs_mx, cs_nqty)
 
     # 4. Assign it to the parent object
@@ -135,7 +131,6 @@ function FourierSpline(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float
     bctype_code = parse_bctype(bctype)
 
     @assert bctype_code != 1 "Fourier spline doesn't have natural spline. (bctype = 1/natural)"
-
     # Call the internal setup function that creates and fits the spline
     fspline = _fspline_setup(xs, ys, fs, mband, Int32(bctype_code), Int32(fit_method), fit_flag)
 
