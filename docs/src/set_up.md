@@ -21,7 +21,7 @@
         sudo apt update && sudo apt upgrade -y
         ```
 2. Install build tools in WSL
-    ```Powershell
+    ```shell
     sudo apt install build-essential gfortran cmake -y
     ```
 
@@ -34,7 +34,7 @@
 3. Install Julia in WSL
    
     1. Download the latest Linux tarball from the official site [Julia downloads](https://julialang.org/downloads/). It will look like
-        ``` shell 
+        ```shell 
         wget https://julialang-s3.julialang.org/bin/linux/x64/1.11/julia-1.11.3-linux-x86_64.tar.gz
         ```
 
@@ -42,7 +42,7 @@
 
     2. Extract and move it to /opt (or any path):
 
-        ``` shell
+        ```shell
         tar -xvzf julia-1.11.3-linux-x86_64.tar.gz
         sudo mv julia-1.11.3 /opt/
         ```
@@ -51,14 +51,14 @@
     
     3. Add Julia to PATH:
 
-        ``` shell 
+        ```shell 
         echo 'export PATH=/opt/julia-1.11.3/bin:$PATH' >> ~/.bashrc
         source ~/.bashrc
         ```
 
     4. Test it is properly installed
 
-        ``` shell
+        ```shell
         julia --version 
         ```
 
@@ -66,25 +66,25 @@
    
    This step is only really required if you want to run the `.ipynb` test notebooks.
    1. To install Python3 and Jupyter notebooks, use these commands
-        ``` shell
+        ```shell
         sudo apt install python3-pip python3-venv -y
         python3 -m pip install --user jupyter jupyterlab notebook ipykernel
         ```
     ⚠ Important: Add local Python scripts to PATH:
 
-        ``` shell
+        ```shell
         echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
         source ~/.bashrc
         ```
     2. Verify it is properly installed
 
-        ``` shell
+        ```shell
         jupyter --version
         ```
 
 5. Clone or move JPEC into WSL home folder.
 It’s recommended to avoid OneDrive for builds (slower, permission issues):
-    ``` shell
+    ```shell
     cp -r /mnt/c/Users/<Username>/<Path>/JPEC ~/JPEC
     cd ~/JPEC
     ```
@@ -95,7 +95,7 @@ It’s recommended to avoid OneDrive for builds (slower, permission issues):
 
     Alternatively you can clone it from GitHub directly to your virtual machine.
 
-    ``` shell
+    ```shell
     git clone https://github.com/OpenFUSIONToolkit/JPEC.git
     cd JPEC
     ```
@@ -104,7 +104,7 @@ It’s recommended to avoid OneDrive for builds (slower, permission issues):
 
 6. Build Fortran dependencies (libspline.so)
     1. Go to the spline source folder:
-        ``` shell
+        ```shell
         cd ~/JPEC/src/Splines/fortran
         ```
 
@@ -133,22 +133,22 @@ It’s recommended to avoid OneDrive for builds (slower, permission issues):
 
 
     3. Back in the shell, clean previous builds using
-        ``` shell
+        ```shell
         make clean
         ```
 
     4. Build
-        ``` shell
+        ```shell
         make
         ```
 
     5. Verify the library exists using
-        ``` shell
+        ```shell
         ls ../../../deps/libspline.so
         ```
 
    6. Export library path so Julia can find it
-        ``` shell
+        ```shell
         export LD_LIBRARY_PATH=~/JPEC/deps:$LD_LIBRARY_PATH
         ```
 
@@ -156,7 +156,7 @@ It’s recommended to avoid OneDrive for builds (slower, permission issues):
 
 7. Install the Julia packages for JPEC
     1. Launch Julia:
-        ``` shell
+        ```shell
         julia
         ```
     2. In Julia REPL:
@@ -187,7 +187,7 @@ It’s recommended to avoid OneDrive for builds (slower, permission issues):
         
         4. Open a terminal inside VS Code — it will automatically use WSL/Ubuntu.
         5. You can now run:
-            ``` shell
+            ```shell
             make        # rebuild libspline.so if needed
             julia       # run scripts
             jupyter notebook --no-browser
@@ -197,7 +197,7 @@ It’s recommended to avoid OneDrive for builds (slower, permission issues):
     3.  Run JPEC
         1. Make sure you are in WSL terminal, with `LD_LIBRARY_PATH` set to include deps.
         2. Launch Julia and run your scripts as usual:
-            ``` shell
+            ```shell
             include("path/to/jpec_script.jl")
             ```
 
