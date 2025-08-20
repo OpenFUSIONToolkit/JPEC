@@ -230,75 +230,20 @@ function search(xbar, x::AbstractVector{<:Real})
 end
 
 #############################################################
-# Legendre function of the first kind eq.(47)~(50) , replacing aleg
+# Legendre function of the first kind eq.(47)~(50) , replacing aleg. (verified)
 #############################################################
 
-# Chance eq.(49)
-function P0_minus_half(s)
-    m1 = 2 / (s + 1)
-    return 2 / π * sqrt(m1) * ellipk(m1)
-end
 
-# Chance eq.(49) (wrong/original)
-function P0_minus_half_wrong(s)
-    m1 = 2 / (s + 1)
-    return 2 / π * sqrt(m1) * ellipkwrong(m1)
-end
+"""
+    This function is different from elliptic integral K(k). Be careful.
 
-# Chance eq.(50)
-function P0_plus_half(s)
-    m1 = 1 / (s + sqrt(s^2 - 1))^2
-    return 2 / π * sqrt(m1) * ellipe(m1)
-end
-
-# Chance eq.(50) (wrong/original)
-function P0_plus_half_wrong(s)
-    m1 = (s + sqrt(s^2 - 1))
-    return 2 / π * sqrt(m1) * ellipewrong(1/m1^2)
-end
-
-# Chance eq.(48)
-function P1_minus_half(s)
-    return 0.5 / ((s^2 - 1)^0.5) * (P0_plus_half(s) - s * P0_minus_half(s))
-end
-
-# Chance eq.(48) (wrong/original)
-function P1_minus_half_wrong(s)
-    return 0.5 / ((s^2 - 1)^0.5) * (P0_plus_half_wrong(s) - s * P0_minus_half_wrong(s))
-end
-
-# Polynomial elliptical integrals from original Chance code
-function ellipewrong(x1)
-
-    if x1 < 0.0 || x1 > 1.0
-        throw(DomainError(m1, "Input `x1` must be in the range (0, 1]."))
-    end
-
-    log_x1 = log(x1)
-
-    ae1=0.44325141463
-    ae2=0.0626060122
-    ae3=0.04757383546
-    ae4=0.01736506451
-    be1=0.2499836831
-    be2=0.09200180037
-    be3=0.04069697526
-    be4=0.00526449639
-
-    p = @evalpoly(x1, 1.0, ae1, ae2, ae3, ae4)
-    q = @evalpoly(x1, 0.0, be1, be2, be3, be4)
-
-    ellipe = p - q * log_x1
-    return ellipe
-
-end
-
-function ellipkwrong(m1)
+Returns : K(1-m1)
+"""
+function ellipk_old(m1)
 
     if m1 < 0.0 || m1 > 1.0
         throw(DomainError(m1, "Input `m1` must be in the range (0, 1]."))
     end
-
     log_m1 = log(m1)
 
     ak0 = 1.38629436112
@@ -319,6 +264,56 @@ function ellipkwrong(m1)
     return ellipk
 end
 
+
+"""
+    This function is different from elliptic integral E(k). Be careful.
+
+Returns : E(1-m1)
+"""
+function ellipe_old(m1)
+
+    if m1 < 0.0 || m1 > 1.0
+        throw(DomainError(m1, "Input `x1` must be in the range (0, 1]."))
+    end
+    log_x1 = log(m1)
+
+    ae1=0.44325141463
+    ae2=0.0626060122
+    ae3=0.04757383546
+    ae4=0.01736506451
+    be1=0.2499836831
+    be2=0.09200180037
+    be3=0.04069697526
+    be4=0.00526449639
+
+    p = @evalpoly(m1, 1.0, ae1, ae2, ae3, ae4)
+    q = @evalpoly(m1, 0.0, be1, be2, be3, be4)
+
+    ellipe = p - q * log_x1
+    return ellipe
+
+end
+
+
+# Chance eq.(49) (original)
+function P0_minus_half_old(s)
+    m1 = 2 / (s + 1)
+    return 2 / π * sqrt(m1) * ellipk_old(m1)
+end
+
+# Chance eq.(50) (original)
+function P0_plus_half_old(s)
+    m1 = (s + sqrt(s^2 - 1))^(-2)
+    return 2 / π * m1^(-1/4) * ellipe_old(m1)
+end
+
+
+# Chance eq.(48) (original)
+function P1_minus_half_old(s)
+    return 0.5 / ((s^2 - 1)^0.5) * (P0_plus_half_old(s) - s * P0_minus_half_old(s))
+end
+
+
 """
     Pn_minus_half(s, n)
 
@@ -329,54 +324,22 @@ Compute the Legendre function of the first kind of order -1/2, Pⁿ_{-1/2}(s), r
 - `n::Int`  : Maximum order n (n ≥ 0)
 
 # Returns
-- `P[end]` :  Value of P_{-1/2}^{n}(s) at the highest order n
-
+- `P[end]` :  Value of P_{-1/2}^{0~n+1}(s)
 """
-function Pn_minus_half(s::Real, n::Int)
+function Pn_minus_half_old(s::Real, n::Int)
 
     #initialize
-    P = zeros(n + 1)
+    P = zeros(n + 2)
 
     # n = 0
-    P[1] = P0_minus_half(s)
+    P[1] = P0_minus_half_old(s)
+    P[2] = P1_minus_half_old(s)
     if n == 0
         return P
     end
 
-    # n = 1
-    P[2] = P1_minus_half(s)
-    if n == 1
-        return P
-    end
-
-    # n > 1
-    for i in 1:n-1
-        # Chance eq.(47)
-        P[i+2] = -2 * i * s / sqrt(s^2 - 1) * P[i+1] - (i - 0.5)^2 * P[i]
-    end
-
-    return P
-end
-
-function Pn_minus_half_wrong(s::Real, n::Int)
-
-    #initialize
-    P = zeros(n + 1)
-
-    # n = 0
-    P[1] = P0_minus_half(s)
-    if n == 0
-        return P
-    end
-
-    # n = 1
-    P[2] = P1_minus_half_wrong(s)
-    if n == 1
-        return P
-    end
-
-    # n > 1
-    for i in 1:n-1
+    # n ≥ 1
+    for i in 1:n
         # Chance eq.(47)
         P[i+2] = -2 * i * s / sqrt(s^2 - 1) * P[i+1] - (i - 0.5)^2 * P[i]
     end
@@ -385,7 +348,7 @@ function Pn_minus_half_wrong(s::Real, n::Int)
 end
 
 #############################################################
-# Green function eq.(36)~(42). replacing green
+# Green function eq.(36)~(42). replacing green (verified)
 #############################################################
 
 """
@@ -394,19 +357,17 @@ end
 Compute the Green's function and related quantities for axisymmetric geometry.
 
 # Arguments
-- `xs`, `zs`: Observation point coordinates (Float64)
-- `xt`, `zt`: Source point coordinates (Float64)
+- `xs`, `zs`: Observation point coordinates (X,Z) (Float64)
+- `xt`, `zt`: Source point coordinates (X',Z')(Float64)
 - `xtp`, `ztp`: Derivatives ∂X'/∂θ, ∂Z'/∂θ (Float64)
 - `n`: Mode number (Int)
-- `usechancebugs`: Use original Chance code bugs for comparability (default: false)
 
 # Returns
-- `G`:      2π𝒢ⁿ(θ,θ′) — Green's function value
 - `aval`:   𝒥 ∇'𝒢ⁿ∇'ℒ — Coupling term for mode n
-- `aval0`:  𝒥 ∇'𝒢⁰∇'ℒ — Coupling term for mode 0
-- `bval`:   2π𝒢ⁿ(θ,θ′) or -2π𝒢ⁿ(θ,θ′) (depends on `usechancebugs`)
+- `aval0`:  1/(2√π) 𝒥 ∇'𝒢⁰∇'ℒ — Coupling term for mode 0
+- `bval`:   2π𝒢ⁿ(θ,θ′) — Green's function value
 """
-function green(xs, zs, xt, zt, xtp, ztp, n, usechancebugs=false)
+function green(xs, zs, xt, zt, xtp, ztp, n)
 
     xs2 = xs^2
     xt2 = xt^2
@@ -421,68 +382,59 @@ function green(xs, zs, xt, zt, xtp, ztp, n, usechancebugs=false)
     R4 = ρ2 * (ρ2 + 4 * x_multiple)
     R2 = sqrt(R4) 
     R = sqrt(R2)
+    R5 = R4 * R
 
     # Chance eq.(42) 𝘴 = s
     s = (xs2 + xt2 + ζ2) / R2
+    println("s: ",s)
     
     # Legendre functions for 
     # P⁰ = p0, P¹ = p1, Pⁿ = pn, Pⁿ⁺¹ = pp 
-    if usechancebugs
-        legendre = Pn_minus_half_wrong(s, n)
+    if old_flag
+        legendre = Pn_minus_half_old(s, n)
     else
-        legendre = Pn_minus_half(s, n+1)
+        legendre = Pn_minus_half(s, n)
     end
+
     p0 = legendre[1]
     p1 = legendre[2]
     pp = legendre[end]
     pn = legendre[end-1]
 
-    # Chance eq.(40) 2π⅁ⁿ = G
+    pn = -0.11428891147663127
+    pp = 0.14546414388934609
+
+    # Chance eq.(40) 2π𝒢ⁿ = G
     gg = 2 * sqrt(π) * gamma(0.5 - n) / R
     G = gg * pn
 
     # Chance eq.(44)
-    # coefficient
-    grad_gg = gg / R4
+    grad_gg = gg / R4 /2π
 
-    if usechancebugs == false
-        # ∂Gⁿ/∂X' = dG_dX
-        aval1 = (n * (xs2 + xt2 + ζ2)*(xs2 - xt2 + ζ2) - xt2*(xt2-xs2+ζ2)) * pn
-        aval2 = (2.0 * xt * xs * (xs2-xt2+ζ2)) * pp 
-        dG_dX = grad_gg * (aval1 + aval2) / xt
-        
-        # ∂Gⁿ/∂Z' = dG_dZ
-        aval3 = (2.0 * n + 1.0) * (xs2 + xt2 + ζ2) * pn
-        aval4 = 4.0 * x_multiple * pp
-        dG_dZ = grad_gg * (aval3 + aval4) * ζ
-        
-        # Chance eq.(51) 
-        # 𝒥 ∇'𝒢ⁿ∇'ℒ = aval
-        # ∂X'/∂θ = xtp, ∂Z'/∂θ = ztp
-        aval = -xt * (ztp * dG_dX - xtp * dG_dZ)
+    # ∂Gⁿ/∂X' = dG_dX
+    aval1 = (n * (xs2 + xt2 + ζ2)*(xs2 - xt2 + ζ2) - xt2*(xt2-xs2+ζ2)) * pn
+    aval2 = (2.0 * xt * xs * (xs2-xt2+ζ2)) * pp 
+    dG_dX = grad_gg * (aval1 + aval2) / xt
+    
+    # ∂Gⁿ/∂Z' = dG_dZ
+    aval3 = (2.0 * n + 1.0) * (xs2 + xt2 + ζ2) * pn
+    aval4 = 4.0 * x_multiple * pp
+    dG_dZ = grad_gg * (aval3 + aval4) * ζ
+    
+    # Chance eq.(51) 
+    # 𝒥 ∇'𝒢ⁿ∇'ℒ = aval
+    # ∂X'/∂θ = xtp, ∂Z'/∂θ = ztp
+    aval = -xt * (ztp * dG_dX - xtp * dG_dZ)
 
-        # bval
-        bval = G
+    # bval. bval = 2π𝒢ⁿ
+    bval = G
 
-        # for 𝓃⩵0,  aval0 = 𝒥 ∇'𝒢⁰∇'ℒ 
-        dG_dX0 = grad_gg * (2.0 * xt * xs * (xs2-xt2+ζ2)) * p1 - xt2*(xt2-xs2+ζ2) * p0 / xt
-        dG_dZ0 = grad_gg * ((xs2 + xt2 + ζ2) * p0 + 4.0 * x_multiple * p1) * ζ
-        aval0 = -xt * (ztp * dG_dX0 - xtp * dG_dZ0)
-    else
-        bval  = -gg*pn
-        aval1 = ( n*(xs2+xt2+ζ2)*(xt2-xs2-ζ2)+xt2*(xm2+ζ2))*pn
-        aval2 = 2.0*xt*xs*(xs2-xt2-ζ2)*pp
-        aval3 = ztp*(aval1+aval2) / xt
-        aval4 = (2.0*n+1.0)*(xp2+ζ2)*pn+4.0*xt*xs*pp
-        aval5 = xtp*(zt-zs)*aval4
-        aval6 =(aval3-aval5) / ( xt*R4)
-        aval = - xt2*aval6 * gg / (2*π)
-        aval0 = ztp*(two*xs*(zm2-ζ2)*aleg1 - xt*(xm2+ζ2)*p0)
-        aval0 = aval0 + xtp*(zt-zs)*(4.0*xt*xs*p1+(xp2+zm2)*p0)
-        aval0 = -aval0*xt / (R4*rR)
-    end
+    # for 𝓃⩵0,  aval0 = 1/(2√π) 𝒥 ∇'𝒢⁰∇'ℒ 
+    dG_dX0 = 1/(R5*xt) * ((2.0 * xt * xs * (xs2-xt2+ζ2)) * p1 - xt2*(xt2-xs2+ζ2) * p0 ) 
+    dG_dZ0 = 1/(R5)* ζ * ((xs2 + xt2 + ζ2) * p0 + 4.0 * x_multiple * p1) 
+    aval0 = -xt * (ztp * dG_dX0 - xtp * dG_dZ0)
 
-    return G, aval, aval0, bval
+    return aval, aval0, bval
 end
 
 #############################################################
