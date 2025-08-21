@@ -82,11 +82,12 @@ immutable/thread-safe for the duration of a run. Anything set directly by user i
 - `farwal`: "Far wall" logic, set by geometry checks.
 - `kernelsign`: Sign for kernel; +1 or -1 (set by main routine, default +1).
 """
-@kwdef struct VacuumGlobalsType
-    mth::Int
-    mth1::Int
-    mth2::Int
-    nfm::Int
+@kwdef mutable struct VacuumGlobalsType
+    n::Int      =1
+    mth::Int    =512
+    mth1::Int   =513
+    mth2::Int   =514
+    nfm::Int    
     mtot::Int
 
     lmin::Vector{Int}
@@ -107,9 +108,9 @@ immutable/thread-safe for the duration of a run. Anything set directly by user i
     xwalp::Vector{Float64}
     zwalp::Vector{Float64}
 
-    dth::Float64
-    wall::Bool
-    farwal::Bool
+    dth::Float64    
+    wall::Bool      =true
+    farwal::Bool    =true
     kernelsign::Float64
 end
 

@@ -352,7 +352,7 @@ end
 #############################################################
 
 """
-    green(xs, zs, xt, zt, xtp, ztp, n; usechancebugs=false)
+    green(xs, zs, xt, zt, xtp, ztp, n)
 
 Compute the Green's function and related quantities for axisymmetric geometry.
 
