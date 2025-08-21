@@ -33,7 +33,7 @@ all : $(OUTLIB)
 
 $(OUTLIB): $(OBJS)
 	$(FC) $(LDFLAGS) -o $@ $^ $(LIBS)
-	mv $(OUTLIB) ../../../deps/
+	cp $(OUTLIB) ../../../deps/
 
 clean:
 	rm -f *.o *.mod *.original *.dylib

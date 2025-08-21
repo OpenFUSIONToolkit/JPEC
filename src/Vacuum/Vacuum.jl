@@ -2,6 +2,9 @@ module VacuumMod
 
 export mscvac, set_dcon_params
 
+# ======================================================================
+# Legacy fortran vacuum module interface
+# ======================================================================
 
 const libdir = joinpath(@__DIR__, "..", "..", "deps")
 const libvac = joinpath(libdir, "libvac")
