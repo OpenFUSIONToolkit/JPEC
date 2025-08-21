@@ -1,6 +1,6 @@
 [EQUIL_CONTROL]
-eq_type = "chease2"             # Type of the input 2D equilibrium file
-eq_filename = "inverse.chease.10"  # path to equilibrium file
+eq_type = "chease"             # Type of the input 2D equilibrium file
+eq_filename = "INP1"  # path to equilibrium file
 
 jac_type = "hamada"          # Coordinate system (hamada, pest, boozer, equal_arc)
 power_bp = 0                 # del.B ~ B_p^power_bp * B^power_b / R^power_r

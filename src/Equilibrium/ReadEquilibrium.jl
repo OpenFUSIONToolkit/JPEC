@@ -265,3 +265,146 @@ function read_chease2(config::EquilConfig)
         return InverseRunInput(config,sq_in,rz_in,ro,zo,psio)
 end
 
+"""
+    _read_chease(equil_config)
+
+Parses a binary CHEASE file, creates initial 1D and 2D splines, and bundles
+them into a `InverseRunInput` object.
+
+## Arguments:
+- `equil_config`: The `EquilConfig` object containing the filename and parameters.
+## Returns:
+- A `InverseRunInput` object ready for the inverse solver.
+"""
+
+function read_chease(config::EquilConfig)
+    println("--> Reading CHEASE file: $(config.control.eq_filename)")
+    diagnostics = false # Set to true to enable detailed print output
+    open(config.control.eq_filename, "r") do io
+        # Read first 3 integers
+        seekstart(io)
+        read(io, UInt32)  # skip record length at start
+        ntnova = read(io, Int32)
+        npsi1  = read(io, Int32)
+        nsym   = read(io, Int32)
+        read(io, UInt32)  # skip record length at end
+
+        if diagnostics
+            println("Header:")
+            println("  ntnova = $ntnova   Type=$(typeof(ntnova))  Bytes=$(sizeof(ntnova))")
+            println("  npsi1  = $npsi1   Type=$(typeof(npsi1))  Bytes=$(sizeof(npsi1))")
+            println("  nsym   = $nsym   Type=$(typeof(nsym))  Bytes=$(sizeof(nsym))")
+        end
+
+        # Read next 5 Float64 values (axx)
+        read(io, UInt32)  # skip record length at start
+        axx = [read(io, Float64) for _ in 1:5]
+        if diagnostics
+            println("\naxx array (expected 5 Float64 values):")
+            for (i, val) in enumerate(axx)
+                println("  axx[$i] = $val   Type=$(typeof(val))  Bytes=$(sizeof(val))")
+            end
+        end
+        read(io, UInt32)  # skip record length at end
+
+        # --- Helper function ---
+        function print_summary(name, arr)
+            n = length(arr)
+            first5 = arr[1:min(5, n)]
+            last5  = arr[max(1, n-4):end]
+            println("$name first 5: ", first5)
+            println("$name last 5:  ", last5)
+        end
+
+        # --- Pre-allocate Arrays ---
+        zcpr  = zeros(npsi1 - 1)
+        zcppr = zeros(npsi1)
+        zq    = zeros(npsi1)
+        zdq   = zeros(npsi1)
+        ztmf  = zeros(npsi1)
+        ztp   = zeros(npsi1)
+        zfb   = zeros(npsi1)
+        zfbp  = zeros(npsi1)
+        zpsi  = zeros(npsi1)
+        zpsim = zeros(npsi1 - 1)
+
+        # --- Read 1D arrays from file ---
+        for (name, arr) in zip(
+                ("zcpr","zcppr","zq","zdq","ztmf","ztp","zfb","zfbp","zpsi","zpsim"),
+                (zcpr,  zcppr,  zq,  zdq,  ztmf,  ztp,  zfb,  zfbp,  zpsi,  zpsim)
+            )
+            read(io, UInt32)  # skip record length at start
+            read!(io, arr)
+            read(io, UInt32)  # skip record length at end
+            if diagnostics print_summary(name, arr); end
+        end
+
+        # --- Prepare spline & geometry ---
+        ma = npsi1 - 1
+        psio = zpsi[npsi1] - zpsi[1]
+        xs = (zpsi .- zpsi[1]) ./ psio
+
+        fs = zeros(npsi1, 4)
+        fs[:, 1] .= ztmf
+        fs[:, 2] .= zcppr
+        fs[:, 3] .= zq
+
+        sq_in = Spl.spline_setup(xs, fs; bctype=3)
+        Spl.spline_integrate!(sq_in)
+        fs_copy = copy(sq_in.fs)
+        fs_copy[:, 2] .= (sq_in.fsi[:, 2] .- sq_in.fsi[ma, 2]) .* psio
+        sq_in = Spl.spline_setup(sq_in._xs, fs_copy; bctype=3)
+
+        # --- Setup parameters ---
+        mtau = ntnova
+
+        # Allocate fs array (radial × poloidal × 2)
+        fs = zeros(npsi1, mtau, 2)
+
+        # Allocate buffer (Fortran: ALLOCATE(buffer(ntnova+3, npsi1)))
+        buffer = zeros(Float64, ntnova+3, npsi1)
+
+        # --- First read (R data) ---
+        read(io, UInt32)  # skip record length at start
+        read!(io, buffer)                         # READ(in_unit) buffer
+        read(io, UInt32)  # skip record length at end
+        ro = buffer[1, 1]                         # ro = buffer(1,1)
+        if diagnostics println("ro = $ro"); end
+
+        # Fill with r-coordinates
+        fs[:, :, 1] .= transpose(buffer[1:ntnova, :])
+
+        # --- Second read (Z data) ---
+        read(io, UInt32)  # skip record length at start
+        read!(io, buffer)                         # READ(in_unit) buffer
+        read(io, UInt32)  # skip record length at end
+        zo = buffer[1, 1]                         # zo = buffer(1,1)
+        if diagnostics println("zo = $zo"); end
+
+        # Fill with z-coordinates
+        fs[:, :, 2] .= transpose(buffer[1:ntnova, :])
+
+        # Construct ys grid (0..2π, length = mtau)
+        ys = range(0, 2π, length=mtau) |> collect
+
+        # Setup bicubic spline with periodic boundary conditions
+        rz_in = Spl.bicube_setup(xs, ys, fs; bctypex=2, bctypey=2)
+
+        if diagnostics
+            # --- Print first 5 and last 5 entries of each slice ---
+            for k in 1:2
+                flat = vec(fs[:, :, k])  # flatten to 1D
+                n = length(flat)
+                println("Slice $k:")
+                println("  First 5 entries: ", flat[1:5])
+                println("  Last  5 entries: ", flat[n-4:n])
+            end
+        end
+        
+
+        println("--> Finished reading CHEASE equilibrium.")
+        println("    Magnetic axis at (ro=$ro, zo=$zo), psio=$psio")
+
+        return InverseRunInput(config, sq_in, rz_in, ro, zo, psio)
+    end
+end

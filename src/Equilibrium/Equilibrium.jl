@@ -48,6 +48,8 @@ function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
         eq_input = read_efit(eq_config)
     elseif eq_type == "chease2"
         eq_input = read_chease2(eq_config)
+    elseif eq_type == "chease"
+        eq_input = read_chease(eq_config)
     elseif eq_type == "lar"
 
         if additional_input === nothing
