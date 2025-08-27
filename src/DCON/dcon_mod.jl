@@ -10,13 +10,15 @@ using FFTW
 using DifferentialEquations
 import ..Equilibrium
 import ..Spl
+using Printf
+
 
 # Include all necessary files
 include("dcon_structs.jl")
 include("dcon.jl")
 include("Ode.jl")
 include("sing.jl")
-include("fourfit.jl")
+include("fourfit_wip.jl")
 include("ode_output.jl")
 include("utils.jl")
 

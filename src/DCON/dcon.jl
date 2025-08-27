@@ -117,9 +117,13 @@ function MainProgram(in_path::String)
     end
 
     # Compute matrices and populate FourFitVars struct
-    make_matrix_populate!(ffit, equil, metric_result, 
-                                  nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, 
-                                  sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
+    make_matrix!(ffit, equil, metric_result, 
+                nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, 
+                sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
+    # make_matrix_populate!(ffit, equil, metric_result, 
+    #                           nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, 
+    #                           sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
+
     println("mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband), nn = $(ctrl.nn), sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
 
     if ctrl.kin_flag

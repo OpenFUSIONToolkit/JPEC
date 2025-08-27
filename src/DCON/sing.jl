@@ -399,7 +399,6 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         # # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else
         # Evaluate splines at psieval
-        #TODO: double check this
         amat = reshape(SplinesMod.spline_eval(ffit.amats, psieval, 0), intr.mpert, intr.mpert)
         bmat = reshape(SplinesMod.spline_eval(ffit.bmats, psieval, 0), intr.mpert, intr.mpert)
         cmat = reshape(SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
@@ -409,16 +408,18 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         kmat = SplinesMod.spline_eval(ffit.kmats, psieval, 0)
         gmat = SplinesMod.spline_eval(ffit.gmats, psieval, 0)
 
-        #TODO: is this right? ChatGPT says it is equivalent so that is probably true
-        # Says this will work if amat is Hermitian and positive definite - is it? 
-        # If not, use F = lu(amat)
-        Afact = cholesky(Hermitian(amat, :L))  # factorization using the lower triangle
+        println("psieval: ", psieval)
+        for (name, arr) in zip(["amat","bmat","cmat","fmat","kmat","gmat"], [amat, bmat, cmat, fmat, kmat, gmat])
+            println("$name (abs): max = ", maximum(abs.(arr)), ", min = ", minimum(abs.(arr)))
+        end
+
+        Afact = cholesky(Hermitian(amat))  # factorization using the lower triangle
         bmat .= Afact \ bmat 
         cmat .= Afact \ cmat
 
         # copy ideal Hermitian banded matrices F and G
         iqty = 1
-        @inbounds for jpert in 1:intr.mpert
+        for jpert in 1:intr.mpert
             for ipert in jpert:min(intr.mpert, jpert + intr.mband)
                 fmatb[1 + ipert - jpert, jpert] = fmat[iqty]
                 gmatb[1 + ipert - jpert, jpert] = gmat[iqty]
@@ -428,7 +429,7 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
 
         # copy ideal non-Hermitian banded matrix K
         iqty = 1
-        @inbounds for jpert in 1:intr.mpert
+        for jpert in 1:intr.mpert
             for ipert in max(1, jpert - intr.mband):min(intr.mpert, jpert + intr.mband)
                 kmatb[1 + intr.mband + ipert - jpert, jpert] = kmat[iqty]
                 iqty += 1
@@ -436,9 +437,14 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         end
     end
 
-    # Compute du    
-    # TODO: this section needs to be heavily checked/optimized
-
+    # TODO: In other parts of the code, I've tried to use the high level Julia
+    # linear algebra functions instead of calling LAPACK directly. However, I was
+    # having issues using BandedMatrices.jl to work with the LAPACK banded routines.
+    # So for now, I'm calling LAPACK directly as in the Fortran code, but we could
+    # improve by debugging the BandedMatrices approach or just implementing dense
+    # matrices to utilize the more readable Julia linear algebra functions.
+    
+    # Compute du
     if false #(TODO: kin_flag)
         # for isol in 1:msol
         #     du[:,isol,1] .= u[:,isol,2]
@@ -450,36 +456,59 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         #     du[:,isol,2] .+= gaatb * u[:,isol,1] + kaatb * du[:,isol,1]
         # end
     else
-        K = BandedMatrix(kmatb, (intr.mband, intr.mband))
-        K_adj = adjoint(K)
-        Ffact = cholesky(Hermitian(BandedMatrix(fmatb, (0, intr.mband)), :L))
-        Gmat = Hermitian(BandedMatrix(gmatb, (0, intr.mband)), :L)
-
-        # 1. Compute du_temp[:,:,1] = u[:,:,2]*singfac - K * u[:,:,1]
+        # Compute du_temp[:,:,1] = u[:,:,2]*singfac - K * u[:,:,1]
         for isol in 1:msol
-            du_temp[:, isol, 1] .= u[:, isol, 2] .* singfac
-            mul!(du_temp[:, isol, 1], K, u[:, isol, 1], -1.0, 1.0)
+            du[:, isol, 1] .= u[:, isol, 2] .* singfac
+
+            # du(:,isol,1) = -kmatb * u(:,isol,1) + du(:,isol,1)
+            LAPACK.zgbmv!('N', mpert, mpert, mband, mband,
+                        -1.0 + 0im, kmatb, 2*mband+1,
+                        u[:, isol, 1], 1,
+                        1.0 + 0im, du[:, isol, 1], 1)
         end
 
-        # 2. Solve Ffact * Y = du_temp[:,:,1] for Y
-        # for isol in 1:msol
-        #     du_temp[:, isol, 1] .= Ffact \ du_temp[:, isol, 1]
-        # end
-        du_temp[:, :, 1] .= Ffact \ du_temp[:, :, 1] # all at once
+        # Solve F * X = du  (F from zpbtrf factorization)
+        LAPACK.zpbtrs!('L', mpert, mband, msol,
+                        fmatb, mband+1,
+                        du, mpert)
 
-        # 3. Compute du_temp[:,:,2] = Gmat * u[:,:,1] + K_adj * du_temp[:,:,1]
-        # TODO: Apparently this can run into issues if gmat has complex diagonal entries
-        for isol in 1:odet.msol
-            # du(:, isol, 2) += gmatb * u(:, isol, 1) + kmatb' * du(:, isol, 1)
-            mul!(du_temp[:, isol, 2], Gmat, u[:, isol, 1], 1.0, 0.0)
-            mul!(du_temp[:, isol, 2], K_adj, du_temp[:, isol, 1], 1.0, 1.0)
-            du_temp[:, isol, 1] .*= singfac
+        # Compute du_temp[:,:,2] = G * u[:,:,1] + K_adj * du_temp[:,:,1]
+        for isol in 1:msol
+            # du(:,isol,2) = gmatb * u(:,isol,1) + du(:,isol,2)
+            LAPACK.zhbmv!('L', mpert, mband,
+                        1.0 + 0im, gmatb, mband+1,
+                        u[:, isol, 1], 1,
+                        1.0 + 0im, du[:, isol, 2], 1)
+
+            # du(:,isol,2) = kmatbᴴ * du(:,isol,1) + du(:,isol,2)
+            LAPACK.zgbmv!('C', mpert, mpert, mband, mband,
+                        1.0 + 0im, kmatb, 2*mband+1,
+                        du[:, isol, 1], 1,
+                        1.0 + 0im, du[:, isol, 2], 1)
+
+            # rescale
+            du[:, isol, 1] .*= singfac
         end
     end
 
-    # 4. Store u-derivative and xss in place
+    # Store full u-derivative
     du[:,:,1] .= du_temp[:,:,1]
     du[:,:,2] .= -bmat * du_temp[:,:,1] - cmat * u[:,:,1]
+
+    println("test")
+    open("/Users/jakehalpern/Github/JPEC/notebooks/ud.out", "w") do io
+    for isol in 1:odet.msol
+        for ipert in 1:intr.mpert
+            r1 = real(du[ipert, isol, 1])
+            r2 = imag(du[ipert, isol, 1])
+            r3 = real(du[ipert, isol, 2])
+            r4 = imag(du[ipert, isol, 2])
+            # Write in same column style as Fortran
+            @printf(io, "%6d%6d%16.8e%16.8e%16.8e%16.8e\n", ipert, isol, r1, r2, r3, r4)
+
+        end
+    end
+end
 end
 
 #= Matrix stuff- ignore for now
