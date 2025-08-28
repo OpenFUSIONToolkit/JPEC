@@ -1259,7 +1259,65 @@ c     terminate.
 c-----------------------------------------------------------------------
       return
       end subroutine fspline_c_eval_deriv2
+c-----------------------------------------------------------------------
+c     subprogram 34. fspline_c_get_cspline_handle
+c     gets a handle to the internal cspline object.
+c-----------------------------------------------------------------------
+      subroutine fspline_c_get_cspline_handle(handle,
+     $  cs_handle_out) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value, intent(in) :: handle
+      type(spline_handle), intent(out) :: cs_handle_out
 
+      type(fspline_type), pointer :: fst
+c-----------------------------------------------------------------------
+c     work.
+c-----------------------------------------------------------------------
 
+      call c_f_pointer(handle%obj, fst)
+
+      ! Return the C address of the cspline_type component
+      cs_handle_out%obj = c_loc(fst%cs)
+
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine fspline_c_get_cspline_handle
+c-----------------------------------------------------------------------
+c     subprogram 35. fspline_c_get_cspline_fs
+c     gets a copy of the fourier coefficients (fs from cspline).
+c-----------------------------------------------------------------------
+      subroutine fspline_c_get_cspline_fs(handle, fs_out) bind(C)
+c-----------------------------------------------------------------------
+c     declarations.
+c-----------------------------------------------------------------------
+      type(spline_handle), value, intent(in) :: handle
+      type(c_ptr), value, intent(in) :: fs_out
+
+      type(fspline_type), pointer :: fst
+      complex(c_double_complex), pointer :: fs_out_fort(:,:)
+      integer :: cs_mx, cs_nqty
+c-----------------------------------------------------------------------
+c     work.
+c-----------------------------------------------------------------------
+      call c_f_pointer(handle%obj, fst)
+      if (.not. associated(fst)) then
+         print *, "fspline_c_get_cspline_fs: invalid handle."
+         return
+      end if
+
+      cs_mx = fst%cs%mx
+      cs_nqty = fst%cs%nqty
+      call c_f_pointer(fs_out, fs_out_fort, [cs_mx+1, cs_nqty])
+
+      fs_out_fort = fst%cs%fs
+c-----------------------------------------------------------------------
+c     terminate.
+c-----------------------------------------------------------------------
+      return
+      end subroutine fspline_c_get_cspline_fs
 c-----------------------------------------------------------------------
       end module spline_c_api_mod

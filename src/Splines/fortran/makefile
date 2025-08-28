@@ -1,3 +1,4 @@
+# === CONFIGURABLE ===
 FC ?= gfortran  # You can override this: `make FC=ifort`
 FFLAGS ?= -fPIC
 LDFLAGS ?= -shared
@@ -12,31 +13,28 @@ F90 = $(FC) $(FFLAGS) $(RECURSFLAG)
 .f.o:
 	$(F90) -c $< -o $@
 
-# 3.  Object list
+
 OBJS = \
 	defs.o \
 	spline.o \
 	cspline.o \
 	bicube.o \
-	fft.o \
-	fspline.o \
 	spline_c_api.o
 
-# 4.  Targets
-all: $(OUTLIB)
+# targets
+
+all : $(OUTLIB) 
 
 $(OUTLIB): $(OBJS)
 	$(FC) $(LDFLAGS) -o $@ $^ $(LIBS)
-	@mkdir -p $(DEPSDIR)
-	mv -f $(OUTLIB)  $(DEPSDIR)
+	mv $(OUTLIB) ../../../deps/
 
 clean:
-	rm -f *.o *.mod *.original *.dylib *.dll *.so
+	rm -f *.o *.mod *.original *.dylib
 
-# 5. dependencies
+# dependencies
+
 spline.o: defs.o
 cspline.o: defs.o spline.o
 bicube.o: defs.o spline.o
-fft.o: defs.o
-fspline.o: defs.o spline.o cspline.o fft.o
 spline_c_api.o: defs.o spline.o cspline.o bicube.o
