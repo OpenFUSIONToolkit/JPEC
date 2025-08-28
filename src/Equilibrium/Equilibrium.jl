@@ -57,7 +57,7 @@ function setup_equilibrium(eq_config::EquilConfig, additional_input=nothing)
         eq_input = lar_run(eq_config, additional_input)
     elseif eq_type == "sol"
 
-        if additonal_input === nothing
+        if additional_input === nothing
             additional_input = SolevevConfig(eq_config.control.eq_filename) 
         end
 
