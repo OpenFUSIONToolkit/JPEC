@@ -47,6 +47,8 @@ function setup_equilibrium(eq_config::EquilibriumConfig, additional_input=nothin
         eq_input = read_efit(eq_config)
     elseif eq_type == "chease2"
         eq_input = read_chease2(eq_config)
+    elseif eq_type == "chease"
+        eq_input = read_chease(eq_config)
     elseif eq_type == "lar"
 
         if additional_input === nothing
@@ -56,8 +58,8 @@ function setup_equilibrium(eq_config::EquilibriumConfig, additional_input=nothin
         eq_input = lar_run(eq_config, additional_input)
     elseif eq_type == "sol"
 
-        if additonal_input === nothing
-            additional_input = SolevevConfig(eq_config.control.eq_filename)
+        if additional_input === nothing
+            additional_input = SolevevConfig(eq_config.control.eq_filename) 
         end
 
         eq_input = sol_run(eq_config, additional_input)
