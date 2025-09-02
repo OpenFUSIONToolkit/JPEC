@@ -1,7 +1,6 @@
 module DconMod
 
 # All imports and includes for the DCON module
-using JPEC 
 using LinearAlgebra
 using LinearAlgebra.LAPACK #required for banded matrix operations
 using BandedMatrices #for banded matrix operations
@@ -10,6 +9,7 @@ using FFTW
 using DifferentialEquations
 import ..Equilibrium
 import ..Spl
+import ..SplinesMod
 using Printf
 
 

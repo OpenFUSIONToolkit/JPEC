@@ -310,10 +310,20 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
 
     ctrl, equil, intr, odet, ffit = params
     # Workspace
-    fmatb = zeros(eltype(ffit.fmats.fs), intr.mband+1, intr.mpert)
-    gmatb = zeros(eltype(ffit.gmats.fs), intr.mband+1, intr.mpert)
-    kmatb = zeros(eltype(ffit.kmats.fs), 2*intr.mband+1, intr.mpert)
+    # fmatb = zeros(eltype(ffit.fmats.fs), intr.mband+1, intr.mpert)
+    # gmatb = zeros(eltype(ffit.gmats.fs), intr.mband+1, intr.mpert)
+    # kmatb = zeros(eltype(ffit.kmats.fs), 2*intr.mband+1, intr.mpert)
     du_temp = zeros(eltype(du), intr.mpert, odet.msol, 2)
+
+    open("/Users/jakehalpern/Github/JPEC/notebooks/u.out", "w") do io
+        header = ["ipert", "jsol", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
+        println(io, join(header, "\t"))
+        for isol in 1:odet.msol
+            for ipert in 1:intr.mpert
+                println(io, join([ipert, isol, real(u[ipert, isol, 1]), imag(u[ipert, isol, 1]), real(u[ipert, isol, 2]), imag(u[ipert, isol, 2])], "\t"))
+            end
+        end
+    end
     
     # Spline evaluation
     q = SplinesMod.spline_eval(equil.sq, psieval, 0)[4]
@@ -404,9 +414,9 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         cmat = reshape(SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
 
         # TODO: double check this too. I changed the matrix copies below from fmats -> fmat, etc. 
-        fmat = SplinesMod.spline_eval(ffit.fmats, psieval, 0)
-        kmat = SplinesMod.spline_eval(ffit.kmats, psieval, 0)
-        gmat = SplinesMod.spline_eval(ffit.gmats, psieval, 0)
+        fmat = reshape(SplinesMod.spline_eval(ffit.fmats, psieval, 0), intr.mpert, intr.mpert)
+        kmat = reshape(SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert)
+        gmat = reshape(SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert)
 
         println("psieval: ", psieval)
         for (name, arr) in zip(["amat","bmat","cmat","fmat","kmat","gmat"], [amat, bmat, cmat, fmat, kmat, gmat])
@@ -418,31 +428,26 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         cmat .= Afact \ cmat
 
         # copy ideal Hermitian banded matrices F and G
-        iqty = 1
-        for jpert in 1:intr.mpert
-            for ipert in jpert:min(intr.mpert, jpert + intr.mband)
-                fmatb[1 + ipert - jpert, jpert] = fmat[iqty]
-                gmatb[1 + ipert - jpert, jpert] = gmat[iqty]
-                iqty += 1
-            end
-        end
+        # iqty = 1
+        # for jpert in 1:intr.mpert
+        #     for ipert in jpert:min(intr.mpert, jpert + intr.mband)
+        #         fmatb[1 + ipert - jpert, jpert] = fmat[iqty]
+        #         gmatb[1 + ipert - jpert, jpert] = gmat[iqty]
+        #         iqty += 1
+        #     end
+        # end
 
         # copy ideal non-Hermitian banded matrix K
-        iqty = 1
-        for jpert in 1:intr.mpert
-            for ipert in max(1, jpert - intr.mband):min(intr.mpert, jpert + intr.mband)
-                kmatb[1 + intr.mband + ipert - jpert, jpert] = kmat[iqty]
-                iqty += 1
-            end
-        end
+        # iqty = 1
+        # for jpert in 1:intr.mpert
+        #     for ipert in max(1, jpert - intr.mband):min(intr.mpert, jpert + intr.mband)
+        #         kmatb[1 + intr.mband + ipert - jpert, jpert] = kmat[iqty]
+        #         iqty += 1
+        #     end
+        # end
     end
 
-    # TODO: In other parts of the code, I've tried to use the high level Julia
-    # linear algebra functions instead of calling LAPACK directly. However, I was
-    # having issues using BandedMatrices.jl to work with the LAPACK banded routines.
-    # So for now, I'm calling LAPACK directly as in the Fortran code, but we could
-    # improve by debugging the BandedMatrices approach or just implementing dense
-    # matrices to utilize the more readable Julia linear algebra functions.
+    # TODO: Banded or dense?
     
     # Compute du
     if false #(TODO: kin_flag)
@@ -457,36 +462,21 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         # end
     else
         # Compute du_temp[:,:,1] = u[:,:,2]*singfac - K * u[:,:,1]
-        for isol in 1:msol
+        for isol in 1:odet.msol
             du[:, isol, 1] .= u[:, isol, 2] .* singfac
-
-            # du(:,isol,1) = -kmatb * u(:,isol,1) + du(:,isol,1)
-            LAPACK.zgbmv!('N', mpert, mpert, mband, mband,
-                        -1.0 + 0im, kmatb, 2*mband+1,
-                        u[:, isol, 1], 1,
-                        1.0 + 0im, du[:, isol, 1], 1)
+            # zgbmv equivalent for dense: du = du - kmat * u
+            du[:, isol, 1] .-= kmat * u[:, isol, 1]
         end
 
         # Solve F * X = du  (F from zpbtrf factorization)
-        LAPACK.zpbtrs!('L', mpert, mband, msol,
-                        fmatb, mband+1,
-                        du, mpert)
+        du[:, :, 1] .= Hermitian(fmat) \ du[:, :, 1]
 
-        # Compute du_temp[:,:,2] = G * u[:,:,1] + K_adj * du_temp[:,:,1]
-        for isol in 1:msol
-            # du(:,isol,2) = gmatb * u(:,isol,1) + du(:,isol,2)
-            LAPACK.zhbmv!('L', mpert, mband,
-                        1.0 + 0im, gmatb, mband+1,
-                        u[:, isol, 1], 1,
-                        1.0 + 0im, du[:, isol, 2], 1)
+        for isol in 1:odet.msol
+            # Compute du_temp[:,:,2] = G * u[:,:,1] + K_adj * du_temp[:,:,1]
+            du[:, isol, 2] .= gmat * u[:, isol, 1]
+            du[:, isol, 2] .+= kmat' * du[:, isol, 1]
 
-            # du(:,isol,2) = kmatbᴴ * du(:,isol,1) + du(:,isol,2)
-            LAPACK.zgbmv!('C', mpert, mpert, mband, mband,
-                        1.0 + 0im, kmatb, 2*mband+1,
-                        du[:, isol, 1], 1,
-                        1.0 + 0im, du[:, isol, 2], 1)
-
-            # rescale
+            # Scale du(:, isol, 1) by singfac
             du[:, isol, 1] .*= singfac
         end
     end
@@ -495,20 +485,15 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
     du[:,:,1] .= du_temp[:,:,1]
     du[:,:,2] .= -bmat * du_temp[:,:,1] - cmat * u[:,:,1]
 
-    println("test")
     open("/Users/jakehalpern/Github/JPEC/notebooks/ud.out", "w") do io
-    for isol in 1:odet.msol
-        for ipert in 1:intr.mpert
-            r1 = real(du[ipert, isol, 1])
-            r2 = imag(du[ipert, isol, 1])
-            r3 = real(du[ipert, isol, 2])
-            r4 = imag(du[ipert, isol, 2])
-            # Write in same column style as Fortran
-            @printf(io, "%6d%6d%16.8e%16.8e%16.8e%16.8e\n", ipert, isol, r1, r2, r3, r4)
-
+        header = ["ipert", "jsol", "Re(du1)", "Im(du1)", "Re(du2)", "Im(du2)"]
+        println(io, join(header, "\t"))
+        for isol in 1:odet.msol
+            for ipert in 1:intr.mpert
+                println(io, join([ipert, isol, real(du[ipert, isol, 1]), imag(du[ipert, isol, 1]), real(du[ipert, isol, 2]), imag(du[ipert, isol, 2])], "\t"))
+            end
         end
     end
-end
 end
 
 #= Matrix stuff- ignore for now
