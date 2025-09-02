@@ -231,7 +231,6 @@ function make_matrix!(ffit::FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibriu
 
     # --- Extract inputs ---
     sq    = plasma_eq.sq
-    psio  = plasma_eq.psio
     mpsi  = metric.mpsi
     mband = metric.mband
     mpert = mhigh - mlow + 1 #TODO: this is already part of a struct
@@ -279,7 +278,7 @@ function make_matrix!(ffit::FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibriu
     # a single 1:(2*mband+1) array and map the zero index to the middle
     mid = mband + 1  # "zero" position in Julia arrays
 
-    imat = zeros(ComplexF64, 2*mband + 1)
+    imat = zeros(ComplexF64, 2 * mband + 1)
     imat[mid] = 1 + 0im
 
     lines = readlines("/Users/jakehalpern/Github/GPEC/docs/examples/solovev_ideal_example/1D_profs.dat")
@@ -312,7 +311,8 @@ function make_matrix!(ffit::FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibriu
         q      = q_f[ipsi]
         q1     = q1_f[ipsi]
         jtheta = jtheta_f[ipsi]
-        chi1   = 2π * psio
+        
+        chi1   = 2π * plasma_eq.psio
         nq     = nn * q
 
         # Fourier coefficient extraction
@@ -364,9 +364,9 @@ function make_matrix!(ffit::FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibriu
 
                 amat[ipert,jpert]   = (2π)^2 * (nn^2*g22_d + nn*(m1+m2)*g23_d + m1*m2*g33_d)
                 bmat[ipert,jpert]   = -2π*im*chi1*(nn*g22_d + (m1+nq)*g23_d + m1*q*g33_d)
-                cmat[ipert,jpert] = 2π*im*((2π*im*chi1*sing2*(nn*g12_d + m1*g31_d)) -
+                cmat[ipert,jpert]   = 2π*im*((2π*im*chi1*sing2*(nn*g12_d + m1*g31_d)) -
                                         (q1*chi1*(nn*g23_d + m1*g33_d))) -
-                                    2π*im*(jtheta*sing1*imat[dmidx] + nn*p1/chi1*jm_d)
+                                        2π*im*(jtheta*sing1*imat[dmidx] + nn*p1/chi1*jm_d)
                 dmat[ipert,jpert]   =  2π*chi1*(g23_d + g33_d*m1/nn)
                 emat[ipert,jpert]   = -chi1/nn*(q1*chi1*g33_d - 2π*im*chi1*g31_d*sing2 + jtheta*imat[dmidx])
                 hmat[ipert,jpert]   = (q1*chi1)^2*g33_d +
@@ -490,6 +490,7 @@ function make_matrix!(ffit::FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibriu
             end
         end
 
+        # Use * for matrix multiplication (instead of .* for element-wise)
         fmat .-= adjoint(dmat) * temp1
         kmat .= emat .- (adjoint(kmat) * temp2)
         gmat .= hmat .- (adjoint(cmat) * temp2)
@@ -549,8 +550,10 @@ function make_matrix!(ffit::FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibriu
         # fmatb = BandedMatrix(fmat, (mband, mband))  # keep ±mband diagonals
 
         # # Cholesky factorization in-place (lower triangle, band storage)
-        # println("Minimum eigenvalue of f matrix: ", minimum(real.(eigvals(Hermitian(fmat)))))  # banded treated as dense here
-        cholesky!(Hermitian(fmat, :L))
+        println("Minimum eigenvalue of f matrix: ", minimum(real.(eigvals(Hermitian(fmat)))))  # banded treated as dense here
+        # TODO: I don't think we have to call this hear, can just call it in the sing_der
+        # function call?
+        # cholesky!(Hermitian(fmat, :L))
 
         # Store Hermitian matrices F and G
         # iqty = 1
@@ -593,4 +596,7 @@ function make_matrix!(ffit::FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibriu
     # Do we need this yet?
 
     # TODO: interpolate matrices to psilim, called if sas_flag is true
+    if sas_flag
+        error("sas_flag = true not yet implemented yet")
+    end
 end

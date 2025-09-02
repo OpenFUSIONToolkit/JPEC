@@ -315,7 +315,7 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
     # kmatb = zeros(eltype(ffit.kmats.fs), 2*intr.mband+1, intr.mpert)
     du_temp = zeros(eltype(du), intr.mpert, odet.msol, 2)
 
-    open("/Users/jakehalpern/Github/JPEC/notebooks/u.out", "w") do io
+    open("/Users/jakehalpern/Github/JPEC/notebooks/u.dat", "w") do io
         header = ["ipert", "jsol", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
         println(io, join(header, "\t"))
         for isol in 1:odet.msol
@@ -408,12 +408,10 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         # end
         # # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else
-        # Evaluate splines at psieval
+        # Evaluate splines at psieval and reshape
         amat = reshape(SplinesMod.spline_eval(ffit.amats, psieval, 0), intr.mpert, intr.mpert)
         bmat = reshape(SplinesMod.spline_eval(ffit.bmats, psieval, 0), intr.mpert, intr.mpert)
         cmat = reshape(SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
-
-        # TODO: double check this too. I changed the matrix copies below from fmats -> fmat, etc. 
         fmat = reshape(SplinesMod.spline_eval(ffit.fmats, psieval, 0), intr.mpert, intr.mpert)
         kmat = reshape(SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert)
         gmat = reshape(SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert)
@@ -461,23 +459,23 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         #     du[:,isol,2] .+= gaatb * u[:,isol,1] + kaatb * du[:,isol,1]
         # end
     else
-        # Compute du_temp[:,:,1] = u[:,:,2]*singfac - K * u[:,:,1]
+        # Compute du_temp[:,:,1] = u[:,:,2] * singfac - K * u[:,:,1]
         for isol in 1:odet.msol
-            du[:, isol, 1] .= u[:, isol, 2] .* singfac
+            du_temp[:, isol, 1] .= u[:, isol, 2] .* singfac
             # zgbmv equivalent for dense: du = du - kmat * u
-            du[:, isol, 1] .-= kmat * u[:, isol, 1]
+            du_temp[:, isol, 1] .-= kmat * u[:, isol, 1]
         end
 
         # Solve F * X = du  (F from zpbtrf factorization)
-        du[:, :, 1] .= Hermitian(fmat) \ du[:, :, 1]
+        du_temp[:, :, 1] .= cholesky(Hermitian(fmat)) \ du_temp[:, :, 1]
 
         for isol in 1:odet.msol
             # Compute du_temp[:,:,2] = G * u[:,:,1] + K_adj * du_temp[:,:,1]
-            du[:, isol, 2] .= gmat * u[:, isol, 1]
-            du[:, isol, 2] .+= kmat' * du[:, isol, 1]
+            du_temp[:, isol, 2] .= gmat * u[:, isol, 1]
+            du_temp[:, isol, 2] .+= kmat' * du_temp[:, isol, 1]
 
             # Scale du(:, isol, 1) by singfac
-            du[:, isol, 1] .*= singfac
+            du_temp[:, isol, 1] .*= singfac
         end
     end
 
@@ -485,8 +483,8 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
     du[:,:,1] .= du_temp[:,:,1]
     du[:,:,2] .= -bmat * du_temp[:,:,1] - cmat * u[:,:,1]
 
-    open("/Users/jakehalpern/Github/JPEC/notebooks/ud.out", "w") do io
-        header = ["ipert", "jsol", "Re(du1)", "Im(du1)", "Re(du2)", "Im(du2)"]
+    open("/Users/jakehalpern/Github/JPEC/notebooks/ud.dat", "w") do io
+        header = ["i", "j", "Re(du1)", "Im(du1)", "Re(du2)", "Im(du2)"]
         println(io, join(header, "\t"))
         for isol in 1:odet.msol
             for ipert in 1:intr.mpert
