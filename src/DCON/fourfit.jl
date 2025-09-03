@@ -1,11 +1,4 @@
-# fourfit.jl
-# This module provides functions to compute MHD stability matrices (F, G, K)
-# based on a plasma equilibrium. It is a Julia port of the `fourfit.f`
-# routines used in codes like DCON.
-
-#-----------------------------------------------------------------------
-# 1. DATA STRUCTURES
-#-----------------------------------------------------------------------
+# TODO: modify these functions to pass in structs instead of individual parameters?
 
 """
     MetricData
@@ -31,8 +24,8 @@ mutable struct MetricData
     mband::Int
     xs::Vector{Float64}
     ys::Vector{Float64}
-    fs::Array{Float64, 3}
-    fspline::Union{SplinesMod.FourierSpline, Nothing}
+    fs::Array{Float64,3}
+    fspline::Union{SplinesMod.FourierSpline,Nothing}
     name::String
     title::Vector{String}
     xtitle::String
@@ -48,121 +41,66 @@ mutable struct MetricData
 end
 
 """
-    MatrixData
+    make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true) -> MetricData
 
-Structure to hold the computed MHD matrix data for stability analysis.
-This corresponds to the `fmats`, `gmats`, and `kmats` cspline types in the
-Fortran `fourfit_make_matrix` subroutine.
-"""
-mutable struct MatrixData
-    # Grid and mode parameters
-    mpsi::Int
-    mpert::Int          # Number of perturbed poloidal modes
-    mband::Int          # Bandwidth of the matrices
-    mlow::Int           # Lowest poloidal mode number
-    mhigh::Int          # Highest poloidal mode number
-    nn::Int             # Toroidal mode number
-
-    # Coordinate array
-    xs::Vector{Float64} # Radial coordinates (normalized poloidal flux `ψ_norm`)
-
-    # Spline representations of the F, G, and K matrices
-    fmats::Union{SplinesMod.CubicSpline{ComplexF64}, Nothing}
-    gmats::Union{SplinesMod.CubicSpline{ComplexF64}, Nothing}
-    kmats::Union{SplinesMod.CubicSpline{ComplexF64}, Nothing}
-
-    amat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
-    bmat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
-    cmat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
-    dmat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
-    emat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
-    hmat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
-    gmat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
-    fmat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
-    kmat_diagnostics::Union{Array{ComplexF64, 3}, Nothing}
-
-
-    # Temporary matrices for singular surface handling
-    amat::Union{Matrix{ComplexF64}, Nothing}
-    bmat::Union{Matrix{ComplexF64}, Nothing}
-    cmat::Union{Matrix{ComplexF64}, Nothing}
-    ipiva::Union{Vector{Int}, Nothing}
-
-    function MatrixData(mpsi, mpert, mband, mlow, mhigh, nn)
-        xs = zeros(mpsi + 1)
-        new(mpsi, mpert, mband, mlow, mhigh, nn, xs,
-            nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing,
-            nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
-    end
-end
-
-
-#-----------------------------------------------------------------------
-# 2. CORE FUNCTIONS
-#-----------------------------------------------------------------------
-
-"""
-    make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true)
-
-Computes the metric tensor components on the equilibrium grid and fits them
-to a Fourier-cubic spline representation. This is a direct port of the Fortran
-subroutine `fourfit_make_metric` but adapted to the JPEC `PlasmaEquilibrium` API.
-
-The function calculates the contravariant metric tensor components (`gⁱʲ`) and the
-Jacobian (`J`) required for MHD stability calculations.
+Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equilibrium.
 
 # Arguments
-- `plasma_eq::Equilibrium.PlasmaEquilibrium`: The main input object containing all
-  the necessary processed equilibrium data, including `rzphi` and `sq` splines.
-
-# Keyword Arguments
-- `mband::Int=10`: The number of Fourier modes (harmonics) to include in the fit.
-- `fft_flag::Bool=true`: If `true`, use the Fast Fourier Transform (`fit_method=2`) for
-  fitting. If `false`, use the slower but more robust integration method (`fit_method=1`).
+- `plasma_eq::Equilibrium.PlasmaEquilibrium`: 
+    An equilibrium object containing spline data (`rzphi`) for flux coordinates and geometry.
+- `mband::Int=10`: 
+    Number of Fourier modes to retain in the metric representation.
+- `fft_flag::Bool=true`: 
+    If `true`, enables use of Fourier fitting for storing metric coefficients. 
+    (Currently reserved for downstream processing.)
 
 # Returns
-- `MetricData`: A struct containing the raw grid data and the fitted `fspline` object.
+- `metric::MetricData`: 
+    A structure containing the metric coefficients, coordinate grids, and Jacobians for the specified equilibrium.
 
-# Fortran Equivalent
-This function replaces `SUBROUTINE fourfit_make_metric`. It takes the `PlasmaEquilibrium`
-object instead of separate `rzphi` and `sq` objects and automatically determines the
-grid size.
+# Details
+- Uses bicubic spline evaluation (`SplinesMod.bicube_eval`) on the equilibrium geometry to compute 
+  contravariant basis vectors ∇ψ, ∇θ, and ∇ζ at each grid point.
+- The metric coefficients stored in `metric.fs` include:
+    1. g^ψψ · J
+    2. g^θθ · J
+    3. g^ζζ · J
+    4. g^θζ · J
+    5. g^ζψ · J
+    6. g^ψθ · J
+    7. J (Jacobian)
+    8. ∂J/∂ψ
+- The ψ grid is taken directly from `rzphi.xs`, and θ is scaled from `[0,1]` to `[0, 2π]`.
 """
-function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium;
-                     mband::Int=10,
-                     fft_flag::Bool=true)
+function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true)
+
+    # TODO: add kinetic metric tensor components
 
     # --- Extract data from the PlasmaEquilibrium object ---
     rzphi = plasma_eq.rzphi
-    ro = plasma_eq.ro
     mpsi = length(rzphi.xs) - 1
     mtheta = length(rzphi.ys) - 1
 
-    println("🔧 Starting metric tensor calculation...")
     println("   Equilibrium grid: $(mpsi+1) (ψ) × $(mtheta+1) (θ)")
     println("   Fourier fit modes (mband): $mband")
 
-    # --- Initialization ---
-    twopi = 2.0 * π
     metric = MetricData(mpsi, mtheta, mband)
 
     # Set coordinate grids based on the input equilibrium
     # The `rzphi.ys` from EquilibriumAPI is normalized (0 to 1), so scale to radians.
     metric.xs .= Vector(rzphi.xs)
-    metric.ys .= Vector(rzphi.ys .* twopi)
+    metric.ys .= Vector(rzphi.ys .* 2π)
 
     # Temporary array for contravariant basis vectors
     v = zeros(Float64, 3, 3)
 
     # --- Main computation loop over the (ψ, θ) grid ---
-    println("📊 Computing metric tensor components...")
-    for i in 1:(mpsi+1)
-        psi_norm = rzphi.xs[i]
-        for j in 1:(mtheta+1)
-            theta_norm = rzphi.ys[j] # θ is from 0 to 1
+    for ipsi in 1:(mpsi+1)
+        psi_norm = rzphi.xs[ipsi]
+        for jtheta in 1:(mtheta+1)
+            theta_norm = rzphi.ys[jtheta] # θ is from 0 to 1
 
             # Evaluate the geometry spline to get (R,Z) and their derivatives
-            # This is equivalent to `CALL bicube_eval(rzphi,...)` in Fortran
             f, fx, fy = SplinesMod.bicube_eval(rzphi, psi_norm, theta_norm, 1)
 
             # Extract geometric quantities from the spline data
@@ -173,80 +111,36 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium;
             jac1 = fx[4] # ∂J/∂ψ
 
             rfac = sqrt(r_coord_sq)
-            eta = twopi * (theta_norm + eta_offset)
-            r_major = ro + rfac * cos(eta) # This is the R coordinate
+            eta = 2π * (theta_norm + eta_offset)
+            r_major = plasma_eq.ro + rfac * cos(eta) # This is the R coordinate
 
             # --- Compute contravariant basis vectors ∇ψ, ∇θ, ∇ζ ---
-            # This logic is a direct translation from the Fortran code
             fx1, fx2, fx3 = fx[1], fx[2], fx[3]
             fy1, fy2, fy3 = fy[1], fy[2], fy[3]
 
             v[1, 1] = fx1 / (2.0 * rfac * jac)
-            v[1, 2] = fx2 * twopi * rfac / jac
+            v[1, 2] = fx2 * 2π * rfac / jac
             v[1, 3] = fx3 * r_major / jac
-
             v[2, 1] = fy1 / (2.0 * rfac * jac)
-            v[2, 2] = (1.0 + fy2) * twopi * rfac / jac
+            v[2, 2] = (1.0 + fy2) * 2π * rfac / jac
             v[2, 3] = fy3 * r_major / jac
-
-            v[3, 3] = twopi * r_major / jac
-
-            # --- Compute metric tensor components gⁱʲ = ∇i ⋅ ∇j ---
-            # The final multiplication by `jac` is part of the original DCON formulation.
-            g11 = sum(v[1, :] .^ 2) * jac
-            g12 = sum(v[1, :] .* v[2, :]) * jac
-            g31 = v[3, 3] * v[1, 3] * jac
-            g22 = sum(v[2, :] .^ 2) * jac
-            g23 = v[2, 3] * v[3, 3] * jac
-            g33 = v[3, 3] * v[3, 3] * jac
-
-
-
+            v[3, 3] = 2π * r_major / jac
 
             # Store results
-            metric.fs[i, j, 1] = g11
-            metric.fs[i, j, 2] = g22
-            metric.fs[i, j, 3] = g33
-            metric.fs[i, j, 4] = g23
-            metric.fs[i, j, 5] = g31
-            metric.fs[i, j, 6] = g12
-            metric.fs[i, j, 7] = jac
-            metric.fs[i, j, 8] = jac1
+            metric.fs[ipsi, jtheta, 1] = sum(v[1, :] .^ 2) * jac
+            metric.fs[ipsi, jtheta, 2] = sum(v[2, :] .^ 2) * jac
+            metric.fs[ipsi, jtheta, 3] = v[3, 3] * v[3, 3] * jac
+            metric.fs[ipsi, jtheta, 4] = v[2, 3] * v[3, 3] * jac
+            metric.fs[ipsi, jtheta, 5] = v[3, 3] * v[1, 3] * jac
+            metric.fs[ipsi, jtheta, 6] = sum(v[1, :] .* v[2, :]) * jac
+            metric.fs[ipsi, jtheta, 7] = jac
+            metric.fs[ipsi, jtheta, 8] = jac1
 
-            # ==================== JULIA DEBUG ====================
-            #if i == 33 && j == 1
-            #    println("--- JULIA DEBUG (i,j)=", i, " ", j)
-            #    println("rmaj $r_major")
-            #    println("jac $jac")
-            #    println("v[1]: $(v[1,1]) $(v[1,2]) $(v[1,3])")
-            #    println("v[2]: $(v[2,1]) $(v[2,2]) $(v[2,3])")
-            #    println("v[3,3] $(v[3,3])")
-            #
-            #    println("--- g_ij values BEFORE storing ---")
-            #    g11_val = sum(v[1, :] .^ 2) * jac
-            #    g22_val = sum(v[2, :] .^ 2) * jac
-            #    g33_val = v[3, 3] * v[3, 3] * jac
-            #    g23_val = v[2, 3] * v[3, 3] * jac
-            #    g31_val = v[3, 3] * v[1, 3] * jac
-            #    g12_val = sum(v[1, :] .* v[2, :]) * jac
-            #
-            #
-            #    println("g11, $g11_val")
-            #    println("g22, $g22_val")
-            #    println("g33, $g33_val")
-            #    println("g23, $g23_val")
-            #    println("g31, $g31_val")
-            #    println("g12, $g12_val")
-            #    println("---------------------------------------")
-            #end
+            # TODO: kinetic metric tensor here fmodb in Fortran
         end
-
-
     end
-    println("✅ Grid computation complete.")
 
     # --- Fit the grid data to a Fourier-cubic spline ---
-    println("🔧 Fitting Fourier-spline representation...")
     fit_method = fft_flag ? 2 : 1
     # In Fortran, `bctype` was set for the periodic `y` dimension. Here, the `FourierSpline`
     # `bctype` argument applies to the non-periodic `x` dimension. The Fortran
@@ -262,364 +156,196 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium;
         bctype=bctype_x,
         fit_method=fit_method
     )
-    println("✅ Fourier-spline fitting successful.")
-
-    #if metric.fspline !== nothing && metric.fspline.cs !== nothing
-    #    cs_spline = metric.fspline.cs
-    #    # The fs field is a matrix of size (N x nqty)
-    #    n_psi_points, n_quantities = size(cs_spline.fs)
-    #    println("\n--- DEBUG INFO from make_metric ---")
-    #    println("Generated CubicSpline{ComplexF64} (cs) information:")
-    #    println("  Number of quantities (nqty): ", n_quantities)
-    #    println("  Expected number of quantities: ", 8 * (mband + 1))
-    #    println("  Shape of cs_spline.fs matrix: ", size(cs_spline.fs))
-    #    println("-------------------------------------\n")
-    #else
-    #    println("\n--- DEBUG INFO from make_metric ---")
-    #    println("fspline or fspline.cs object was not created.")
-    #    println("-------------------------------------\n")
-    #end
-
 
     return metric
 end
 
-
-
-
-
-
-
-# fourfit.jl
-# ... (previous MetricData and make_metric function definitions) ...
-
-# Required for matrix factorizations and linear algebra
-using LinearAlgebra
-using LinearAlgebra.LAPACK
-
-# ... (MatrixData definition) ...
-
 """
     make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData;
-                nn::Int=1, mlow::Int=-5, mhigh::Int=5, sas_flag::Bool=false)
+                nn::Int=1, mlow::Int=-5, mhigh::Int=5, sas_flag::Bool=false, verbose::Bool=false) -> FourFitVars
 
-Constructs the MHD stability coefficient matrices (F, G, K) by Fourier-analyzing
-the metric tensor and equilibrium profiles. The resulting matrix coefficients are
-then fitted to 1D complex cubic splines over the radial coordinate `ψ_norm`.
-
-This function is a direct port of the Fortran subroutine `fourfit_make_matrix`.
+Constructs Fourier–poloidal coupling matrices for a given toroidal mode number `nn`
+and returns them as a new `FourFitVars` object.
 
 # Arguments
-- `plasma_eq::Equilibrium.PlasmaEquilibrium`: The main equilibrium object, providing
-  1D profiles (`sq`), total flux (`psio`), etc.
-- `metric::MetricData`: The object returned from `make_metric`, which contains the
-  fitted Fourier-spline of the metric tensor components (`fspline`).
-
-# Keyword Arguments
-- `nn::Int=1`: The toroidal mode number for the stability analysis.
-- `mlow::Int=-5`, `mhigh::Int=5`: The range of poloidal mode numbers `m` to include
-  in the perturbed matrices.
-- `sas_flag::Bool=false`: If `true`, enables special handling for analysis at the
-  plasma boundary (not fully implemented in this port).
+- `plasma_eq::Equilibrium.PlasmaEquilibrium`: 
+    Plasma equilibrium object providing 1D flux-surface profiles (`sq`) and normalization constants.
+- `metric::MetricData`: 
+    Metric coefficients on the (ψ, θ) grid, including Fourier representations of g^ij and J.
+- `nn::Int`: 
+    Toroidal mode number.
+- `mlow::Int`: 
+    Lowest poloidal mode index.
+- `mhigh::Int`: 
+    Highest poloidal mode index.
+- `sas_flag::Bool`: 
+    (not yet implemented).
+- `verbose::Bool`: 
+    If `true`, prints detailed information about mode ranges and matrix bandwidth.
 
 # Returns
-- `MatrixData`: A struct containing the final complex spline representations of the
-  `F`, `G`, and `K` matrices, ready for stability analysis.
-
-# Fortran Equivalent
-This function replaces `SUBROUTINE fourfit_make_matrix`. It implements the full
-logic, including the construction of composite matrices F, G, and K and their
-storage in a banded format.
+- `ffit::FourFitVars`:
+    A container holding cubic spline fits of the assembled matrices
 """
-function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData;
-                     nn::Int=1, mlow::Int=-5, mhigh::Int=5, sas_flag::Bool=false, verbose::Bool=false)
+function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData; 
+    nn::Int, mlow::Int, mhigh::Int, mpert::Int, sas_flag::Bool, verbose::Bool)
 
-    println("🔧 Starting MHD matrix calculation...")
-
-
+    # TODO: add banded matrices (if desired), kinetic matrices, sas_flag
 
     # --- Extract inputs ---
-    sq    = plasma_eq.sq
-    psio  = plasma_eq.psio
-    mpsi  = metric.mpsi
+    sq = plasma_eq.sq
+    mpsi = metric.mpsi
     mband = metric.mband
-    mpert = mhigh - mlow + 1
-    ifac  = 1im
 
-    println("   Toroidal mode n=$nn, Poloidal modes m=$mlow:$mhigh ($mpert modes)")
-    println("   Matrix bandwidth: $mband")
-
-    # Initialize result structures
-    matrix_data = MatrixData(mpsi, mpert, mband, mlow, mhigh, nn)
-    matrix_data.xs .= metric.xs
-
-    # Allocate banded storage
-    n_fg_qty = div((mband + 1) * (2*mpert - mband), 2)
-    fmats_fs = zeros(ComplexF64, mpsi+1, n_fg_qty)
-    gmats_fs = zeros(ComplexF64, mpsi+1, n_fg_qty)
-    n_k_qty = mpert * (2*mband + 1)
-    kmats_fs = zeros(ComplexF64, mpsi+1, n_k_qty)
-
-    # Temporary primitive matrices
     if verbose
-
-        matrix_data.amat_diagnostics = zeros(ComplexF64,mpsi+1,mpert,mpert)
-        matrix_data.bmat_diagnostics = zeros(ComplexF64,mpsi+1,mpert,mpert)
-        matrix_data.cmat_diagnostics = zeros(ComplexF64,mpsi+1,mpert,mpert)
-        matrix_data.dmat_diagnostics = zeros(ComplexF64,mpsi+1,mpert,mpert)
-        matrix_data.emat_diagnostics = zeros(ComplexF64,mpsi+1,mpert,mpert)
-        matrix_data.hmat_diagnostics = zeros(ComplexF64,mpsi+1,mpert,mpert)
-        matrix_data.gmat_diagnostics = zeros(ComplexF64,mpsi+1,mpert,mpert)
-        matrix_data.fmat_diagnostics = zeros(ComplexF64,mpsi+1,mpert,mpert)
-        matrix_data.kmat_diagnostics = zeros(ComplexF64,mpsi+1,mpert,mpert)
+        println("   Toroidal mode n=$nn, Poloidal modes m=$mlow:$mhigh ($mpert modes)")
+        println("   Matrix bandwidth: $mband")
     end
 
+    # --- Allocate 3D arrays ---
+    amats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    bmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    cmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    dmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    emats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    hmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    fmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    gmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    kmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    dbats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    ebats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    fbats = zeros(ComplexF64, mpsi+1, mpert, mpert)
 
-    amat = zeros(ComplexF64, mpert, mpert)
-    bmat = zeros(ComplexF64, mpert, mpert)
-    cmat = zeros(ComplexF64, mpert, mpert)
-    dmat = zeros(ComplexF64, mpert, mpert)
-    emat = zeros(ComplexF64, mpert, mpert)
-    hmat = zeros(ComplexF64, mpert, mpert)
-    fmat = zeros(ComplexF64, mpert, mpert)
-    kmat_full = zeros(ComplexF64, mpert, mpert)
-    ipiva = zeros(Int, mpert)
+    # Instead of using Offset Arrays like in Fortran (-mband:mband), we store everything in
+    # a single 1:(2*mband+1) array and map the zero index to the middle
+    mid = mband + 1  # "zero" position in Julia arrays
+    imat = zeros(ComplexF64, 2 * mband + 1)
+    imat[mid] = 1 + 0im
 
-    # Prepare Fourier coefficients array and identity modes
-    cs_fs = metric.fspline.cs.fs                # (mpsi+1)×(8*(mband+1))
-    imat = zeros(ComplexF64, 2*mband + 1); imat[mband+1] = 1 + 0im
+    for ipsi in 1:(mpsi+1)
+        # --- Create views for this surface ---
+        amat = @view amats[ipsi, :, :]
+        bmat = @view bmats[ipsi, :, :]
+        cmat = @view cmats[ipsi, :, :]
+        dmat = @view dmats[ipsi, :, :]
+        emat = @view emats[ipsi, :, :]
+        hmat = @view hmats[ipsi, :, :]
+        fmat = @view fmats[ipsi, :, :]
+        gmat = @view gmats[ipsi, :, :]
+        kmat = @view kmats[ipsi, :, :]
+        dbat = @view dbats[ipsi, :, :]
+        ebat = @view ebats[ipsi, :, :]
+        fbat = @view fbats[ipsi, :, :]
 
-    println("📊 Computing coefficient matrices on the ψ grid...")
-    for i in 1:(mpsi+1)
-        psifac = matrix_data.xs[i]
+        # --- Profiles ---
+        p1     = sq.fs1[ipsi, 2]
+        q      = sq.fs[ipsi, 4]
+        q1     = sq.fs1[ipsi, 4]
+        jtheta = -sq.fs1[ipsi, 1]
+        chi1 = 2π * plasma_eq.psio
+        nq = nn * q
 
-        # 1️⃣  Evaluate 1D profiles
-        prof, prof_d = SplinesMod.spline_eval(sq, psifac, 1)
-        p1     = prof_d[2]
-        q      = prof[4]
-        q1     = prof_d[4]
-        jtheta = -prof_d[1]
-        chi1   = (2π) * psio
-        nq     = nn * q
+        # Fourier coefficient extraction
+        g11 = zeros(ComplexF64, 2 * mband + 1)
+        g22 = zeros(ComplexF64, 2 * mband + 1)
+        g33 = zeros(ComplexF64, 2 * mband + 1)
+        g23 = zeros(ComplexF64, 2 * mband + 1)
+        g31 = zeros(ComplexF64, 2 * mband + 1)
+        g12 = zeros(ComplexF64, 2 * mband + 1)
+        jmat = zeros(ComplexF64, 2 * mband + 1)
+        jmat1 = zeros(ComplexF64, 2 * mband + 1)
 
-        # 2️⃣  Fourier coefficient extraction
-        g11    = zeros(ComplexF64, 2*mband+1)
-        g22    = similar(g11); g33 = similar(g11)
-        g23    = similar(g11); g31 = similar(g11)
-        g12    = similar(g11); jmat  = similar(g11)
-        jmat1  = similar(g11)
-        for dm in 0:-1:-mband
-            idx  = -dm + 1
-            jdx  = dm + mband + 1
-            base = (idx - 1)
-            g11[jdx]   = cs_fs[i, base + 1]
-            g22[jdx]   = cs_fs[i, mband+1   + base + 1]
-            g33[jdx]   = cs_fs[i, 2*(mband+1) + base + 1]
-            g23[jdx]   = cs_fs[i, 3*(mband+1) + base + 1]
-            g31[jdx]   = cs_fs[i, 4*(mband+1) + base + 1]
-            g12[jdx]   = cs_fs[i, 5*(mband+1) + base + 1]
-            jmat[jdx]  = cs_fs[i, 6*(mband+1) + base + 1]
-            jmat1[jdx] = cs_fs[i, 7*(mband+1) + base + 1]
+        # Fill lower half (0, -1, …, -mband)
+        g11[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 1:mband+1]
+        g22[mid:-1:1] .= metric.fspline.cs.fs[ipsi, mband+2:2*mband+2]
+        g33[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 2*mband+3:3*mband+3]
+        g23[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 3*mband+4:4*mband+4]
+        g31[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 4*mband+5:5*mband+5]
+        g12[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 5*mband+6:6*mband+6]
+        jmat[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 6*mband+7:7*mband+7]
+        jmat1[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 7*mband+8:8*mband+8]
+
+        # Fill upper half (+1:mband) with conjugate symmetry
+        for k = 1:mband
+            g11[mid+k] = conj(g11[mid-k])
+            g22[mid+k] = conj(g22[mid-k])
+            g33[mid+k] = conj(g33[mid-k])
+            g23[mid+k] = conj(g23[mid-k])
+            g31[mid+k] = conj(g31[mid-k])
+            g12[mid+k] = conj(g12[mid-k])
+            jmat[mid+k] = conj(jmat[mid-k])
+            jmat1[mid+k] = conj(jmat1[mid-k])
         end
-        for dm in 1:mband
-            neg = (-dm) + mband + 1
-            pos = dm + mband + 1
-            g11[pos]   = conj(g11[neg])
-            g22[pos]   = conj(g22[neg])
-            g33[pos]   = conj(g33[neg])
-            g23[pos]   = conj(g23[neg])
-            g31[pos]   = conj(g31[neg])
-            g12[pos]   = conj(g12[neg])
-            jmat[pos]  = conj(jmat[neg])
-            jmat1[pos] = conj(jmat1[neg])
-        end
 
-        # 3️⃣  Reset primitive matrices
-        fill!(amat, 0); fill!(bmat, 0); fill!(cmat, 0)
-        fill!(dmat, 0); fill!(emat, 0); fill!(hmat, 0)
-        fill!(fmat, 0); fill!(kmat_full, 0)
-
-        # 4️⃣  Construct primitive matrices via m1/dm loops
+        # Construct primitive matrices via m1/dm loops
         ipert = 0
         for m1 in mlow:mhigh
             ipert += 1
             sing1 = m1 - nq
-            for dm in max(1-ipert, -mband):min(mpert-ipert, mband)
+            for dm in max(1 - ipert, -mband):min(mpert - ipert, mband)
+                m2 = m1 + dm
+                sing2 = m2 - nq
                 jpert = ipert + dm
-                m2     = mlow + jpert - 1
-                sing2  = m2 - nq
-                dmidx  = dm + mband + 1
-                # extract mode coefficients
+                dmidx = dm + mid
 
-
-
-                g11_d = g11[dmidx]; g22_d = g22[dmidx]; g33_d = g33[dmidx]
-                g23_d = g23[dmidx]; g31_d = g31[dmidx]; g12_d = g12[dmidx]
-                jm_d  = jmat[dmidx]; jm1_d = jmat1[dmidx]
-
-                amat[ipert,jpert]     = (2π)^2 * (nn^2*g22_d + nn*(m1+m2)*g23_d + m1*m2*g33_d)
-                bmat[ipert,jpert]     = -2π*im*chi1*(nn*g22_d + (m1+nq)*g23_d + m1*q*g33_d)
-                cmat[ipert,jpert]     = 2π*im*((2π*im*chi1*sing2*(nn*g12_d + m1*g31_d))
-                                            - (q1*chi1*(nn*g23_d + m1*g33_d)))
-                                         - 2π*im*(jtheta*sing1*imat[dmidx] + nn*p1/chi1*jm_d)
-                dmat[ipert,jpert]     =  2π*chi1*(g23_d + g33_d*m1/nn)
-                emat[ipert,jpert]     = -chi1/nn*(q1*chi1*g33_d - 2π*im*chi1*g31_d*sing2 + jtheta*imat[dmidx])
-                hmat[ipert,jpert]     = (q1*chi1)^2*g33_d +
-                                        ( (2π) * (chi1) )^2*sing1*sing2*g11_d -
-                                        2π*im*chi1*dm*q1*chi1*g31_d +
-                                        jtheta*q1*chi1*imat[dmidx] +
-                                        p1*jm1_d
-                fmat[ipert,jpert]     = (chi1/nn)^2 * g33_d
-                kmat_full[ipert,jpert] = 2π*im*chi1*(g23_d + g33_d*m1/nn)
-
-                # ==================== DEBUG PRINT ====================
-                #if ipert==3 && jpert == 3
-                #    println(i)
-                #    println("i, m1, m2, dm ", ipert, " ", m1," ",m2 ," ", dm)
-                #    println("ipert, jpert = ", ipert, " ", jpert)
-                #    println("q, q1, jtheta = ", q, " ", q1, " ", jtheta)
-                #    println("chi1, $chi1, sing1 $sing1, sing2 $sing2")
-                #    println("nn $nn p1 $p1")
-                #    println("11 ",g11[dmidx])
-                #    println("12 ",g12[dmidx])
-                #    println("31 ",g31[dmidx])
-                #    println("22 ",g22[dmidx])
-                #    println("23 ",g23[dmidx])
-                #    println("33 ",g33[dmidx])
-                #    println("imat= ", imat[dmidx])
-                #
-                #
-                #    println("cmat_val = ", cmat[ipert,jpert])
-                #    println("---------------------------------------")
-                #end
-                # =====================================================
-
-
+                amat[ipert, jpert] = (2π)^2 * (nn^2 * g22[dmidx] + nn * (m1 + m2) * g23[dmidx] + m1 * m2 * g33[dmidx])
+                bmat[ipert, jpert] = -2π * im * chi1 * (nn * g22[dmidx] + (m1 + nq) * g23[dmidx] + m1 * q * g33[dmidx])
+                cmat[ipert, jpert] = 2π * im * ((2π * im * chi1 * sing2 * (nn * g12[dmidx] + m1 * g31[dmidx])) -
+                                                (q1 * chi1 * (nn * g23[dmidx] + m1 * g33[dmidx]))) -
+                                     2π * im * (jtheta * sing1 * imat[dmidx] + nn * p1 / chi1 * jm[dmidx])
+                dmat[ipert, jpert] = 2π * chi1 * (g23[dmidx] + g33[dmidx] * m1 / nn)
+                emat[ipert, jpert] = -chi1 / nn * (q1 * chi1 * g33[dmidx] - 2π * im * chi1 * g31[dmidx] * sing2 + jtheta * imat[dmidx])
+                hmat[ipert, jpert] = (q1 * chi1)^2 * g33[dmidx] +
+                                     (2π * chi1)^2 * sing1 * sing2 * g11[dmidx] -
+                                     2π * im * chi1 * dm * q1 * chi1 * g31[dmidx] +
+                                     jtheta * q1 * chi1 * imat[dmidx] +
+                                     p1 * jm1[dmidx]
+                fmat[ipert, jpert] = (chi1 / nn)^2 * g33[dmidx]
+                kmat[ipert, jpert] = 2π * im * chi1 * (g23[dmidx] + g33[dmidx] * m1 / nn)
             end
         end
-
-        # 5️⃣  Factorize A and build composite F, G, K
-        amat_fact = cholesky(Hermitian(amat), check=false)
-        temp1 = amat_fact \ transpose(dmat)
-        temp2 = amat_fact \ transpose(cmat)
-        final_fmat = fmat - adjoint(dmat)*temp1
-        final_gmat = hmat - adjoint(cmat)*temp2
-        final_kmat = emat - kmat_full*temp2
+        dbat .= dmat
+        ebat .= emat
+        fbat .= fmat
 
 
-        # store diagnostics
-        if verbose
-            matrix_data.amat_diagnostics[i,:,:] .= amat
-            matrix_data.bmat_diagnostics[i,:,:] .= bmat
-            matrix_data.cmat_diagnostics[i,:,:] .= cmat
-            matrix_data.dmat_diagnostics[i,:,:] .= dmat
-            matrix_data.emat_diagnostics[i,:,:] .= emat
-            matrix_data.hmat_diagnostics[i,:,:] .= hmat
-            matrix_data.fmat_diagnostics[i,:,:] .= final_fmat
-            matrix_data.gmat_diagnostics[i,:,:] .= final_gmat
-            matrix_data.kmat_diagnostics[i,:,:] .= final_kmat
-        end
+        # --- Factorize and build composites ---
+        amat_fact = cholesky(Hermitian(amat, :L))
+        # TODO: Fortran used the info output from LAPACK to error out if amat is singular, add something similar here?
+        temp1 = amat_fact \ dmat
+        temp2 = amat_fact \ cmat
+        # Use * for matrix multiplication (instead of .* for element-wise)
+        fmat .-= adjoint(dmat) * temp1
+        kmat .= emat .- (adjoint(kmat) * temp2)
+        gmat .= hmat .- (adjoint(cmat) * temp2)
 
-        # 6️⃣  Banded storage for F, G, K
-        idx_fg = 1
-        for jpert in 1:mpert
-            for ipert in jpert:min(mpert, jpert+mband)
-                fmats_fs[i, idx_fg] = final_fmat[ipert, jpert]
-                gmats_fs[i, idx_fg] = final_gmat[ipert, jpert]
-                idx_fg += 1
-            end
-        end
-        idx_k = 1
-        for jpert in 1:mpert
-            for ipert in max(1, jpert-mband):min(mpert, jpert+mband)
-                kmats_fs[i, idx_k] = final_kmat[ipert, jpert]
-                idx_k += 1
-            end
-        end
+        # TODO: add kinetic matrices here
+
+        # TODO: banded matrix calculations would also go here if implemented
     end
 
-    println("✅ Grid computation complete.")
+    # --- Fit splines (reshape 3D to 2D: (mpsi+1) × (mpert^2)) ---
+    ffit = FourFitVars()
+    ffit.amats = SplinesMod.CubicSpline(metric.xs, reshape(amats, mpsi+1, :); bctype="extrap")
+    ffit.bmats = SplinesMod.CubicSpline(metric.xs, reshape(bmats, mpsi+1, :); bctype="extrap")
+    ffit.cmats = SplinesMod.CubicSpline(metric.xs, reshape(cmats, mpsi+1, :); bctype="extrap")
+    ffit.dmats = SplinesMod.CubicSpline(metric.xs, reshape(dmats, mpsi+1, :); bctype="extrap")
+    ffit.emats = SplinesMod.CubicSpline(metric.xs, reshape(emats, mpsi+1, :); bctype="extrap")
+    ffit.hmats = SplinesMod.CubicSpline(metric.xs, reshape(hmats, mpsi+1, :); bctype="extrap")
+    ffit.fmats = SplinesMod.CubicSpline(metric.xs, reshape(fmats, mpsi+1, :); bctype="extrap")
+    ffit.gmats = SplinesMod.CubicSpline(metric.xs, reshape(gmats, mpsi+1, :); bctype="extrap")
+    ffit.kmats = SplinesMod.CubicSpline(metric.xs, reshape(kmats, mpsi+1, :); bctype="extrap")
+    ffit.dbats = SplinesMod.CubicSpline(metric.xs, reshape(dbats, mpsi+1, :); bctype="extrap")
+    ffit.ebats = SplinesMod.CubicSpline(metric.xs, reshape(ebats, mpsi+1, :); bctype="extrap")
+    ffit.fbats = SplinesMod.CubicSpline(metric.xs, reshape(fbats, mpsi+1, :); bctype="extrap")
 
-    # Final spline fits
-    matrix_data.fmats = SplinesMod.CubicSpline(matrix_data.xs, fmats_fs; bctype="extrap")
-    matrix_data.gmats = SplinesMod.CubicSpline(matrix_data.xs, gmats_fs; bctype="extrap")
-    matrix_data.kmats = SplinesMod.CubicSpline(matrix_data.xs, kmats_fs; bctype="extrap")
-    println("🔧 Spline fitting complete.")
+    # TODO: set powers
+    # Do we need this yet? Only called if power_flag = true
 
-    return matrix_data
-end
-
-"""
-    populate_fourfit!(ffit::JPEC.DCON.FourFitVars, matrix_data::MatrixData)
-
-Populates a FourFitVars struct with the computed matrix data from make_matrix.
-This function bridges the gap between the fourfit.jl module outputs and the
-DCON workflow that uses FourFitVars.
-
-# Arguments
-- `ffit::JPEC.DCON.FourFitVars`: The struct to populate (modified in place)
-- `matrix_data::MatrixData`: The output from make_matrix containing the computed matrices
-
-# Returns
-- The modified `ffit` struct (for convenience, though it's modified in place)
-"""
-function populate_fourfit!(ffit, matrix_data::MatrixData)
-    # Store the main spline matrices
-    ffit.fmats = matrix_data.fmats
-    ffit.gmats = matrix_data.gmats
-    ffit.kmats = matrix_data.kmats
-
-    # Store diagnostic matrices if they exist (from verbose=true)
-    if matrix_data.amat_diagnostics !== nothing
-        # Convert 3D diagnostic arrays to splines
-        mpsi = matrix_data.mpsi
-        xs = matrix_data.xs
-
-        # Reshape the 3D arrays (mpsi+1, mpert, mpert) to 2D for spline fitting
-        # Each column represents one matrix element flattened across ψ
-        mpert = matrix_data.mpert
-
-        # Flatten the matrix dimensions: (mpsi+1, mpert*mpert)
-        amat_flat = reshape(matrix_data.amat_diagnostics, mpsi+1, mpert*mpert)
-        bmat_flat = reshape(matrix_data.bmat_diagnostics, mpsi+1, mpert*mpert)
-        cmat_flat = reshape(matrix_data.cmat_diagnostics, mpsi+1, mpert*mpert)
-        dmat_flat = reshape(matrix_data.dmat_diagnostics, mpsi+1, mpert*mpert)
-        emat_flat = reshape(matrix_data.emat_diagnostics, mpsi+1, mpert*mpert)
-        hmat_flat = reshape(matrix_data.hmat_diagnostics, mpsi+1, mpert*mpert)
-
-        # Create splines for each diagnostic matrix
-        ffit.amats = SplinesMod.CubicSpline(xs, amat_flat; bctype="extrap")
-        ffit.bmats = SplinesMod.CubicSpline(xs, bmat_flat; bctype="extrap")
-        ffit.cmats = SplinesMod.CubicSpline(xs, cmat_flat; bctype="extrap")
-        ffit.dmats = SplinesMod.CubicSpline(xs, dmat_flat; bctype="extrap")
-        ffit.emats = SplinesMod.CubicSpline(xs, emat_flat; bctype="extrap")
-        ffit.hmats = SplinesMod.CubicSpline(xs, hmat_flat; bctype="extrap")
+    # TODO: interpolate matrices to psilim, called if sas_flag is true
+    if sas_flag
+        error("sas_flag = true not yet implemented yet")
     end
 
-    return ffit
-end
-
-"""
-    make_matrix_populate!(ffit::JPEC.DCON.FourFitVars, plasma_eq::Equilibrium.PlasmaEquilibrium,
-                          metric::MetricData; kwargs...)
-
-Convenience function that combines make_matrix and populate_fourfit! into a single call.
-This computes the MHD matrices and directly populates the FourFitVars struct.
-
-# Arguments
-- `ffit::JPEC.DCON.FourFitVars`: The struct to populate (modified in place)
-- `plasma_eq::Equilibrium.PlasmaEquilibrium`: The plasma equilibrium
-- `metric::MetricData`: The metric data from make_metric
-
-# Keyword Arguments
-Same as make_matrix: nn, mlow, mhigh, sas_flag, verbose
-
-# Returns
-- The modified `ffit` struct
-"""
-function make_matrix_populate!(ffit, plasma_eq::Equilibrium.PlasmaEquilibrium,
-                              metric::MetricData; kwargs...)
-    matrix_data = make_matrix(plasma_eq, metric; kwargs...)
-    populate_fourfit!(ffit, matrix_data)
     return ffit
 end

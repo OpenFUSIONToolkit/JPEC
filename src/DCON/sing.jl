@@ -308,28 +308,16 @@ Fills `du` with the derivatives for the specified state and flux surface.
 """
 function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, OdeState, FourFitVars}, psieval::Float64)
 
+    # Unpack structs
     ctrl, equil, intr, odet, ffit = params
-    # Workspace
-    # fmatb = zeros(eltype(ffit.fmats.fs), intr.mband+1, intr.mpert)
-    # gmatb = zeros(eltype(ffit.gmats.fs), intr.mband+1, intr.mpert)
-    # kmatb = zeros(eltype(ffit.kmats.fs), 2*intr.mband+1, intr.mpert)
-    du_temp = zeros(eltype(du), intr.mpert, odet.msol, 2)
-
-    open("/Users/jakehalpern/Github/JPEC/notebooks/u.dat", "w") do io
-        header = ["ipert", "jsol", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
-        println(io, join(header, "\t"))
-        for isol in 1:odet.msol
-            for ipert in 1:intr.mpert
-                println(io, join([ipert, isol, real(u[ipert, isol, 1]), imag(u[ipert, isol, 1]), real(u[ipert, isol, 2]), imag(u[ipert, isol, 2])], "\t"))
-            end
-        end
-    end
     
     # Spline evaluation
     q = SplinesMod.spline_eval(equil.sq, psieval, 0)[4]
     singfac = intr.mlow .- ctrl.nn*q .+ collect(0:intr.mpert-1)
     singfac .= 1.0 ./ singfac
     chi1 = 2π * equil.psio
+
+    du_temp = zeros(eltype(du), intr.mpert, odet.msol, 2)
 
     # kinetic stuff - skip for now
     if false #(TODO: kin_flag)
@@ -416,36 +404,12 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         kmat = reshape(SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert)
         gmat = reshape(SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert)
 
-        println("psieval: ", psieval)
-        for (name, arr) in zip(["amat","bmat","cmat","fmat","kmat","gmat"], [amat, bmat, cmat, fmat, kmat, gmat])
-            println("$name (abs): max = ", maximum(abs.(arr)), ", min = ", minimum(abs.(arr)))
-        end
-
         Afact = cholesky(Hermitian(amat))  # factorization using the lower triangle
         bmat .= Afact \ bmat 
         cmat .= Afact \ cmat
 
-        # copy ideal Hermitian banded matrices F and G
-        # iqty = 1
-        # for jpert in 1:intr.mpert
-        #     for ipert in jpert:min(intr.mpert, jpert + intr.mband)
-        #         fmatb[1 + ipert - jpert, jpert] = fmat[iqty]
-        #         gmatb[1 + ipert - jpert, jpert] = gmat[iqty]
-        #         iqty += 1
-        #     end
-        # end
-
-        # copy ideal non-Hermitian banded matrix K
-        # iqty = 1
-        # for jpert in 1:intr.mpert
-        #     for ipert in max(1, jpert - intr.mband):min(intr.mpert, jpert + intr.mband)
-        #         kmatb[1 + intr.mband + ipert - jpert, jpert] = kmat[iqty]
-        #         iqty += 1
-        #     end
-        # end
+        # TODO: banded matrix calculations would go here
     end
-
-    # TODO: Banded or dense?
     
     # Compute du
     if false #(TODO: kin_flag)
@@ -482,16 +446,6 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
     # Store full u-derivative
     du[:,:,1] .= du_temp[:,:,1]
     du[:,:,2] .= -bmat * du_temp[:,:,1] - cmat * u[:,:,1]
-
-    open("/Users/jakehalpern/Github/JPEC/notebooks/ud.dat", "w") do io
-        header = ["i", "j", "Re(du1)", "Im(du1)", "Re(du2)", "Im(du2)"]
-        println(io, join(header, "\t"))
-        for isol in 1:odet.msol
-            for ipert in 1:intr.mpert
-                println(io, join([ipert, isol, real(du[ipert, isol, 1]), imag(du[ipert, isol, 1]), real(du[ipert, isol, 2]), imag(du[ipert, isol, 2])], "\t"))
-            end
-        end
-    end
 end
 
 #= Matrix stuff- ignore for now

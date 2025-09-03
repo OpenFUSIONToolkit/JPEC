@@ -18,7 +18,7 @@ include("dcon_structs.jl")
 include("dcon.jl")
 include("Ode.jl")
 include("sing.jl")
-include("fourfit_wip.jl")
+include("fourfit.jl")
 include("ode_output.jl")
 include("utils.jl")
 

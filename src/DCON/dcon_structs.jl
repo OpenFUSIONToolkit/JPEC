@@ -191,27 +191,27 @@ end
     fmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
     kmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
     gmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    kaats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    gaats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    f0mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    pmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    paats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    kkmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    kkaats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    r1mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    r2mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    r3mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    akmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    bkmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
-    ckmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # kaats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # gaats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # f0mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # pmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # paats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # kkmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # kkaats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # r1mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # r2mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # r3mats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # akmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # bkmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
+    # ckmats::Union{Nothing,SplinesMod.CubicSpline{ComplexF64}} = nothing
 
     # k0s::JPEC.SplinesMod.SplineType
 
-    ipiva::Union{Nothing,Vector{Int}} = nothing
-    asmat::Union{Nothing,Array{ComplexF64,2}} = nothing
-    bsmat::Union{Nothing,Array{ComplexF64,2}} = nothing
-    csmat::Union{Nothing,Array{ComplexF64,2}} = nothing
-    jmat::Union{Nothing,Vector{ComplexF64}} = nothing
+    # ipiva::Union{Nothing,Vector{Int}} = nothing
+    # asmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    # bsmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    # csmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    # jmat::Union{Nothing,Vector{ComplexF64}} = nothing
 
     parallel_threads::Int = 0
     dcon_kin_threads::Int = 0

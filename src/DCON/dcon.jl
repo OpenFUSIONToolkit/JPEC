@@ -106,8 +106,6 @@ function MainProgram(in_path::String)
       println("   nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
       println(" Fourier analysis of metric tensor components")
     end
-
-    ffit = FourFitVars()
     
     # Compute metric tensor
     metric_result = make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag)
@@ -117,14 +115,7 @@ function MainProgram(in_path::String)
     end
 
     # Compute matrices and populate FourFitVars struct
-    make_matrix!(ffit, equil, metric_result, 
-                nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, 
-                sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
-    # make_matrix_populate!(ffit, equil, metric_result, 
-    #                           nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, 
-    #                           sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
-
-    println("mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband), nn = $(ctrl.nn), sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
+    ffit = make_matrix!(equil, metric_result, nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, mpert=intr.mpert, sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
 
     if ctrl.kin_flag
       # fourfit_action_matrix()

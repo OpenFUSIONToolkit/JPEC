@@ -14,13 +14,13 @@ A mutable struct to hold the state of the ODE solver for DCON.
 This struct contains all necessary fields to manage the ODE integration process,
 including solution vectors, tolerances, and flags for the integration process.
 """
-#TODO: variable description review by DCON expert (once finished)
+#TODO: variable description review by DCON expert (once finished), evaluate if all variables need to be part of the struct
 @kwdef mutable struct OdeState
     mpert::Int                  # poloidal mode number count
     msol::Int                   # number of solutions
     psi_save::Float64 = 0.0     # last saved psi value
     istep::Int= 0               # integration step count
-    ix::Int= 0                  # index for psiout in spline
+    ix::Int= 0                  # index for psiout in spline #TODO: does this really need to be part of the struct?
     atol0::Float64 = 1e-10       # absolute tolerance # TODO: I'm not convinced this and atol need to be a member of a struct. I think its calculated and used only once per step in ode_step
     atol::Array{ComplexF64,3} = zeros(ComplexF64, mpert, msol, 2)       #  tolerance
     singfac::Float64 = 0.0      # separation from singular surface
@@ -536,11 +536,13 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
 
     # Compute absolute tolerances
-    for ieq in 1:2, isol in 1:odet.msol
-        odet.atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-        odet.atol0 = odet.atol0 == 0 ? typemax(Float64) : odet.atol0
-        odet.atol[:, isol, ieq] .= ComplexF64(odet.atol0, odet.atol0)
-    end
+    # TODO: do we still need an atol array? bypassing for now
+    # for ieq in 1:2, isol in 1:odet.msol
+    #     odet.atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
+    #     odet.atol0 = odet.atol0 == 0 ? typemax(Float64) : odet.atol0
+    #     odet.atol[:, isol, ieq] .= ComplexF64(odet.atol0, odet.atol0)
+    # end
+    odet.atol0 = maximum(abs.(odet.u)) * tol
 
     # Choose psiout
     if ctrl.node_flag
@@ -551,21 +553,17 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
         psiout = min(psiout, odet.psimax)
     else
         psiout = odet.psimax
-    end
-
-    # test
-    du = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
-    params = (ctrl, equil, intr, odet, ffit)
-    sing_der!(du, odet.u, params, odet.psifac)    
+    end  
     
     # Advance differential equation
     odet.istep += 1
     prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, odet, ffit))
-    sol = solve(prob, abstol=vec(abs.(odet.atol)), reltol=rtol) #TODO: add flag for DiffEq solver here?
+    sol = solve(prob, abstol=odet.atol0, reltol=rtol) #TODO: add flag for DiffEq solver here?
 
     # Update u and psifac with the solution at the end of the interval
     odet.u .= sol.u[end]
     odet.psifac = sol.t[end]
+    error("Stopping after first ODE step")
 end
 
 """
