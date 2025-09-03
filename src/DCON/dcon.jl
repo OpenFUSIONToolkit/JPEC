@@ -115,7 +115,7 @@ function MainProgram(in_path::String)
     end
 
     # Compute matrices and populate FourFitVars struct
-    ffit = make_matrix!(equil, metric_result, nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, mpert=intr.mpert, sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
+    ffit = make_matrix(equil, metric_result, nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, mpert=intr.mpert, sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
 
     if ctrl.kin_flag
       # fourfit_action_matrix()

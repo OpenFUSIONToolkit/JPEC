@@ -292,14 +292,14 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
                 bmat[ipert, jpert] = -2π * im * chi1 * (nn * g22[dmidx] + (m1 + nq) * g23[dmidx] + m1 * q * g33[dmidx])
                 cmat[ipert, jpert] = 2π * im * ((2π * im * chi1 * sing2 * (nn * g12[dmidx] + m1 * g31[dmidx])) -
                                                 (q1 * chi1 * (nn * g23[dmidx] + m1 * g33[dmidx]))) -
-                                     2π * im * (jtheta * sing1 * imat[dmidx] + nn * p1 / chi1 * jm[dmidx])
+                                     2π * im * (jtheta * sing1 * imat[dmidx] + nn * p1 / chi1 * jmat[dmidx])
                 dmat[ipert, jpert] = 2π * chi1 * (g23[dmidx] + g33[dmidx] * m1 / nn)
                 emat[ipert, jpert] = -chi1 / nn * (q1 * chi1 * g33[dmidx] - 2π * im * chi1 * g31[dmidx] * sing2 + jtheta * imat[dmidx])
                 hmat[ipert, jpert] = (q1 * chi1)^2 * g33[dmidx] +
                                      (2π * chi1)^2 * sing1 * sing2 * g11[dmidx] -
                                      2π * im * chi1 * dm * q1 * chi1 * g31[dmidx] +
                                      jtheta * q1 * chi1 * imat[dmidx] +
-                                     p1 * jm1[dmidx]
+                                     p1 * jmat1[dmidx]
                 fmat[ipert, jpert] = (chi1 / nn)^2 * g33[dmidx]
                 kmat[ipert, jpert] = 2π * im * chi1 * (g23[dmidx] + g33[dmidx] * m1 / nn)
             end
