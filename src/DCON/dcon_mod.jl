@@ -6,12 +6,11 @@ using LinearAlgebra.LAPACK #required for banded matrix operations
 using BandedMatrices #for banded matrix operations
 using TOML
 using FFTW
-using DifferentialEquations
+using OrdinaryDiffEq
 import ..Equilibrium
 import ..Spl
 import ..SplinesMod
 using Printf
-
 
 # Include all necessary files
 include("dcon_structs.jl")

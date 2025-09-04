@@ -3,7 +3,7 @@ module Equilibrium
 # --- Module-level Dependencies ---
 import ..Spl
 
-using Printf, DifferentialEquations, LinearAlgebra, HDF5
+using Printf, OrdinaryDiffEq, DiffEqCallbacks, LinearAlgebra, HDF5
 using TOML
 
 
