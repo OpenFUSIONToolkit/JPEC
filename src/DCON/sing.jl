@@ -305,19 +305,25 @@ Fills `du` with the derivatives for the specified state and flux surface.
 # you write a function which updates a vector that is designated to hold the solution. 
 # By doing this, DifferentialEquations.jl's solver packages are able to reduce the 
 # amount of array allocations and achieve better performance."
-"""
-function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, OdeState, FourFitVars}, psieval::Float64)
 
+Wherever possible, in-place operations on pre-allocated arrays are used to minimize memory allocations.
+"""
+function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
+                   params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium,
+                                 DconInternal, OdeState, FourFitVars},
+                   psieval::Float64)
     # Unpack structs
     ctrl, equil, intr, odet, ffit = params
-    
+
+    # Temp array, make sure zeroed out before calcs
+    odet.du_temp .= 0
+
     # Spline evaluation
     q = SplinesMod.spline_eval(equil.sq, psieval, 0)[4]
-    singfac = intr.mlow .- ctrl.nn*q .+ collect(0:intr.mpert-1)
-    singfac .= 1.0 ./ singfac
+    @inbounds @simd for i in 1:intr.mpert
+        odet.singfac_vec[i] = 1.0 / (intr.mlow - ctrl.nn*q + (i-1))
+    end
     chi1 = 2π * equil.psio
-
-    du_temp = zeros(eltype(du), intr.mpert, odet.msol, 2)
 
     # kinetic stuff - skip for now
     if false #(TODO: kin_flag)
@@ -397,16 +403,20 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         # # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else
         # Evaluate splines at psieval and reshape
-        amat = reshape(SplinesMod.spline_eval(ffit.amats, psieval, 0), intr.mpert, intr.mpert)
-        bmat = reshape(SplinesMod.spline_eval(ffit.bmats, psieval, 0), intr.mpert, intr.mpert)
-        cmat = reshape(SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
-        fmat = reshape(SplinesMod.spline_eval(ffit.fmats, psieval, 0), intr.mpert, intr.mpert)
-        kmat = reshape(SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert)
-        gmat = reshape(SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert)
+        odet.amat .= reshape(SplinesMod.spline_eval(ffit.amats, psieval, 0), intr.mpert, intr.mpert)
+        odet.bmat .= reshape(SplinesMod.spline_eval(ffit.bmats, psieval, 0), intr.mpert, intr.mpert)
+        odet.cmat .= reshape(SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
+        odet.fmat .= reshape(SplinesMod.spline_eval(ffit.fmats, psieval, 0), intr.mpert, intr.mpert)
+        odet.kmat .= reshape(SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert)
+        odet.gmat .= reshape(SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert)
 
-        Afact = cholesky(Hermitian(amat))  # factorization using the lower triangle
-        bmat .= Afact \ bmat 
-        cmat .= Afact \ cmat
+        odet.Afact = cholesky!(Hermitian(odet.amat))
+        # # Solve Afact \ bmat
+        copy!(odet.tmp, odet.bmat)
+        ldiv!(odet.bmat, odet.Afact, odet.tmp)
+        # # Solve Afact \ cmat
+        copy!(odet.tmp, odet.cmat)
+        ldiv!(odet.cmat, odet.Afact, odet.tmp)
 
         # TODO: banded matrix calculations would go here
     end
@@ -423,29 +433,29 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3}, params::Tupl
         #     du[:,isol,2] .+= gaatb * u[:,isol,1] + kaatb * du[:,isol,1]
         # end
     else
-        # Compute du_temp[:,:,1] = u[:,:,2] * singfac - K * u[:,:,1]
-        for isol in 1:odet.msol
-            du_temp[:, isol, 1] .= u[:, isol, 2] .* singfac
-            # zgbmv equivalent for dense: du = du - kmat * u
-            du_temp[:, isol, 1] .-= kmat * u[:, isol, 1]
+        @inbounds for isol in 1:odet.msol
+            # du_temp[:,isol,1] = u[:,isol,2] .* singfac - kmat * u[:,isol,1]
+            mul!(odet.du_temp[:, isol, 1], odet.kmat, u[:, isol, 1])
+            @. odet.du_temp[:, isol, 1] = u[:, isol, 2] .* odet.singfac_vec - odet.du_temp[:, isol, 1]
         end
 
-        # Solve F * X = du  (F from zpbtrf factorization)
-        du_temp[:, :, 1] .= cholesky(Hermitian(fmat)) \ du_temp[:, :, 1]
+        # Solve F * X = du
+        odet.Ffact = cholesky!(Hermitian(odet.fmat))
+        odet.du_temp[:, :, 1] .= odet.Ffact \ odet.du_temp[:, :, 1]
+        # TODO: haven't been able to get ldiv to work here, why?
+        # copy!(du_slice, du_temp[:, :, 1])
+        # ldiv!(du_temp[:, :, 1], Ffact, du_slice)
 
-        for isol in 1:odet.msol
-            # Compute du_temp[:,:,2] = G * u[:,:,1] + K_adj * du_temp[:,:,1]
-            du_temp[:, isol, 2] .= gmat * u[:, isol, 1]
-            du_temp[:, isol, 2] .+= kmat' * du_temp[:, isol, 1]
-
-            # Scale du(:, isol, 1) by singfac
-            du_temp[:, isol, 1] .*= singfac
+        # Compute du_temp[:,:,2]
+        @inbounds for isol in 1:odet.msol
+            # du_temp[:,:,2] = G * u[:,:,1] + K_adj * du_temp[:,:,1]
+            mul!(odet.du_temp[:, isol, 2], odet.gmat, u[:, isol, 1])
+            mul!(odet.du_temp[:, isol, 2], odet.kmat', odet.du_temp[:, isol, 1], 1.0, 1.0)
+            @. odet.du_temp[:, isol, 1] = odet.du_temp[:, isol, 1] .* odet.singfac_vec
         end
     end
-
-    # Store full u-derivative
-    du[:,:,1] .= du_temp[:,:,1]
-    du[:,:,2] .= -bmat * du_temp[:,:,1] - cmat * u[:,:,1]
+    du[:,:,1] .= odet.du_temp[:,:,1]
+    du[:,:,2] .= -odet.bmat * odet.du_temp[:,:,1] - odet.cmat * u[:,:,1]
 end
 
 #= Matrix stuff- ignore for now

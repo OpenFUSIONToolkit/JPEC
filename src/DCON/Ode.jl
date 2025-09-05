@@ -15,6 +15,7 @@ This struct contains all necessary fields to manage the ODE integration process,
 including solution vectors, tolerances, and flags for the integration process.
 """
 #TODO: variable description review by DCON expert (once finished), evaluate if all variables need to be part of the struct
+# TODO: will msol ever be different than mpert? If so, need to create a separate tmp for mpert x msol
 @kwdef mutable struct OdeState
     mpert::Int                  # poloidal mode number count
     msol::Int                   # number of solutions
@@ -30,7 +31,6 @@ including solution vectors, tolerances, and flags for the integration process.
     flag_count::Int = 0         # count of flags raised
     new::Bool = true            # flag for new solution
     u::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)            # solution vectors
-    du::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)           # derivative vectors
     u_save::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)       # saved solution vectors
     index::Vector{Int} = collect(1:mpert)                                   # indices for sorting solutions
     unorm::Vector{Float64} = zeros(Float64, 2*mpert)                        # norms of solution vectors
@@ -42,6 +42,21 @@ including solution vectors, tolerances, and flags for the integration process.
     q::Float64 = 0.0            # q value at the surface
     psimax::Float64 = 0.0         # maximum psi value for the integrator (TODO: is this correct?)
     ua::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, 2*mpert, 2) # auxiliary array for singular surface calculations
+    # Temporary matrices for calculations
+    du_temp::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, msol, 2)    
+    du_slice::Matrix{ComplexF64} = zeros(ComplexF64, mpert, msol)
+    amat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
+    bmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
+    cmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
+    fmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
+    kmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
+    gmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
+    tmp::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
+    Afact::Cholesky{ComplexF64,Matrix{ComplexF64}} =
+        cholesky!(Hermitian(Matrix{ComplexF64}(I, mpert, mpert)))
+    Ffact::Cholesky{ComplexF64,Matrix{ComplexF64}} =
+        cholesky!(Hermitian(Matrix{ComplexF64}(I, mpert, mpert)))
+    singfac_vec::Vector{Float64} = zeros(Float64, mpert)
 end
 
 OdeState(mpert::Int, msol::Int) = OdeState(; mpert, msol)
@@ -80,8 +95,9 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
     while true
         first = true
         while true
+            println("Step: ", odet.istep)
             if odet.istep > 0
-                ode_unorm!(odet, intr, false)
+                ode_unorm!(odet, intr, ctrl, false)
             end
             # Always record the first and last point in an inter-rational region
             # these are important for resonant quantities
@@ -98,7 +114,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
 
         # Re-initialize
         ising == ctrl.ksing && break
-        if next == "cross"
+        if odet.next == "cross"
             if ctrl.res_flag
                 error("res_flag = true not implemented yet!")
                 #ode_resist_cross()
@@ -536,13 +552,11 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
 
     # Compute absolute tolerances
-    # TODO: do we still need an atol array? bypassing for now
-    # for ieq in 1:2, isol in 1:odet.msol
-    #     odet.atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-    #     odet.atol0 = odet.atol0 == 0 ? typemax(Float64) : odet.atol0
-    #     odet.atol[:, isol, ieq] .= ComplexF64(odet.atol0, odet.atol0)
-    # end
-    odet.atol0 = maximum(abs.(odet.u)) * tol
+    for ieq in 1:2, isol in 1:odet.msol
+        odet.atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
+        odet.atol0 = odet.atol0 == 0 ? typemax(Float64) : odet.atol0
+        odet.atol[:, isol, ieq] .= ComplexF64(odet.atol0, odet.atol0)
+    end
 
     # Choose psiout
     if ctrl.node_flag
@@ -555,28 +569,79 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
         psiout = odet.psimax
     end  
     
+    # open("/Users/jakehalpern/Github/JPEC/notebooks/u.dat", "w") do io
+    #     header = ["i", "j", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
+    #     println(io, join(header, "\t"))
+    #     for isol in 1:odet.msol
+    #         for ipert in 1:intr.mpert
+    #             println(io, join([ipert, isol, real(odet.u[ipert, isol, 1]), imag(odet.u[ipert, isol, 1]), real(odet.u[ipert, isol, 2]), imag(odet.u[ipert, isol, 2])], "\t"))
+    #         end
+    #     end
+    # end
+
+    # # test
+    # du = zeros(ComplexF64, intr.mpert, odet.msol, 2)
+    # params = (ctrl, equil, intr, odet, ffit)
+    # sing_der!(du, odet.u, params, odet.psifac)
+
+    # open("/Users/jakehalpern/Github/JPEC/notebooks/ud.dat", "w") do io
+    #     header = ["i", "j", "Re(du1)", "Im(du1)", "Re(du2)", "Im(du2)"]
+    #     println(io, join(header, "\t"))
+    #     for isol in 1:odet.msol
+    #         for ipert in 1:intr.mpert
+    #             println(io, join([ipert, isol, real(du[ipert, isol, 1]), imag(du[ipert, isol, 1]), real(du[ipert, isol, 2]), imag(du[ipert, isol, 2])], "\t"))
+    #         end
+    #     end
+    # end
+
+    # println("max val of du = $(maximum(abs.(du))) at psifac = $(odet.psifac)")
+    # error("stopping after sing der")
+
+    Δψ = 0.005
+    last_psi = Ref(0.0)
+
+    condition(u,t,integrator) = (t - last_psi[] >= Δψ)
+    affect!(integrator) = begin
+        println("       ψ = ", integrator.t)
+        last_psi[] = integrator.t
+    end
+
+    cb = DiscreteCallback(condition, affect!)
+
     # Advance differential equation
     odet.istep += 1
     prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, odet, ffit))
-    sol = solve(prob, abstol=odet.atol0, reltol=rtol) #TODO: add flag for DiffEq solver here?
+    sol = solve(prob, Tsit5(), abstol=odet.atol0, reltol=rtol, callback=cb)
 
     # Update u and psifac with the solution at the end of the interval
-    odet.u .= sol.u[end]
+    odet.u .= reshape(sol.u[end], size(odet.u))
     odet.psifac = sol.t[end]
-    error("Stopping after first ODE step")
+
+    println("Final psifac = $(odet.psifac), max u = $(maximum(abs.(odet.u)))")
+
+    # println("Stopping integration at psifac = $psifac")
+    # open("/Users/jakehalpern/Github/JPEC/notebooks/u_post.dat", "w") do io
+    #     header = ["i", "j", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
+    #     println(io, join(header, "\t"))
+    #     for isol in 1:odet.msol
+    #         for ipert in 1:intr.mpert
+    #             println(io, join([ipert, isol, real(odet.u[ipert, isol, 1]), imag(odet.u[ipert, isol, 1]), real(odet.u[ipert, isol, 2]), imag(odet.u[ipert, isol, 2])], "\t"))
+    #         end
+    #     end
+    # end
 end
 
 """
     ode_unorm!(odet::OdeState, intr::DconInternal,  sing_flag::Bool)
 
-Computes norms of the solution vectors in , normalizes them
+Computes norms of the solution vectors, normalizes them
 relative to initial values, and applies Gaussian reduction via `ode_fixup!`
 if the variation exceeds a threshold or if `sing_flag` is true.
 Throws an error if any vector norm is zero.
 """
 #function ode_unorm(intr::DconInternal, odet::OdeState, dout::DconOutput, fNames::DconFileNames, sing_flag::Bool)
 # odet should be first, its modified. Can add output structs back later, removing for simplicity now
-function ode_unorm!(odet::OdeState, intr::DconInternal,  sing_flag::Bool)
+function ode_unorm!(odet::OdeState, intr::DconInternal, ctrl::DconControl, sing_flag::Bool)
     # Compute norms of first solution vectors, abort if any are zero
     odet.unorm[1:intr.mpert] .= sqrt.(sum(abs.(odet.u[:, 1:intr.mpert, 1]).^2, dims=1)[:])
     odet.unorm[intr.mpert+1:odet.msol] .= sqrt.(sum(abs.(odet.u[:, intr.mpert+1:odet.msol, 2]).^2, dims=1)[:])

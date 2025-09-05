@@ -163,7 +163,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     end
 
     # Write new crit
-    println("       istep: $(odet.istep), psifac:  $(odet.psifac), dpsi: $dpsi, q: $q, singfac: $singfac, crit: $crit")
+    println("       istep: $(odet.istep), psifac:  $(odet.psifac), dpsi: $dpsi, q: $q, singfac: $singfac, crit: $crit, logpsi1: $logpsi1, logpsi2: $logpsi2")
     # println(crit_out_unit, "$(odet.istep) $psifac $dpsi $q $singfac $crit")
     # write(crit_bin_unit, Float32(psifac), Float32(logpsi1),
     #       Float32(logpsi2), Float32(q), Float32(crit))
