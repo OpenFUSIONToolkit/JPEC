@@ -22,14 +22,13 @@ including solution vectors, tolerances, and flags for the integration process.
     psi_save::Float64 = 0.0     # last saved psi value
     istep::Int= 0               # integration step count
     ix::Int= 0                  # index for psiout in spline #TODO: does this really need to be part of the struct?
-    atol0::Float64 = 1e-10       # absolute tolerance # TODO: I'm not convinced this and atol need to be a member of a struct. I think its calculated and used only once per step in ode_step
-    atol::Array{ComplexF64,3} = zeros(ComplexF64, mpert, msol, 2)       #  tolerance
     singfac::Float64 = 0.0      # separation from singular surface
     psifac::Float64 = 0.0       # normalized flux coordinate
     neq::Int = 0                # number of equations
     next::String = ""           # next action ("cross" or "finish")
     flag_count::Int = 0         # count of flags raised
     new::Bool = true            # flag for new solution
+    first::Bool = true          # flag for first step
     u::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)            # solution vectors
     u_save::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)       # saved solution vectors
     index::Vector{Int} = collect(1:mpert)                                   # indices for sorting solutions
@@ -44,18 +43,15 @@ including solution vectors, tolerances, and flags for the integration process.
     ua::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, 2*mpert, 2) # auxiliary array for singular surface calculations
     # Temporary matrices for calculations
     du_temp::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, msol, 2)    
-    du_slice::Matrix{ComplexF64} = zeros(ComplexF64, mpert, msol)
-    amat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
-    bmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
-    cmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
-    fmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
-    kmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
-    gmat::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
-    tmp::Matrix{ComplexF64} = zeros(ComplexF64, mpert, mpert)
-    Afact::Cholesky{ComplexF64,Matrix{ComplexF64}} =
-        cholesky!(Hermitian(Matrix{ComplexF64}(I, mpert, mpert)))
-    Ffact::Cholesky{ComplexF64,Matrix{ComplexF64}} =
-        cholesky!(Hermitian(Matrix{ComplexF64}(I, mpert, mpert)))
+    amat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
+    bmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
+    cmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
+    fmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
+    kmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
+    gmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
+    tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
+    Afact::Union{Cholesky{ComplexF64,Matrix{ComplexF64}}, Nothing} = nothing
+    Ffact::Union{Cholesky{ComplexF64,Matrix{ComplexF64}}, Nothing} = nothing
     singfac_vec::Vector{Float64} = zeros(Float64, mpert)
 end
 
@@ -92,24 +88,25 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
     if ctrl.verbose # mimicing an output from ode_output_open
         println("   ψ=$(odet.psifac), q=$(SplinesMod.spline_eval(equil.sq, odet.psifac, 0)[4])")
     end
-    while true
-        first = true
-        while true
+    # TODO: Eventually figure out a way to get rid of these - use callbacks in the integrator for the second one? maybe just do while ising != ksing and next != cross for the first?
+    while true # inside plasma (break out when at the edge)
+        odet.first = true
+        while true # inside sing surface (break out when close to singular surface)
             println("Step: ", odet.istep)
-            if odet.istep > 0
-                ode_unorm!(odet, intr, ctrl, false)
-            end
+            # if odet.istep > 0
+            #     ode_unorm!(odet, intr, ctrl, false)
+            # end
             # Always record the first and last point in an inter-rational region
             # these are important for resonant quantities
             # recording the last point is critical for matching the nominal edge
             test = ode_test(odet, intr, ctrl, ising)
-            force_output = first || test
+            force_output = odet.first || test
             #ode_output_step(unorm, intr, ctrl, DconFileNames(), equil; force=force_output)
             ode_output_step(odet, intr, ctrl, equil; force=force_output)
             ode_record_edge!(intr, odet, ctrl, equil)
             test && break # break out of loop if ode_test returns true
             ode_step(ising, odet, equil, intr, ctrl, ffit)
-            first = false
+            odet.first = false
         end
 
         # Re-initialize
@@ -525,6 +522,7 @@ scanning in plasma physics and MHD codes.
 - ODE integration is performed using the DifferentialEquations.jl interface.
 - Handles both node-based and maximal-psi stepping, depending on control flags.
 """
+# TODO: make this a ! function, get rid of ising
 function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl, ffit::FourFitVars)
 
     # TODO: is there better relative/absolute tolerance handling for Julia? This might be specific to lsode
@@ -552,10 +550,12 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
 
     # Compute absolute tolerances
+    atol = zeros(ComplexF64, intr.mpert, odet.msol, 2)
+    atol0 = 0.0
     for ieq in 1:2, isol in 1:odet.msol
-        odet.atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-        odet.atol0 = odet.atol0 == 0 ? typemax(Float64) : odet.atol0
-        odet.atol[:, isol, ieq] .= ComplexF64(odet.atol0, odet.atol0)
+        atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
+        atol0 = atol0 == 0 ? typemax(Float64) : atol0
+        atol[:, isol, ieq] .= ComplexF64(atol0, atol0)
     end
 
     # Choose psiout
@@ -579,48 +579,67 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     #     end
     # end
 
-    # # test
+    # test
     # du = zeros(ComplexF64, intr.mpert, odet.msol, 2)
+    # odet.u .= ones(ComplexF64, size(odet.u))
     # params = (ctrl, equil, intr, odet, ffit)
+    # println("testing sing_der at psifac = $(odet.psifac)")
     # sing_der!(du, odet.u, params, odet.psifac)
-
-    # open("/Users/jakehalpern/Github/JPEC/notebooks/ud.dat", "w") do io
-    #     header = ["i", "j", "Re(du1)", "Im(du1)", "Re(du2)", "Im(du2)"]
-    #     println(io, join(header, "\t"))
-    #     for isol in 1:odet.msol
-    #         for ipert in 1:intr.mpert
-    #             println(io, join([ipert, isol, real(du[ipert, isol, 1]), imag(du[ipert, isol, 1]), real(du[ipert, isol, 2]), imag(du[ipert, isol, 2])], "\t"))
-    #         end
-    #     end
-    # end
 
     # println("max val of du = $(maximum(abs.(du))) at psifac = $(odet.psifac)")
     # error("stopping after sing der")
 
-    Δψ = 0.005
+    Δψ = 0.0001
     last_psi = Ref(0.0)
 
     condition(u,t,integrator) = (t - last_psi[] >= Δψ)
     affect!(integrator) = begin
-        println("       ψ = ", integrator.t)
+        u = integrator.u
+        # params = integrator.p
+        # # params is a tuple: (ctrl, equil, intr, odet, ffit)
+        # du = similar(u)
+        # sing_der!(du, u, params, integrator.t)
+        # Extract odet from params
+        # odet = params[4]
+        fmt(x) = @sprintf("%.5e", x)
+        println("       ψ=", fmt(integrator.t), 
+            ", max|u|=", fmt(maximum(abs.(u)))) 
+            # ", max|du|=", fmt(maximum(abs.(du))))
         last_psi[] = integrator.t
     end
 
     cb = DiscreteCallback(condition, affect!)
 
+    # Callback to normalize solution after each step if t > 0
+    function unorm_condition(u, t, integrator)
+        t > odet.psifac
+    end
+    function unorm_affect!(integrator)
+        # Extract odet from parameters tuple
+        params = integrator.p
+        odet = params[4]
+        intr = params[3]
+        ctrl = params[1]
+        odet.u .= integrator.u
+        odet.psifac = integrator.t
+        ode_unorm!(odet, intr, ctrl, false)
+    end
+    unorm_cb = DiscreteCallback(unorm_condition, unorm_affect!)
+
+    cb = CallbackSet(cb, unorm_cb)
+
     # Advance differential equation
     odet.istep += 1
     prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, odet, ffit))
-    sol = solve(prob, Tsit5(), abstol=odet.atol0, reltol=rtol, callback=cb)
+    sol = solve(prob, Tsit5(), abstol=atol0, reltol=rtol, callback=cb)
 
     # Update u and psifac with the solution at the end of the interval
-    odet.u .= reshape(sol.u[end], size(odet.u))
+    odet.u .= sol.u[end]
     odet.psifac = sol.t[end]
 
     println("Final psifac = $(odet.psifac), max u = $(maximum(abs.(odet.u)))")
 
-    # println("Stopping integration at psifac = $psifac")
-    # open("/Users/jakehalpern/Github/JPEC/notebooks/u_post.dat", "w") do io
+    # open("/Users/jakehalpern/Github/JPEC/notebooks/u.dat", "w") do io
     #     header = ["i", "j", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
     #     println(io, join(header, "\t"))
     #     for isol in 1:odet.msol
@@ -629,6 +648,7 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     #         end
     #     end
     # end
+    # error("stopping after ode step with psi = $(odet.psifac)")
 end
 
 """
@@ -642,6 +662,7 @@ Throws an error if any vector norm is zero.
 #function ode_unorm(intr::DconInternal, odet::OdeState, dout::DconOutput, fNames::DconFileNames, sing_flag::Bool)
 # odet should be first, its modified. Can add output structs back later, removing for simplicity now
 function ode_unorm!(odet::OdeState, intr::DconInternal, ctrl::DconControl, sing_flag::Bool)
+    println("In unorm")
     # Compute norms of first solution vectors, abort if any are zero
     odet.unorm[1:intr.mpert] .= sqrt.(sum(abs.(odet.u[:, 1:intr.mpert, 1]).^2, dims=1)[:])
     odet.unorm[intr.mpert+1:odet.msol] .= sqrt.(sum(abs.(odet.u[:, intr.mpert+1:odet.msol, 2]).^2, dims=1)[:])
@@ -657,6 +678,7 @@ function ode_unorm!(odet::OdeState, intr::DconInternal, ctrl::DconControl, sing_
     else
         odet.unorm[1:odet.msol] .= odet.unorm[1:odet.msol] ./ odet.unorm0[1:odet.msol]
         uratio = maximum(odet.unorm[1:odet.msol]) / minimum(odet.unorm[1:odet.msol])
+        println("uratio = $uratio")
         if uratio > ctrl.ucrit || sing_flag
             # ode_fixup(intr, odet, dout, fNames, sing_flag, false)
             ode_fixup!(odet, intr, sing_flag, false)
@@ -691,25 +713,35 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::B
     # end
     odet.flag_count = 0
 
+    # open("/Users/jakehalpern/Github/JPEC/notebooks/u_prefixup.dat", "w") do io
+    #     header = ["i", "j", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
+    #     println(io, join(header, "\t"))
+    #     for isol in 1:odet.msol
+    #         for ipert in 1:intr.mpert
+    #             println(io, join([ipert, isol, real(odet.u[ipert, isol, 1]), imag(odet.u[ipert, isol, 1]), real(odet.u[ipert, isol, 2]), imag(odet.u[ipert, isol, 2])], "\t"))
+    #         end
+    #     end
+    # end
+
     # Initialize fixfac
     if !test
         for isol in 1:odet.msol
             odet.fixfac[isol, isol] = 1 # fixfac initialized to zeros already in OdeState constructor
         end
         # Sort unorm
-        index[1:odet.msol] .= collect(1:odet.msol)
-        index[1:intr.mpert] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
-        index[intr.mpert+1:odet.msol] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
+        odet.index[1:odet.msol] .= collect(1:odet.msol)
+        odet.index[1:intr.mpert] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
+        odet.index[intr.mpert+1:odet.msol] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
     end
 
     # Triangularize primary solutions
     mask = trues(2, odet.msol)
     for isol in 1:intr.mpert
-        ksol = index[isol]
+        ksol = odet.index[isol]
         mask[2, ksol] = false
         if !test
             # Find max location
-            absvals = abs.(u[:, ksol, 1])
+            absvals = abs.(odet.u[:, ksol, 1])
             masked = absvals .* mask[1, 1:intr.mpert]
             kpert = argmax(masked)
             #kpert = findmax(abs.(odet.u[:, ksol, 1]) .* (mask[1, 1:intr.mpert] .|> Int))[2] #TODO: ChatGPT suggests this might be better than the above three lines
@@ -718,9 +750,9 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::B
         for jsol in 1:odet.msol
             if mask[2, jsol]
                 if !test
-                    fixfac[ksol, jsol] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
+                    odet.fixfac[ksol, jsol] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
                 end
-                odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* fixfac[ksol, jsol]
+                odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol]
                 if !test
                     odet.u[kpert, jsol, 1] = 0
                 end
@@ -730,12 +762,13 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::B
 
     # Triangularize secondary solutions
     if odet.msol > intr.mpert && secondary
+        println("Triangularizing secondary solutions")
         mask = trues(2, odet.msol)
         for isol in intr.mpert + 1:odet.msol
-            ksol = index[isol]
+            ksol = odet.index[isol]
             mask[2, ksol] = false
             if !test
-                absvals = abs.(u[:, ksol, 2])
+                absvals = abs.(odet.u[:, ksol, 2])
                 masked = absvals .* mask[1, 1:intr.mpert]
                 kpert = argmax(masked)
                 mask[1, kpert] = false
@@ -745,9 +778,9 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::B
                     if !test
                         fixfac[ksol, jsol] = -u[kpert, jsol, 2] / u[kpert, ksol, 2]
                     end
-                    u[:, jsol, :] .= u[:, jsol, :] .+ u[:, ksol, :] .* fixfac[ksol, jsol]
+                    odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol]
                     if !test
-                        u[kpert, jsol, 2] = 0
+                        odet.u[kpert, jsol, 2] = 0
                     end
                 end
             end
@@ -760,6 +793,16 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::B
     #     write(fNames.euler_bin_unit, sing_flag, msol)
     #     write(fNames.euler_bin_unit, fixfac, index[1:msol])
     # end
+    # open("/Users/jakehalpern/Github/JPEC/notebooks/u_postfixup.dat", "w") do io
+    # header = ["i", "j", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
+    # println(io, join(header, "\t"))
+    # for isol in 1:odet.msol
+    #     for ipert in 1:intr.mpert
+    #         println(io, join([ipert, isol, real(odet.u[ipert, isol, 1]), imag(odet.u[ipert, isol, 1]), real(odet.u[ipert, isol, 2]), imag(odet.u[ipert, isol, 2])], "\t"))
+    #     end
+    # end
+    # end
+    # error("ode_fixup")
 end
 
 """

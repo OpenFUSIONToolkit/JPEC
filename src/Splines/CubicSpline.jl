@@ -189,6 +189,39 @@ function spline_eval(spline::CubicSpline{T}, xs::Vector{Float64}, derivs::Int=0)
 end
 
 """
+    spline_eval!(f, spline, x; derivs=0, f1=nothing, f2=nothing, f3=nothing)
+
+In-place evaluation of `CubicSpline` at a single point `x`.
+
+Arguments:
+- `f`: preallocated vector for the function values (length = spline.nqty).
+- `spline`: the cubic spline object.
+- `x`: Float64 input point.
+- `derivs`: number of derivatives to evaluate (0–3).
+- `f1`, `f2`, `f3`: optional preallocated vectors for first, second, third derivatives.
+
+Results are written into `f` (and optionally `f1`, `f2`, `f3`).
+"""
+function spline_eval!(f::Vector{T}, spline::CubicSpline{T}, x::Float64;
+                      derivs::Int=0, f1=nothing, f2=nothing, f3=nothing) where {T<:Union{Float64, ComplexF64}}
+    @assert (derivs in 0:3) "Invalid number of derivatives requested: $derivs"
+
+    if derivs == 0
+        call_spline_c_eval(T, spline, x, f)
+    elseif derivs == 1
+        @assert f1 !== nothing "Need preallocated f1"
+        call_spline_c_eval(T, spline, x, f, f1)
+    elseif derivs == 2
+        @assert f1 !== nothing && f2 !== nothing "Need preallocated f1, f2"
+        call_spline_c_eval(T, spline, x, f, f1, f2)
+    elseif derivs == 3
+        @assert f1 !== nothing && f2 !== nothing && f3 !== nothing "Need preallocated f1, f2, f3"
+        call_spline_c_eval(T, spline, x, f, f1, f2, f3)
+    end
+    return nothing
+end
+
+"""
     spline_integrate!(spline::CubicSpline{T}) where {T<:Union{Float64, ComplexF64}}
 
 	## Arguments:

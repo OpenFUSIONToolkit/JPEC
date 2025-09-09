@@ -325,6 +325,19 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
     end
     chi1 = 2π * equil.psio
 
+    # function dump_matrix(filename, mat)
+    #     open(filename, "w") do io
+    #         header = ["i", "j", "Re(val)", "Im(val)"]
+    #         println(io, join(header, "\t"))
+    #         mpert, _ = size(mat)
+    #         for i in 1:mpert
+    #             for j in 1:mpert
+    #                 println(io, join([i, j, real(mat[i, j]), imag(mat[i, j])], "\t"))
+    #             end
+    #         end
+    #     end
+    # end
+
     # kinetic stuff - skip for now
     if false #(TODO: kin_flag)
         # cspline_eval(ffit.amats, psifac, 0)
@@ -402,21 +415,27 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         # end
         # # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else
-        # Evaluate splines at psieval and reshape
-        odet.amat .= reshape(SplinesMod.spline_eval(ffit.amats, psieval, 0), intr.mpert, intr.mpert)
-        odet.bmat .= reshape(SplinesMod.spline_eval(ffit.bmats, psieval, 0), intr.mpert, intr.mpert)
-        odet.cmat .= reshape(SplinesMod.spline_eval(ffit.cmats, psieval, 0), intr.mpert, intr.mpert)
-        odet.fmat .= reshape(SplinesMod.spline_eval(ffit.fmats, psieval, 0), intr.mpert, intr.mpert)
-        odet.kmat .= reshape(SplinesMod.spline_eval(ffit.kmats, psieval, 0), intr.mpert, intr.mpert)
-        odet.gmat .= reshape(SplinesMod.spline_eval(ffit.gmats, psieval, 0), intr.mpert, intr.mpert)
+        # Evaluate splines at psieval and reshape avoiding new allocations
+        SplinesMod.spline_eval!(odet.amat, ffit.amats, psieval; derivs=0)
+        amat = reshape(odet.amat, intr.mpert, intr.mpert)
+        SplinesMod.spline_eval!(odet.bmat, ffit.bmats, psieval; derivs=0)
+        bmat = reshape(odet.bmat, intr.mpert, intr.mpert)
+        SplinesMod.spline_eval!(odet.cmat, ffit.cmats, psieval; derivs=0)
+        cmat = reshape(odet.cmat, intr.mpert, intr.mpert)
+        SplinesMod.spline_eval!(odet.fmat, ffit.fmats, psieval; derivs=0)
+        fmat = reshape(odet.fmat, intr.mpert, intr.mpert)
+        SplinesMod.spline_eval!(odet.kmat, ffit.kmats, psieval; derivs=0)
+        kmat = reshape(odet.kmat, intr.mpert, intr.mpert)
+        SplinesMod.spline_eval!(odet.gmat, ffit.gmats, psieval; derivs=0)
+        gmat = reshape(odet.gmat, intr.mpert, intr.mpert)
 
-        odet.Afact = cholesky!(Hermitian(odet.amat))
+        odet.Afact = cholesky(Hermitian(amat))
         # # Solve Afact \ bmat
-        copy!(odet.tmp, odet.bmat)
-        ldiv!(odet.bmat, odet.Afact, odet.tmp)
+        copy!(odet.tmp, bmat)
+        ldiv!(bmat, odet.Afact, odet.tmp)
         # # Solve Afact \ cmat
-        copy!(odet.tmp, odet.cmat)
-        ldiv!(odet.cmat, odet.Afact, odet.tmp)
+        copy!(odet.tmp, cmat)
+        ldiv!(cmat, odet.Afact, odet.tmp)
 
         # TODO: banded matrix calculations would go here
     end
@@ -435,12 +454,15 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
     else
         @inbounds for isol in 1:odet.msol
             # du_temp[:,isol,1] = u[:,isol,2] .* singfac - kmat * u[:,isol,1]
-            mul!(odet.du_temp[:, isol, 1], odet.kmat, u[:, isol, 1])
-            @. odet.du_temp[:, isol, 1] = u[:, isol, 2] .* odet.singfac_vec - odet.du_temp[:, isol, 1]
+            odet.du_temp[:, isol, 1] .= u[:, isol, 2] .* odet.singfac_vec
+            odet.du_temp[:, isol, 1] .+= -kmat * u[:, isol, 1]
+            # TODO: this is more allocation efficient, but not safe (needs a temporary buffer)
+            #mul!(odet.du_temp[:, isol, 1], kmat, u[:, isol, 1])
+            #@. odet.du_temp[:, isol, 1] = u[:, isol, 2] .* odet.singfac_vec - odet.du_temp[:, isol, 1]
         end
 
         # Solve F * X = du
-        odet.Ffact = cholesky!(Hermitian(odet.fmat))
+        odet.Ffact = cholesky(Hermitian(fmat))
         odet.du_temp[:, :, 1] .= odet.Ffact \ odet.du_temp[:, :, 1]
         # TODO: haven't been able to get ldiv to work here, why?
         # copy!(du_slice, du_temp[:, :, 1])
@@ -449,13 +471,21 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         # Compute du_temp[:,:,2]
         @inbounds for isol in 1:odet.msol
             # du_temp[:,:,2] = G * u[:,:,1] + K_adj * du_temp[:,:,1]
-            mul!(odet.du_temp[:, isol, 2], odet.gmat, u[:, isol, 1])
-            mul!(odet.du_temp[:, isol, 2], odet.kmat', odet.du_temp[:, isol, 1], 1.0, 1.0)
+            # TODO: this is more allocation efficient, but not safe (needs a temporary buffer)
+            # mul!(odet.du_temp[:, isol, 2], gmat, u[:, isol, 1])
+            # mul!(odet.du_temp[:, isol, 2], kmat', odet.du_temp[:, isol, 1], 1.0, 1.0)
+            odet.du_temp[:, isol, 2] .= gmat * u[:, isol, 1]
+            odet.du_temp[:, isol, 2] .+= kmat' * odet.du_temp[:, isol, 1]
             @. odet.du_temp[:, isol, 1] = odet.du_temp[:, isol, 1] .* odet.singfac_vec
         end
     end
-    du[:,:,1] .= odet.du_temp[:,:,1]
-    du[:,:,2] .= -odet.bmat * odet.du_temp[:,:,1] - odet.cmat * u[:,:,1]
+    # TODO: this is ud in the Fortran - is this ever used?
+    # du[:,:,1] .= odet.du_temp[:,:,1]
+    # du[:,:,2] .= -bmat * odet.du_temp[:,:,1] - cmat * u[:,:,1]
+
+    # This is the derivative that should be used to advance the ODEs
+    # TODO: clean this up above, can all operations just use du instead of odet.du_temp?
+    du .= odet.du_temp
 end
 
 #= Matrix stuff- ignore for now
