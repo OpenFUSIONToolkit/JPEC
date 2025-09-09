@@ -568,26 +568,6 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     else
         psiout = odet.psimax
     end  
-    
-    # open("/Users/jakehalpern/Github/JPEC/notebooks/u.dat", "w") do io
-    #     header = ["i", "j", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
-    #     println(io, join(header, "\t"))
-    #     for isol in 1:odet.msol
-    #         for ipert in 1:intr.mpert
-    #             println(io, join([ipert, isol, real(odet.u[ipert, isol, 1]), imag(odet.u[ipert, isol, 1]), real(odet.u[ipert, isol, 2]), imag(odet.u[ipert, isol, 2])], "\t"))
-    #         end
-    #     end
-    # end
-
-    # test
-    # du = zeros(ComplexF64, intr.mpert, odet.msol, 2)
-    # odet.u .= ones(ComplexF64, size(odet.u))
-    # params = (ctrl, equil, intr, odet, ffit)
-    # println("testing sing_der at psifac = $(odet.psifac)")
-    # sing_der!(du, odet.u, params, odet.psifac)
-
-    # println("max val of du = $(maximum(abs.(du))) at psifac = $(odet.psifac)")
-    # error("stopping after sing der")
 
     Δψ = 0.0001
     last_psi = Ref(0.0)
