@@ -126,8 +126,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
         end
         odet.flag_count = 0
     end
-
-    return nzero
+    return odet.nzero
 end
 
 
@@ -575,16 +574,16 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     condition(u,t,integrator) = (t - last_psi[] >= Δψ)
     affect!(integrator) = begin
         u = integrator.u
-        # params = integrator.p
-        # # params is a tuple: (ctrl, equil, intr, odet, ffit)
-        # du = similar(u)
-        # sing_der!(du, u, params, integrator.t)
+        params = integrator.p
+        # params is a tuple: (ctrl, equil, intr, odet, ffit)
+        du = similar(u)
+        sing_der!(du, u, params, integrator.t)
         # Extract odet from params
-        # odet = params[4]
+        odet = params[4]
         fmt(x) = @sprintf("%.5e", x)
         println("       ψ=", fmt(integrator.t), 
-            ", max|u|=", fmt(maximum(abs.(u)))) 
-            # ", max|du|=", fmt(maximum(abs.(du))))
+            ", max|u|=", fmt(maximum(abs.(u))), 
+            ", max|du|=", fmt(maximum(abs.(du))))
         last_psi[] = integrator.t
     end
 
@@ -602,7 +601,10 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
         ctrl = params[1]
         odet.u .= integrator.u
         odet.psifac = integrator.t
+        # TODO: I don't love how we double copy from integrator.u to odet.u then back, is there a better way?
         ode_unorm!(odet, intr, ctrl, false)
+        # Need to update integrator.u with normalized odet.u!
+        integrator.u .= odet.u
     end
     unorm_cb = DiscreteCallback(unorm_condition, unorm_affect!)
 
@@ -611,7 +613,7 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
     # Advance differential equation
     odet.istep += 1
     prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, odet, ffit))
-    sol = solve(prob, Tsit5(), abstol=atol0, reltol=rtol, callback=cb)
+    sol = solve(prob, Tsit5(), reltol=rtol, callback=cb)
 
     # Update u and psifac with the solution at the end of the interval
     odet.u .= sol.u[end]
@@ -619,15 +621,9 @@ function ode_step(ising::Int, odet::OdeState, equil::Equilibrium.PlasmaEquilibri
 
     println("Final psifac = $(odet.psifac), max u = $(maximum(abs.(odet.u)))")
 
-    # open("/Users/jakehalpern/Github/JPEC/notebooks/u.dat", "w") do io
-    #     header = ["i", "j", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
-    #     println(io, join(header, "\t"))
-    #     for isol in 1:odet.msol
-    #         for ipert in 1:intr.mpert
-    #             println(io, join([ipert, isol, real(odet.u[ipert, isol, 1]), imag(odet.u[ipert, isol, 1]), real(odet.u[ipert, isol, 2]), imag(odet.u[ipert, isol, 2])], "\t"))
-    #         end
-    #     end
-    # end
+    # dump_matrix("/Users/jakehalpern/Github/JPEC/notebooks/u_integration1.dat", odet.u[:, :, 1])
+    # dump_matrix("/Users/jakehalpern/Github/JPEC/notebooks/u_integration2.dat", odet.u[:, :, 2])
+
     # error("stopping after ode step with psi = $(odet.psifac)")
 end
 
@@ -642,10 +638,9 @@ Throws an error if any vector norm is zero.
 #function ode_unorm(intr::DconInternal, odet::OdeState, dout::DconOutput, fNames::DconFileNames, sing_flag::Bool)
 # odet should be first, its modified. Can add output structs back later, removing for simplicity now
 function ode_unorm!(odet::OdeState, intr::DconInternal, ctrl::DconControl, sing_flag::Bool)
-    println("In unorm")
     # Compute norms of first solution vectors, abort if any are zero
-    odet.unorm[1:intr.mpert] .= sqrt.(sum(abs.(odet.u[:, 1:intr.mpert, 1]).^2, dims=1)[:])
-    odet.unorm[intr.mpert+1:odet.msol] .= sqrt.(sum(abs.(odet.u[:, intr.mpert+1:odet.msol, 2]).^2, dims=1)[:])
+    odet.unorm[1:intr.mpert] .= [norm(odet.u[:, j, 1]) for j in 1:intr.mpert]
+    odet.unorm[intr.mpert+1:odet.msol] .= [norm(odet.u[:, j, 2]) for j in intr.mpert+1:odet.msol]
     if minimum(odet.unorm[1:odet.msol]) == 0
         jmax = argmin(odet.unorm[1:odet.msol])
         error("One of the first solution vector norms unorm(1,$jmax) = 0")
@@ -658,7 +653,7 @@ function ode_unorm!(odet::OdeState, intr::DconInternal, ctrl::DconControl, sing_
     else
         odet.unorm[1:odet.msol] .= odet.unorm[1:odet.msol] ./ odet.unorm0[1:odet.msol]
         uratio = maximum(odet.unorm[1:odet.msol]) / minimum(odet.unorm[1:odet.msol])
-        println("uratio = $uratio")
+        println("ψ = $(odet.psifac), uratio = $uratio, max = $(maximum(odet.unorm[1:odet.msol])), min = $(minimum(odet.unorm[1:odet.msol]))")
         if uratio > ctrl.ucrit || sing_flag
             # ode_fixup(intr, odet, dout, fNames, sing_flag, false)
             ode_fixup!(odet, intr, sing_flag, false)
@@ -685,6 +680,8 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::B
     # TODO: seems like secondary is always false in fortran DCON (unless manually changed). is this needed?
     secondary = false
 
+    # TODO: can test be removed if we aren't implementing ode_test_fixup?
+
     # Initial output
     println("Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $(odet.q)")
     # println(fNames.crit_out_unit, "Gaussian Reduction at istep = $(odet.istep), psi = $(odet.psifac), q = $q")
@@ -693,20 +690,16 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::B
     # end
     odet.flag_count = 0
 
-    # open("/Users/jakehalpern/Github/JPEC/notebooks/u_prefixup.dat", "w") do io
-    #     header = ["i", "j", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
-    #     println(io, join(header, "\t"))
-    #     for isol in 1:odet.msol
-    #         for ipert in 1:intr.mpert
-    #             println(io, join([ipert, isol, real(odet.u[ipert, isol, 1]), imag(odet.u[ipert, isol, 1]), real(odet.u[ipert, isol, 2]), imag(odet.u[ipert, isol, 2])], "\t"))
-    #         end
-    #     end
-    # end
+    # dump_matrix("/Users/jakehalpern/Github/JPEC/notebooks/u_prefixup1.dat", odet.u[:, :, 1])
+    # dump_u_matrix("/Users/jakehalpern/Github/JPEC/notebooks/u_prefixup.dat", odet.u)
+    # odet.u = load_u_matrix("/Users/jakehalpern/Github/GPEC/docs/examples/solovev_ideal_example/u_prefixup.dat")
+    # dump_u_matrix("/Users/jakehalpern/Github/JPEC/notebooks/u_prefixup_check.dat", odet.u)
 
     # Initialize fixfac
     if !test
+        odet.fixfac .= 0
         for isol in 1:odet.msol
-            odet.fixfac[isol, isol] = 1 # fixfac initialized to zeros already in OdeState constructor
+            odet.fixfac[isol, isol] = 1
         end
         # Sort unorm
         odet.index[1:odet.msol] .= collect(1:odet.msol)
@@ -742,7 +735,6 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::B
 
     # Triangularize secondary solutions
     if odet.msol > intr.mpert && secondary
-        println("Triangularizing secondary solutions")
         mask = trues(2, odet.msol)
         for isol in intr.mpert + 1:odet.msol
             ksol = odet.index[isol]
@@ -773,15 +765,7 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::B
     #     write(fNames.euler_bin_unit, sing_flag, msol)
     #     write(fNames.euler_bin_unit, fixfac, index[1:msol])
     # end
-    # open("/Users/jakehalpern/Github/JPEC/notebooks/u_postfixup.dat", "w") do io
-    # header = ["i", "j", "Re(u1)", "Im(u1)", "Re(u2)", "Im(u2)"]
-    # println(io, join(header, "\t"))
-    # for isol in 1:odet.msol
-    #     for ipert in 1:intr.mpert
-    #         println(io, join([ipert, isol, real(odet.u[ipert, isol, 1]), imag(odet.u[ipert, isol, 1]), real(odet.u[ipert, isol, 2]), imag(odet.u[ipert, isol, 2])], "\t"))
-    #     end
-    # end
-    # end
+    # dump_u_matrix("/Users/jakehalpern/Github/JPEC/notebooks/u_postfixup.dat", odet.u)
     # error("ode_fixup")
 end
 
