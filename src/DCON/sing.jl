@@ -325,19 +325,6 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
     end
     chi1 = 2π * equil.psio
 
-    # function dump_matrix(filename, mat)
-    #     open(filename, "w") do io
-    #         header = ["i", "j", "Re(val)", "Im(val)"]
-    #         println(io, join(header, "\t"))
-    #         mpert, _ = size(mat)
-    #         for i in 1:mpert
-    #             for j in 1:mpert
-    #                 println(io, join([i, j, real(mat[i, j]), imag(mat[i, j])], "\t"))
-    #             end
-    #         end
-    #     end
-    # end
-
     # kinetic stuff - skip for now
     if false #(TODO: kin_flag)
         # cspline_eval(ffit.amats, psifac, 0)
