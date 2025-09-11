@@ -463,10 +463,10 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
             # mul!(odet.du_temp[:, isol, 2], kmat', odet.du_temp[:, isol, 1], 1.0, 1.0)
             odet.du_temp[:, isol, 2] .= gmat * u[:, isol, 1]
             odet.du_temp[:, isol, 2] .+= kmat' * odet.du_temp[:, isol, 1]
-            @. odet.du_temp[:, isol, 1] = odet.du_temp[:, isol, 1] .* odet.singfac_vec
+            odet.du_temp[:, isol, 1] .*= odet.singfac_vec
         end
     end
-    # TODO: this is ud in the Fortran - is this ever used?
+    # TODO: this is ud in the Fortran - this is used in GPEC, so will need to dump to file later
     # du[:,:,1] .= odet.du_temp[:,:,1]
     # du[:,:,2] .= -bmat * odet.du_temp[:,:,1] - cmat * u[:,:,1]
 
