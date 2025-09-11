@@ -2,6 +2,8 @@ using LinearAlgebra
 
 # TODO: perhaps this isn't the best place for this function?
 # Should I do include("../dcon/utils.jl") instead? or maybe save these functions in a separate file?
+# associated TODO: come up with Gaussian reduction test that doesn't rely on external data
+
 function load_u_matrix(filename)
     lines = readlines(filename)
     data = [parse.(Float64, split(l)) for l in lines[2:end]]
@@ -74,5 +76,51 @@ end
         @test all(abs.(odet.u .- u_fortran) .< 1e-3)
 
     end
-    # Add your tests here
+
+    @testset "ode_unorm!" begin
+        msol = 2
+        odet = JPEC.DconMod.OdeState(msol, msol)
+        intr = JPEC.DconMod.DconInternal()
+        intr.mpert = msol
+        ctrl = JPEC.DconMod.DconControl()
+        ctrl.ucrit = 10.0
+
+        # Case 1: Basic norm computation
+        odet.u = zeros(ComplexF64, 2, 2, 2)
+        odet.u[:,1,1] .= [3, 4]          # norm = 5
+        odet.u[:,2,1] .= [0, 2]          # norm = 2
+
+        JPEC.DconMod.ode_unorm!(odet, intr, ctrl, false)
+        # After the first run with new=True (default), unorm0 should be set to unorm
+        # and new should be false
+        @test odet.unorm[1:intr.mpert] ≈ [5, 2]
+        @test odet.unorm0 == odet.unorm
+        @test odet.new == false
+
+        # Case 2: Error on zero norm
+        odet.u[:,1,1] .= 0
+        odet.new = true
+        @test_throws ErrorException JPEC.DconMod.ode_unorm!(odet, intr, ctrl, false)
+
+        # Case 3: Normalization on second call
+        odet.u[:,1,1] .= [3,4]   # norm = 5
+        odet.u[:,2,1] .= [0,2]   # norm = 2
+        odet.new = false
+        JPEC.DconMod.ode_unorm!(odet, intr, ctrl, false)
+        @test odet.unorm[1:intr.mpert] ≈ [1,1]
+
+        # Case 4: Trigger fixup via ucrit
+        odet.unorm0 = ones(2*intr.mpert)
+        odet.u[:,1,1] .= [1000,0]   # large norm
+        odet.u[:,2,1] .= [1,0]      # small norm
+        JPEC.DconMod.ode_unorm!(odet, intr, ctrl, false)
+        @test odet.new == true  # implies fixup ran
+
+        # Case 5: Trigger fixup via sing_flag
+        odet.new = false
+        odet.u[:,1,1] .= [1,0]
+        odet.u[:,2,1] .= [1,0]
+        JPEC.DconMod.ode_unorm!(odet, intr, ctrl, true)
+        @test odet.new == true  # fixup triggered
+    end
 end
