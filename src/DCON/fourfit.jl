@@ -10,7 +10,6 @@ named `metric` in the Fortran `fourfit_make_metric` subroutine.
 # Fields
 - `mpsi::Int`: Number of radial grid points minus one.
 - `mtheta::Int`: Number of poloidal grid points minus one.
-- `mband::Int`: Number of Fourier modes (harmonics) used in the fit.
 - `xs::Vector{Float64}`: Radial coordinates (normalized poloidal flux `ψ_norm`).
 - `ys::Vector{Float64}`: Poloidal angle coordinates `θ` in radians (0 to 2π).
 - `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi+1, mtheta+1, 8)`.
@@ -18,27 +17,16 @@ named `metric` in the Fortran `fourfit_make_metric` subroutine.
 - `fspline::SplinesMod.FourierSpline`: The fitted Fourier-cubic spline object.
 - `name::String`, `title::Vector{String}`, `xtitle::String`, `ytitle::String`: Metadata.
 """
-mutable struct MetricData
+@kwdef mutable struct MetricData
     mpsi::Int
     mtheta::Int
-    mband::Int
-    xs::Vector{Float64}
-    ys::Vector{Float64}
-    fs::Array{Float64,3}
-    fspline::Union{SplinesMod.FourierSpline,Nothing}
-    name::String
-    title::Vector{String}
-    xtitle::String
-    ytitle::String
-
-    function MetricData(mpsi, mtheta, mband)
-        xs = zeros(mpsi + 1)
-        ys = zeros(mtheta + 1)
-        fs = zeros(mpsi + 1, mtheta + 1, 8)
-        title = ["g¹¹", "g²²", "g³³", "g²³", "g³¹", "g¹²", "Jacobian", "dJ/dψ"]
-        new(mpsi, mtheta, mband, xs, ys, fs, nothing, "metric", title, "ψ_norm", "θ [rad]")
-    end
+    xs::Vector{Float64} = zeros(mpsi + 1)
+    ys::Vector{Float64} = zeros(mtheta + 1)
+    fs::Array{Float64,3} = zeros(mpsi + 1, mtheta + 1, 8)
+    fspline::Union{SplinesMod.FourierSpline,Nothing} = nothing
 end
+
+MetricData(mpsi::Int, mtheta::Int) = MetricData(; mpsi, mtheta)
 
 """
     make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true) -> MetricData
@@ -84,7 +72,7 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, ff
     println("   Equilibrium grid: $(mpsi+1) (ψ) × $(mtheta+1) (θ)")
     println("   Fourier fit modes (mband): $mband")
 
-    metric = MetricData(mpsi, mtheta, mband)
+    metric = MetricData(mpsi, mtheta)
 
     # Set coordinate grids based on the input equilibrium
     # The `rzphi.ys` from EquilibriumAPI is normalized (0 to 1), so scale to radians.
@@ -178,6 +166,10 @@ and returns them as a new `FourFitVars` object.
     Lowest poloidal mode index.
 - `mhigh::Int`: 
     Highest poloidal mode index.
+- `mpert::Int`: 
+    Number of poloidal modes (`mhigh - mlow + 1`).
+- `mband::Int`: 
+    Bandwidth of solutions to keep on either side of diagonal (for banded matrices).
 - `sas_flag::Bool`: 
     (not yet implemented).
 - `verbose::Bool`: 
@@ -188,14 +180,13 @@ and returns them as a new `FourFitVars` object.
     A container holding cubic spline fits of the assembled matrices
 """
 function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData; 
-    nn::Int, mlow::Int, mhigh::Int, mpert::Int, sas_flag::Bool, verbose::Bool)
+    nn::Int, mlow::Int, mhigh::Int, mpert::Int, mband::Int, sas_flag::Bool, verbose::Bool)
 
     # TODO: add banded matrices (if desired), kinetic matrices, sas_flag
 
     # --- Extract inputs ---
     sq = plasma_eq.sq
     mpsi = metric.mpsi
-    mband = metric.mband
 
     if verbose
         println("   Toroidal mode n=$nn, Poloidal modes m=$mlow:$mhigh ($mpert modes)")
@@ -318,6 +309,8 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
         fmat .-= adjoint(dmat) * temp1
         kmat .= emat .- (adjoint(kmat) * temp2)
         gmat .= hmat .- (adjoint(cmat) * temp2)
+
+        # TODO: store factorized fmat (does not have to be banded?), improve computation in sing_der
 
         # TODO: add kinetic matrices here
 
