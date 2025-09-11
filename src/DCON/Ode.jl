@@ -15,15 +15,15 @@ This struct contains all necessary fields to manage the ODE integration process,
 including solution vectors, tolerances, and flags for the integration process.
 """
 #TODO: variable description review by DCON expert (once finished), evaluate if all variables need to be part of the struct
-# TODO: will msol ever be different than mpert? If so, need to create a separate tmp for mpert x msol
 @kwdef mutable struct OdeState
     mpert::Int                  # poloidal mode number count
     msol::Int                   # number of solutions
     psi_save::Float64 = 0.0     # last saved psi value
     istep::Int= 0               # integration step count
     ix::Int= 0                  # index for psiout in spline #TODO: does this really need to be part of the struct?
-    singfac::Float64 = 0.0      # separation from singular surface
+    singfac::Float64 = 0.0      # separation from singular surface in terms of m - nq
     psifac::Float64 = 0.0       # normalized flux coordinate
+    q::Float64 = 0.0            # q value at psifac
     next::String = ""           # next action ("cross" or "finish")
     ising::Int = 0               # index of next singular surface
     flag_count::Int = 0         # count of flags raised
@@ -38,7 +38,6 @@ including solution vectors, tolerances, and flags for the integration process.
     crit_save::Float64 = 0.0    # saved critical value for zero crossing detection
     nzero::Int = 0              # count of zero crossings detected
     m1::Int = 0                 # poloidal mode number for the first singular surface (?)
-    q::Float64 = 0.0            # q value at the next singular surface
     psimax::Float64 = 0.0         # maximum psi value for the integrator (TODO: is this correct?)
     ua::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, 2*mpert, 2) # auxiliary array for singular surface calculations
     # Temporary matrices for derivative calculations
@@ -219,8 +218,7 @@ function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium,
             if odet.ising > intr.msing || intr.psilim < intr.sing[min(odet.ising, intr.msing)].psifac
                 break
             end
-            odet.q = intr.sing[odet.ising].q
-            if intr.mlow <= ctrl.nn * odet.q && intr.mhigh >= ctrl.nn * odet.q
+            if intr.mlow <= ctrl.nn * intr.sing[odet.ising].q && intr.mhigh >= ctrl.nn * intr.sing[odet.ising].q
                 break
             end
         end
@@ -446,8 +444,7 @@ function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
         if odet.ising > intr.msing || intr.psilim < intr.sing[min(odet.ising, intr.msing)].psifac
             break
         end
-        odet.q = intr.sing[odet.ising].q
-        if intr.mlow <= ctrl.nn * odet.q && intr.mhigh >= ctrl.nn * odet.q
+        if intr.mlow <= ctrl.nn * intr.sing[odet.ising].q && intr.mhigh >= ctrl.nn * intr.sing[odet.ising].q
             break
         end
     end
@@ -517,8 +514,7 @@ scanning in plasma physics and MHD codes.
 """
 function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl, ffit::FourFitVars)
 
-    # TODO: is there better relative/absolute tolerance handling for Julia? This might be specific to lsode
-    
+# This is the old version of the code before making it a callback    
 #     # Compute relative tolerances
 #     singfac_local = typemax(Float64)
 #     if false #(TODO: kin_flag)
@@ -567,12 +563,13 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
         if false  # kin_flag (not implemented)
             # Insert kin_flag branch if needed
         else
+            # Note: odet.q is updated within the derivative calculation
             if odet.ising <= intr.msing
                 singfac_local = abs(intr.sing[odet.ising].m - ctrl.nn * odet.q)
             end
+            # If in between singular surfaces, check distance to both
             if odet.ising > 1
-                singfac_local = min(singfac_local,
-                                    abs(intr.sing[odet.ising-1].m - ctrl.nn * odet.q))
+                singfac_local = min(singfac_local, abs(intr.sing[odet.ising-1].m - ctrl.nn * odet.q))
             end
         end
         rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
@@ -580,7 +577,7 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
         atol = similar(odet.u, Float64) # same shape as u
         for ieq in 1:size(odet.u,3), isol in 1:size(odet.u,2)
             atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-            atol0 = atol0 == 0 ? typemax(Float64) : atol0
+            if (atol0 == 0) atol0 = typemax(Float64) end
             atol[:, isol, ieq] .= atol0
         end
         return rtol, atol
@@ -590,13 +587,13 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
         integrator.p[4].u .= integrator.u
         rtol, atol = compute_tols(integrator.p[3], integrator.p[4], integrator.p[1])
         integrator.opts.reltol = rtol
-        integrator.opts.abstol = atol
+        # integrator.opts.abstol = atol
     end 
     tol_cb = DiscreteCallback((u,t,integrator)->true, (integrator)->update_tols!(integrator)) # update every step
 
     # Print out every tenth of the interval
     psi_start = odet.psifac
-    Δψ = (odet.psimax - psi_start) / 10
+    Δψ = (odet.psimax - psi_start) / 500
     last_psi = Ref(0.0)
 
     print!(integrator) = begin
@@ -607,7 +604,9 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
         # sing_der!(du, u, params, integrator.t)
         fmt(x) = @sprintf("%.5e", x)
         println("       ψ=", fmt(integrator.t), 
-            ", max|u|=", fmt(maximum(abs.(u))))
+            ", max|u|=", fmt(maximum(abs.(u))),
+            ", rtol=", fmt(integrator.opts.reltol),
+            ", atol=", fmt(maximum(integrator.opts.abstol)))
             # ", max|du|=", fmt(maximum(abs.(du))))
         last_psi[] = integrator.t
     end

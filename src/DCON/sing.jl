@@ -319,9 +319,9 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
     odet.du_temp .= 0
 
     # Spline evaluation
-    q = SplinesMod.spline_eval(equil.sq, psieval, 0)[4]
+    odet.q = SplinesMod.spline_eval(equil.sq, psieval, 0)[4]
     @inbounds @simd for i in 1:intr.mpert
-        odet.singfac_vec[i] = 1.0 / (intr.mlow - ctrl.nn*q + (i-1))
+        odet.singfac_vec[i] = 1.0 / (intr.mlow - ctrl.nn*odet.q + (i-1))
     end
     chi1 = 2π * equil.psio
 
