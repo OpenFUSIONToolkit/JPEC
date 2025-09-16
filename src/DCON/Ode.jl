@@ -89,23 +89,26 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
     end
     # TODO: Eventually figure out a way to get rid of these - use callbacks in the integrator for the second one? maybe just do while ising != ksing and next != cross for the first?
     while true # inside plasma (break out when at the edge)
-        odet.first = true
-        while true # inside sing surface (break out when close to singular surface)
+        # Rough sketch of Fortran logic for comparison
+        # while true # inside sing surface (break out when close to singular surface)
             # if odet.istep > 0
             #     ode_unorm!(odet, intr, ctrl, false)
             # end
             # Always record the first and last point in an inter-rational region
             # these are important for resonant quantities
             # recording the last point is critical for matching the nominal edge
-            test = ode_test(odet, intr, ctrl)
-            force_output = odet.first || test
-            #ode_output_step(unorm, intr, ctrl, DconFileNames(), equil; force=force_output)
-            ode_output_step(odet, intr, ctrl, equil; force=force_output)
-            ode_record_edge!(intr, odet, ctrl, equil)
-            test && break # break out of loop if ode_test returns true
-            ode_step!(odet, equil, intr, ctrl, ffit)
-            odet.first = false
-        end
+            # test = ode_test(odet, intr, ctrl)
+            # force_output = odet.first || test
+            # ode_output_step(odet, intr, ctrl, equil; force=force_output)
+            # ode_record_edge!(intr, odet, ctrl, equil)
+            # test && break # break out of loop if ode_test returns true
+            # ode_step!(odet, equil, intr, ctrl, ffit)
+            # odet.first = false
+        # end
+        
+        # Now, all the above logic is implemented within callbacks
+        # TODO: This function should be called like integrate! or something if integrate! is taken already
+        ode_step!(odet, equil, intr, ctrl, ffit)
 
         # Re-initialize
         odet.ising == ctrl.ksing && break
@@ -514,88 +517,6 @@ scanning in plasma physics and MHD codes.
 """
 function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl, ffit::FourFitVars)
 
-# This is the old version of the code before making it a callback    
-#     # Compute relative tolerances
-#     singfac_local = typemax(Float64)
-#     if false #(TODO: kin_flag)
-#  #       if ising == 1 && intr.kmsing >= 1
-#  #           singfac_local = abs(odet.psifac - kinsing[ising].psifac) /
-#  #                           (kinsing[ising].psifac - psilow)
-#  #       elseif ising <= intr.kmsing
-#  #           singfac_local = min(
-#  #               abs(odet.psifac - kinsing[ising].psifac),
-#  #               abs(odet.psifac - kinsing[ising-1].psifac)
-#  #           ) / abs(kinsing[ising].psifac - kinsing[ising-1].psifac)
-#  #       end
-#     else
-#         if odet.ising <= intr.msing
-#             singfac_local = abs(intr.sing[odet.ising].m - ctrl.nn * odet.q)
-#         end
-#         if odet.ising > 1
-#             singfac_local = min(singfac_local, abs(intr.sing[odet.ising-1].m - ctrl.nn * odet.q))
-#         end
-#     end
-#     rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
-
-#     # Compute absolute tolerances
-#     atol = zeros(ComplexF64, intr.mpert, odet.msol, 2)
-#     atol0 = 0.0
-#     for ieq in 1:2, isol in 1:odet.msol
-#         atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-#         atol0 = atol0 == 0 ? typemax(Float64) : atol0
-#         atol[:, isol, ieq] .= ComplexF64(atol0, atol0)
-#     end
-
-    # Choose psiout
-    if ctrl.node_flag
-        while odet.psifac < equil.sq.xs[ix]
-            ix += 1
-        end
-        psiout = equil.sq.xs[ix]
-        psiout = min(psiout, odet.psimax)
-    else
-        psiout = odet.psimax
-    end
-
-    function compute_tols(intr, odet, ctrl)
-        singfac_local = typemax(Float64)
-        # Relative tolerance
-        if false  # kin_flag (not implemented)
-            # Insert kin_flag branch if needed
-        else
-            # Note: odet.q is updated within the derivative calculation
-            if odet.ising <= intr.msing
-                singfac_local = abs(intr.sing[odet.ising].m - ctrl.nn * odet.q)
-            end
-            # If in between singular surfaces, check distance to both
-            if odet.ising > 1
-                singfac_local = min(singfac_local, abs(intr.sing[odet.ising-1].m - ctrl.nn * odet.q))
-            end
-        end
-        rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
-        # Absolute tolerances
-        atol = similar(odet.u, Float64) # same shape as u
-        for ieq in 1:size(odet.u,3), isol in 1:size(odet.u,2)
-            atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-            if (atol0 == 0) atol0 = typemax(Float64) end
-            atol[:, isol, ieq] .= atol0
-        end
-        return rtol, atol
-    end    
-
-    function update_tols!(integrator)
-        integrator.p[4].u .= integrator.u
-        rtol, atol = compute_tols(integrator.p[3], integrator.p[4], integrator.p[1])
-        integrator.opts.reltol = rtol
-        # integrator.opts.abstol = atol
-    end 
-    tol_cb = DiscreteCallback((u,t,integrator)->true, (integrator)->update_tols!(integrator)) # update every step
-
-    # Print out every tenth of the interval
-    psi_start = odet.psifac
-    Δψ = (odet.psimax - psi_start) / 500
-    last_psi = Ref(0.0)
-
     print!(integrator) = begin
         u = integrator.u
         # params = integrator.p
@@ -610,48 +531,100 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
             # ", max|du|=", fmt(maximum(abs.(du))))
         last_psi[] = integrator.t
     end
-    print_cb = DiscreteCallback((u, t, integrator) -> (t >= last_psi[] + Δψ), print!)
-    
-    # Callback to normalize solution after each step if t > 0
-    function unorm!(integrator)
-        # Extract odet from parameters tuple
-        params = integrator.p
-        odet = params[4]
-        intr = params[3]
-        ctrl = params[1]
+
+    # This callback handles the logic that was previously in a DO loop within ode_run
+    # and called every step by running LSODE in one step mode
+    function integrator_callback!(integrator)
+        ctrl, equil, intr, odet, ffit = integrator.p
         odet.u .= integrator.u
         odet.psifac = integrator.t
-        # TODO: I don't love how we double copy from integrator.u to odet.u then back, is there a better way?
+        
+        # Adaptively update integration tolerances
+        rtol, atol = compute_tols(intr, odet, ctrl)
+        integrator.opts.reltol = rtol
+        # integrator.opts.abstol = atol
+
+        # TODO: Print status every Δψ, maybe get rid of this at some point? Good for debugging rn
+        if integrator.t >= last_psi[] + Δψ
+            print!(integrator)
+        end
+
+        # Note: no need for istep, since this is called after the first integration step always        
         ode_unorm!(odet, intr, ctrl, false)
         # Need to update integrator.u with normalized odet.u!
         integrator.u .= odet.u
+
+        # Always record the first and last point in an inter-rational region
+        # these are important for resonant quantities
+        # recording the last point is critical for matching the nominal edge
+        test = ode_test(odet, intr, ctrl)
+        force_output = odet.first || test
+        ode_output_step!(odet, intr, ctrl, equil; force=force_output)
+        ode_record_edge!(intr, odet, ctrl, equil)
+        # TODO: ode_test effectively controls whether we print at the end of integration or if a number of integration steps is reached
+        # this then controls the output of ode_output_step and then has a break condition below
+        # Given that the Julia DiffEq solver will handle step sizes and errors, and we could just add a call to ode_output_step after the Integration
+        # to force output, is this logic needed here? Might depend on how we do outputs in Julia
+        # test && break # break out of loop if ode_test returns true
+        odet.first = false
     end
-    unorm_cb = DiscreteCallback((u, t, integrator) -> (t > odet.psifac), unorm!) # call on all but the first step
+    cb = DiscreteCallback((u,t,integrator)->true, integrator_callback!) # every step
 
-    # Existing callback functionality to match lsode/Fortran logic:
-    # print_cb: print status every tenth of the interval
-    # unorm_cb: unorming/fixup
-    # tol_cb: update tolerances
-    cb = CallbackSet(print_cb, unorm_cb, tol_cb)
+    # Choose integration bounds
+    if ctrl.node_flag
+        while odet.psifac < equil.sq.xs[ix]
+            ix += 1
+        end
+        psiout = equil.sq.xs[ix]
+        psiout = min(psiout, odet.psimax)
+    else
+        psiout = odet.psimax
+    end
 
-    # Advance differential equation
-    odet.istep += 1
-    rtol, atol = compute_tols(intr, odet, ctrl)
+    # Print out every tenth of the inter-rational interval
+    Δψ = (odet.psimax - odet.psifac) / 10
+    last_psi = Ref(0.0)
+
+    # Advance differential equation to next singular surface or edge
+    # odet.istep += 1 # TODO: I don't think istep is needed anymore
+    odet.first = true
+    rtol, atol = compute_tols(intr, odet, ctrl) # initial tolerances
     prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, odet, ffit))
-    # TODO: check absolute tolerances, check how sensitive outputs are to tolerances
-    # TODO: check if relative is updating correctly
     sol = solve(prob, Tsit5(), reltol=rtol, abstol=atol, callback=cb)
+    # TODO: check absolute tolerances, check how sensitive outputs are to tolerances
 
     # Update u and psifac with the solution at the end of the interval
     odet.u .= sol.u[end]
     odet.psifac = sol.t[end]
 
     println("Final psifac = $(odet.psifac), max u = $(maximum(abs.(odet.u)))")
+end
 
-    # dump_matrix("/Users/jakehalpern/Github/JPEC/notebooks/u_integration1.dat", odet.u[:, :, 1])
-    # dump_matrix("/Users/jakehalpern/Github/JPEC/notebooks/u_integration2.dat", odet.u[:, :, 2])
-
-    # error("stopping after ode step with psi = $(odet.psifac)")
+# Compute tolerances based on distance to singular surface during integration
+function compute_tols(intr, odet, ctrl)
+    singfac_local = typemax(Float64)
+    # Relative tolerance
+    if false  # kin_flag (not implemented)
+        # Insert kin_flag branch if needed
+    else
+        # Note: odet.q is updated within the derivative calculation
+        if odet.ising <= intr.msing
+            singfac_local = abs(intr.sing[odet.ising].m - ctrl.nn * odet.q)
+        end
+        # If in between singular surfaces, check distance to both
+        if odet.ising > 1
+            singfac_local = min(singfac_local, abs(intr.sing[odet.ising-1].m - ctrl.nn * odet.q))
+        end
+    end
+    rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
+    # Absolute tolerances
+    atol = similar(odet.u, Float64) # same shape as u
+    for ieq in 1:size(odet.u,3), isol in 1:size(odet.u,2)
+        atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
+        if (atol0 == 0) atol0 = typemax(Float64) end
+        atol[:, isol, ieq] .= atol0
+    end
+    return rtol, atol
 end
 
 """
@@ -804,6 +777,7 @@ and evaluates a power growth metric to trigger early stopping (TODO: not sure if
 function ode_test(odet::OdeState, intr::DconInternal, ctrl::DconControl)::Bool
 
     # check if we are at end of integration
+    # TODO: get rid of istep?
     flag = odet.psifac == odet.psimax || odet.istep == ctrl.nstep
 
     # if not running with res_flag = true this function will exit and return flag here)

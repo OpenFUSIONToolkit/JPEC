@@ -10,7 +10,7 @@ Additional output (e.g., eigenvalue dumps, binary solution logging) may be added
 #TODO: depending on how we restructure our outputs, this function might be uncessary.
 # It currently just calls ode_output_monitor! and does not write any outputs.
 #function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium; op_force::Union{Bool,Nothing}=nothing)
-function ode_output_step(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; force::Bool=false)
+function ode_output_step!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; force::Bool=false)
 
     # dout = DconOutput() #TODO: this probably needs to be passed in instead
 
@@ -163,7 +163,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     end
 
     # Write new crit
-    println("       istep: $(odet.istep), psifac:  $(odet.psifac), dpsi: $dpsi, q: $q, singfac: $singfac, crit: $crit, logpsi1: $logpsi1, logpsi2: $logpsi2")
+    println("       psifac:  $(odet.psifac), q: $q, singfac: $singfac, crit: $crit, logpsi1: $logpsi1, logpsi2: $logpsi2")
     # println(crit_out_unit, "$(odet.istep) $psifac $dpsi $q $singfac $crit")
     # write(crit_bin_unit, Float32(psifac), Float32(logpsi1),
     #       Float32(logpsi2), Float32(q), Float32(crit))
