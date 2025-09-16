@@ -106,7 +106,7 @@ function MainProgram(in_path::String)
       println("   nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
       println(" Fourier analysis of metric tensor components")
     end
-    
+
     # Compute metric tensor
     metric_result = make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag)
     
@@ -142,8 +142,8 @@ function MainProgram(in_path::String)
       # fourfit_kinetic_matrix(kingridtype, out_fund)
     end
     # TODO: these functions need to be converted, need this for con_flag = false
-    # Leave commented for now
-    # sing_scan()
+
+    sing_scan!(intr, ctrl, equil, ffit)
     # for ising in 1:msing
     #   resist_eval(sing[ising])
     # end

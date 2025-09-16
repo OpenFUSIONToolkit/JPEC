@@ -149,7 +149,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
             # println(term_unit, "Zero crossing at psi = $psi_med, q = $q_med")
             # println(out_unit, "Zero crossing at psi = $psi_med, q = $q_med")
             # println(crit_out_unit, "Zero crossing at psi = $psi_med, q = $q_med")
-            println("$(odet.istep) $psi_med $dpsi_med $q_med $singfac_med $crit_med")
+            println("$psi_med $q_med $singfac_med $crit_med")
             # println(crit_out_unit, "$(odet.istep) $psi_med $dpsi_med $q_med $singfac_med $crit_med")
             # write(crit_bin_unit, Float32(psi_med), Float32(logpsi1_med),
             #       Float32(logpsi2_med), Float32(q_med), Float32(crit_med))

@@ -120,7 +120,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
                 error("kin_flag = true not implemented yet!")
                 #ode_kin_cross()
             else
-                ode_ideal_cross!(ctrl, equil, intr, odet)
+                ode_ideal_cross!(odet, equil, intr, ctrl, ffit)
             end
         else
             break
@@ -388,49 +388,49 @@ write auxiliary diagnostic output or coefficients as configured.
 - Assumes certain global state (such as `u`, `ua`, `index`, etc.) is properly managed.
 - Intended for ideal MHD regions; kinetic surface handling is not included in this function.
 """
-function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl)
+function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl, ffit::FourFitVars)
 
     # Fixup solution at singular surface
     if ctrl.verbose
         println("psi = $(intr.sing[odet.ising].psifac), q = $(intr.sing[odet.ising].q)")
     end
-    ode_unorm(true)
+    ode_unorm!(odet, intr, ctrl, true)
 
     # Write asymptotic coefficients before reinit
-    if ctrl.bin_euler
+    # if ctrl.bin_euler
    #     sing_get_ca(ising, odet.psifac, u, ca)
    #     write(euler_bin_unit, 4)
    #     write(euler_bin_unit, intr.sing[ising].psifac, intr.sing[ising].q, intr.sing[ising].q1)
    #     write(euler_bin_unit, msol)
    #     write(euler_bin_unit, ca)
-    end
+    # end
 
-    # Re-initialize
+    # Re-initialize on opposite side of rational surface
     psi_old = odet.psifac
     ipert0 = round(Int, ctrl.nn * intr.sing[odet.ising].q, RoundFromZero) - intr.mlow + 1
     dpsi = intr.sing[odet.ising].psifac - odet.psifac
     odet.psifac = intr.sing[odet.ising].psifac + dpsi
     # TODO: uncomment this once sing_get_ua! is implemented
-    # sing_get_ua!(ising, odet.psifac, ua)
+    odet.ua .= 1.0
+    sing_get_ua!(odet, intr, ctrl)
     if !ctrl.con_flag
-        u[:, index[1], :] .= 0 #TODO: need to add index to odet
+        odet.u[:, odet.index[1], :] .= 0
     end
 
     # Update solution vectors
     du1 = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
     du2 = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
-    params = (ctrl, equil, intr, ffit)
+    params = (ctrl, equil, intr, odet, ffit)
     sing_der!(du1, odet.u, params, psi_old) #TODO: where does du1 come from?
     sing_der!(du2, odet.u, params, odet.psifac)
-    odet.u .= odet.u .+ (du1 .+ du2) .* dpsi
+    odet.u .+= (du1 .+ du2) .* dpsi
     if !ctrl.con_flag
-        error("con_flag = false not implemented yet!")
         odet.u[ipert0, :, :] .= 0
-        odet.u[:, index[1], :] .= odet.ua[:, ipert0 + mpert, :]
+        odet.u[:, odet.index[1], :] .= odet.ua[:, ipert0 + intr.mpert, :]
     end
 
     # Write asymptotic coefficients after reinit
-    if ctrl.bin_euler
+    # if ctrl.bin_euler
   #      sing_get_ca(ising, odetpsifac, u, ca)
   #      write(euler_bin_unit, msol)
   #      write(euler_bin_unit, ca)
@@ -439,7 +439,7 @@ function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
   #            sing[ising].restype.g, sing[ising].restype.k,
   #            sing[ising].restype.eta, sing[ising].restype.rho,
   #            sing[ising].restype.taua, sing[ising].restype.taur)
-    end
+    # end
 
     # Find next ising
     while true
@@ -455,7 +455,7 @@ function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
     # Compute conditions at next singular surface
     if odet.ising > intr.msing || intr.psilim < intr.sing[min(odet.ising, intr.msing)].psifac
         odet.psimax = intr.psilim * (1 - eps)
-        odet.m1 = round(Int, ctrl.nn * intr.qlim, RoundFromZero) + sign(ctrl.nn * equil.sq.fs1[mpsi, 4])
+        odet.m1 = round(Int, ctrl.nn * intr.qlim, RoundFromZero) + sign(ctrl.nn * equil.sq.fs1[end, 4])
         odet.next = "finish"
     else
         odet.psimax = intr.sing[odet.ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[odet.ising].q1)
@@ -467,7 +467,7 @@ function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
     # Restart ode solver
     odet.istep += 1
     odet.new = true
-    odet.u_save .= u
+    odet.u_save .= odet.u
     odet.psi_save = odet.psifac
 
     # Write to files

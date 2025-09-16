@@ -12,11 +12,12 @@
     taur::Float64 = 0.0
 end
 
+# TODO: maybe give this an initialization like OdeState since we know the sizes based on mpert and sing_order?
 @kwdef mutable struct SingType
     m::Int = 0
-    order::Int = 0
-    r1::NTuple{1,Int} = (0,)
-    r2::NTuple{2,Int} = (0,0)
+    order::Int = 0 # TODO: is this really just sing_order? if so, delete
+    r1::Vector{Int} = [0]
+    r2::Vector{Int} = [0, 0]
     n1::Vector{Int} = Int[]
     n2::Vector{Int} = Int[]
     psifac::Float64 = 0.0
@@ -28,6 +29,7 @@ end
     power::Union{Nothing, Vector{ComplexF64}} = nothing
     vmat::Union{Nothing, Array{ComplexF64,4}} = nothing
     mmat::Union{Nothing, Array{ComplexF64,4}} = nothing
+    m0mat::Union{Nothing, Matrix{ComplexF64}} = zeros(ComplexF64, 2, 2)
     restype::ResistType = ResistType()
 end
 
@@ -111,7 +113,7 @@ end
     dmlim::Float64 = 0.5
     lim_flag::Bool = false
     sas_flag::Bool = false
-    sing_order::Int = 0
+    sing_order::Int = 2
     sort_type::String = "absm"
     termbycross_flag::Bool = false
     qhigh::Float64 = 1e3
@@ -221,6 +223,7 @@ end
     # ktmats::Vector{JPEC.SplinesMod.CubicSpline{ComplexF64}} = [JPEC.SplinesMod.CubicSpline{ComplexF64}() for _ in 1:6]
 end
 
+# TODO: does this need to be a separate type?
 @kwdef mutable struct SingVars
 
       msol::Int = 0

@@ -10,13 +10,12 @@
 
 Scan all singular surfaces and print information about them.
 """
-function sing_scan!(odet::OdeState, intr::DconInternal)
-    #mpert and msing  come from DconInternal struct
+function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars)
     println("\n Singular Surfaces:")
     println("  i    psi      rho      q        q1      di0      di      err")
-    odet.msol = intr.mpert #TODO: why is msol a global variable and should it be declared elsewhere?
-    for ising in 1:intr.msing #TODO: ising is supposed to be an int, I do not think we need to give it a type in Julia??
-        sing_vmat(ising) #TODO: we don't want to write this function yet; what to do instead?
+    # msol = intr.mpert # TODO: is msol used anywhere else? It's a global in Fortran and very confusing
+    for ising in 1:intr.msing
+        sing_vmat!(intr, ctrl, equil, ffit, ising)
     end
     println("  i    psi      rho      q        q1      di0      di      err")
 end
@@ -173,6 +172,321 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
     end
 end
 
+function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
+    if ising < 1 || ising > intr.msing
+        return
+    end
+    singp = intr.sing[ising]
+
+    # TODO: move these to initialiation by passing in mpert and sing_order
+    singp.vmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 2*ctrl.sing_order + 1)
+    singp.mmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 2*ctrl.sing_order+3)
+
+    ipert0 = round(Int, ctrl.nn * singp.q, RoundFromZero) - intr.mlow + 1
+    # TODO: is this needed if we initialize di to zero in the struct definition?
+    if ipert0 <= 0 || intr.mlow > ctrl.nn * singp.q || intr.mhigh < ctrl.nn * singp.q
+        singp.di = 0
+        return
+    end
+
+    # Compute ranges
+    singp.r1 = [ipert0]
+    singp.r2 = [ipert0, ipert0 + intr.mpert]
+    singp.n1 = [i for i in 1:intr.mpert if i != ipert0]
+    singp.n2 = vcat(singp.n1, [i + intr.mpert for i in singp.n1])
+
+    # TODO: uncomment this once locstab (created in mercier.f) is working
+    psifac = singp.psifac
+    q = singp.q
+    # spline_eval(locstab, singp.psifac, 0)
+    # di0 = locstab.f[1] / singp.psifac
+    di0 = 0.0 # TODO: placeholder until locstab is working
+    q1 = singp.q1
+    rho = singp.rho
+
+    # Compute Mercier criterion and singular power
+    sing_mmat!(intr, ctrl, equil, ffit, ising)
+    # TODO: should m0mat go in a struct somewhere?
+    singp.m0mat = transpose(singp.mmat[singp.r1[1], singp.r2, :, 1])
+    di = singp.m0mat[1,1]*singp.m0mat[2,2] - singp.m0mat[2,1]*singp.m0mat[1,2]
+    singp.di = abs(di) # TODO: this is giving imaginary, but should be real. Work out during debugging
+    singp.alpha = sqrt(-complex(singp.di))
+    singp.power = zeros(ComplexF64, 2*intr.mpert)
+    singp.power[ipert0] = -singp.alpha
+    singp.power[ipert0 + intr.mpert] = singp.alpha
+
+    println(@sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e",
+        ising, psifac, rho, q, q1, di0, singp.di, singp.di/di0-1))
+
+    # Zeroth-order non-resonant solutions
+    singp.vmat .= 0
+    for ipert in 1:intr.mpert
+        singp.vmat[ipert, ipert, 1, 1] = 1
+        singp.vmat[ipert, ipert + intr.mpert, 2, 1] = 1
+    end
+
+    # Zeroth-order resonant solutions
+    singp.vmat[ipert0, ipert0, 1, 1] = 1
+    singp.vmat[ipert0, ipert0 + intr.mpert, 1, 1] = 1
+    singp.vmat[ipert0, ipert0, 2, 1] = -(singp.m0mat[1,1] + singp.alpha) / singp.m0mat[1,2]
+    singp.vmat[ipert0, ipert0 + intr.mpert, 2, 1] = -(singp.m0mat[1,1] - singp.alpha) / singp.m0mat[1,2]
+    det = conj(singp.vmat[ipert0, ipert0, 1, 1]) * singp.vmat[ipert0, ipert0 + intr.mpert, 2, 1] -
+          conj(singp.vmat[ipert0, ipert0 + intr.mpert, 1, 1]) * singp.vmat[ipert0, ipert0, 2, 1]
+    singp.vmat[ipert0, :, :, 1] ./= sqrt(det)
+
+    # Higher order solutions
+    for k in 1:2*ctrl.sing_order
+        sing_solve!(singp, intr, k)
+    end
+end
+
+function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
+
+    # Initial allocations
+    msol = 2 * intr.mpert # TODO: make sure this doesn't get updated as a global elsewhere in the Fortran
+    q = zeros(Float64, 4)
+    singfac = zeros(Float64, intr.mpert, 4)
+    f_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
+    g_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
+    k_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
+    f = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
+    f0 = zeros(ComplexF64, intr.mpert, intr.mpert)
+    ff = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
+    g = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
+    k = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
+    v = zeros(ComplexF64, intr.mpert, msol, 2)
+    x = zeros(ComplexF64, intr.mpert, msol, 2, ctrl.sing_order + 1)
+
+    # TODO: add singp Shorthand
+
+    # Evaluate cubic splines
+    q[1], q[2], q[3], q[4] = SplinesMod.spline_eval(equil.sq, intr.sing[ising].psifac, 3)[4]
+    f_interp[:, :, 1], f_interp[:, :, 2], f_interp[:, :, 3], f_interp[:, :, 4] = SplinesMod.spline_eval(ffit.fmats, intr.sing[ising].psifac, 3)
+    g_interp[:, :, 1], g_interp[:, :, 2], g_interp[:, :, 3], g_interp[:, :, 4] = SplinesMod.spline_eval(ffit.gmats, intr.sing[ising].psifac, 3)
+    k_interp[:, :, 1], k_interp[:, :, 2], k_interp[:, :, 3], k_interp[:, :, 4] = SplinesMod.spline_eval(ffit.kmats, intr.sing[ising].psifac, 3)
+
+    # Evaluate singfac and its derivatives
+    ipert0 = intr.sing[ising].m - intr.mlow + 1
+    mvec = intr.mlow:intr.mhigh
+    singfac[:, 1] .= mvec .- ctrl.nn * q[1]
+    singfac[:, 2] .= -ctrl.nn * q[2]
+    singfac[:, 3] .= -ctrl.nn * q[3]
+    singfac[:, 4] .= -ctrl.nn * q[4]
+    singfac[ipert0, 1] = -ctrl.nn * q[2]
+    singfac[ipert0, 2] = -ctrl.nn * q[3] / 2
+    singfac[ipert0, 3] = -ctrl.nn * q[4] / 3
+    singfac[ipert0, 4] = 0
+
+    # Compute NON-factored Hermitian F and its derivatives
+    # TODO: only supports dense matrices for now, implement Banded?
+    for jpert in 1:intr.mpert
+        for ipert in 1:intr.mpert
+            f[ipert, jpert, 1] = singfac[ipert, 1] * f_interp[ipert, jpert, 1]
+            if ctrl.sing_order < 1 continue end
+            f[ipert, jpert, 2] = singfac[ipert, 1] * f_interp[ipert, jpert, 2] +
+                                 singfac[ipert, 2] * f_interp[ipert, jpert, 1]
+            if ctrl.sing_order < 2 continue end
+            f[ipert, jpert, 3] = singfac[ipert, 1] * f_interp[ipert, jpert, 3] + 
+                                 2 * singfac[ipert, 2] * f_interp[ipert, jpert, 2] + 
+                                 singfac[ipert, 3] * f_interp[ipert, jpert, 1]
+            if ctrl.sing_order < 3 continue end
+            f[ipert, jpert, 4] = singfac[ipert, 1] * f_interp[ipert, jpert, 4] + 
+                                 3 * singfac[ipert, 2] * f_interp[ipert, jpert, 3] + 
+                                 3 * singfac[ipert, 3] * f_interp[ipert, jpert, 2] + 
+                                 singfac[ipert, 4] * f_interp[ipert, jpert, 1]
+            if ctrl.sing_order < 4 continue end
+            f[ipert, jpert, 5] = 4 * singfac[ipert, 2] * f_interp[ipert, jpert, 4] +
+                                 6 * singfac[ipert, 3] * f_interp[ipert, jpert, 3] +
+                                 4 * singfac[ipert, 4] * f_interp[ipert, jpert, 2]
+            if ctrl.sing_order < 5 continue end
+            f[ipert, jpert, 6] = 10 * singfac[ipert, 3] * f_interp[ipert, jpert, 4] +
+                                 10 * singfac[ipert, 4] * f_interp[ipert, jpert, 3]
+            if ctrl.sing_order < 6 continue end
+            f[ipert, jpert, 7] = 20 * singfac[ipert, 4] * f_interp[ipert, jpert, 4]
+        end
+    end
+    f0 .= f[:, :, 1]
+
+    # Compute product of Hermitian matrix F
+    fac0 = 1
+    for n in 0:ctrl.sing_order
+        fac1 = 1
+        for j in 0:n
+            for jpert in 1:intr.mpert
+                for ipert in 1:intr.mpert
+                    for kpert in 1:intr.mpert
+                        ff[ipert, jpert, n + 1] += fac1 * f[ipert, kpert, j + 1] * conj(f[jpert, kpert, n - j + 1])
+                    end
+                end
+            end
+            fac1 *= (n - j) / (j + 1)
+        end
+        ff[:, :, n + 1] ./= fac0
+        fac0 *= (n + 1)
+    end
+
+    # Compute non-Hermitian matrix K
+    for jpert in 1:intr.mpert
+        for ipert in 1:intr.mpert
+            k[ipert, jpert, 1] = singfac[ipert, 1] * k_interp[ipert, jpert, 1]
+            if ctrl.sing_order < 1 continue end
+            k[ipert, jpert, 2] = singfac[ipert, 1] * k_interp[ipert, jpert, 2] +
+                                 singfac[ipert, 2] * k_interp[ipert, jpert, 1]
+            if ctrl.sing_order < 2 continue end
+            k[ipert, jpert, 3] = singfac[ipert, 1] * k_interp[ipert, jpert, 3] / 2 +
+                                 singfac[ipert, 2] * k_interp[ipert, jpert, 2] +
+                                 singfac[ipert, 3] * k_interp[ipert, jpert, 1] / 2
+            if ctrl.sing_order < 3 continue end
+            k[ipert, jpert, 4] = singfac[ipert, 1] * k_interp[ipert, jpert, 4] / 6 +
+                                 singfac[ipert, 2] * k_interp[ipert, jpert, 3] / 2 +
+                                 singfac[ipert, 3] * k_interp[ipert, jpert, 2] / 2 +
+                                 singfac[ipert, 4] * k_interp[ipert, jpert, 1] / 6
+            if ctrl.sing_order < 4 continue end
+            k[ipert, jpert, 5] = singfac[ipert, 2] * k_interp[ipert, jpert, 4] / 6 +
+                                 singfac[ipert, 3] * k_interp[ipert, jpert, 3] / 4 +
+                                 singfac[ipert, 4] * k_interp[ipert, jpert, 2] / 6
+            if ctrl.sing_order < 5 continue end
+            k[ipert, jpert, 6] = singfac[ipert, 3] * k_interp[ipert, jpert, 4] / 12 +
+                                 singfac[ipert, 4] * k_interp[ipert, jpert, 3] / 12
+            if ctrl.sing_order < 6 continue end
+            k[ipert, jpert, 7] = singfac[ipert, 4] * k_interp[ipert, jpert, 4] / 36
+        end
+    end
+    
+    # Compute Hermitian matrix G
+    for jpert in 1:intr.mpert
+        for ipert in 1:intr.mpert
+            g[ipert, jpert, 1] = g_interp[ipert, jpert, 1]
+            if ctrl.sing_order < 1 continue end
+            g[ipert, jpert, 2] = g_interp[ipert, jpert, 2]
+            if ctrl.sing_order < 2 continue end
+            g[ipert, jpert, 3] = g_interp[ipert, jpert, 3] / 2
+            if ctrl.sing_order < 3 continue end
+            g[ipert, jpert, 4] = g_interp[ipert, jpert, 3] / 6
+        end
+    end
+
+    # Compute identity
+    for ipert in 1:intr.mpert
+        v[ipert, ipert, 1] = 1
+        v[ipert, ipert + intr.mpert, 2] = 1
+    end
+
+    # Compute zeroth-order x1
+    for isol=1:msol
+        x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
+    end
+    # Solve the linear system f0 * X = x(:,:,1,1) for all solution vectors at once.
+    # x[:, :, 1, 1] = cholesky(Hermitian(f0))  \ x[:, :, 1, 1] # TODO: uncomment once debugging
+    x[:, :, 1, 1] = f0  \ x[:, :, 1, 1]
+
+
+    # Compute higher-order x1
+    for i=2:ctrl.sing_order
+        for isol=1:msol
+            for j=1:i
+                x[:, isol, 1, i] .+= -ff[:, :, j] * x[:, isol, 1, i - j + 1]
+            end
+            x[:, isol, 1, i] .+= -k[:, :, i] * v[:, isol, 1]
+        end
+        # Solve linear system with Hermitian f0
+        # x[:, :, 1, i] = cholesky(Hermitian(f0)) \ x[:, :, 1, i] # TODO: uncomment once debugging
+        x[:, :, 1, i] = f0 \ x[:, :, 1, i]
+    end
+
+    # Compute x2
+    for i=1:ctrl.sing_order
+        for isol=1:msol
+            for j = 0:i
+                x[:, isol, 2, i+1] .+= k[:, :, j+1]' * x[:, isol, 1, i - j + 1]
+            end
+            x[:, isol, 2, i+1] .+= g[:, :, i+1] * v[:, isol, 1]
+        end
+    end
+
+    # Principal terms of mmat
+    intr.sing[ising].mmat .= 0
+    r1 = intr.sing[ising].r1
+    r2 = intr.sing[ising].r2
+    n1 = intr.sing[ising].n1
+    n2 = intr.sing[ising].n2
+    j = 0
+    # TODO: double check all indices, might be double adding one
+    for i = 1:ctrl.sing_order
+        intr.sing[ising].mmat[r1, r2, :, j+1] .= x[r1, r2, :, i+1]
+        intr.sing[ising].mmat[r1, n2, :, j+2] .= x[r1, n2, :, i+1]
+        intr.sing[ising].mmat[n1, r2, :, j+2] .= x[n1, r2, :, i+1]
+        intr.sing[ising].mmat[n1, n2, :, j+3] .= x[n1, n2, :, i+1]
+        j += 2
+    end
+
+    # Shearing terms
+    intr.sing[ising].mmat[r1, r2[1], 1, 1] .+= 0.5
+    intr.sing[ising].mmat[r1, r2[2], 2, 1] .-= 0.5
+end
+
+"""
+    sing_solve!(singp::SingType, k::Int)
+
+Solves iteratively for the next order in the power series `singp.vmat`.
+
+Arguments
+---------
+- `singp::SingType`: The singularity data structure containing all relevant matrices and parameters.
+- `k::Int`: The current order in the power series expansion.
+"""
+function sing_solve!(singp::SingType, intr::DconInternal, k::Int)
+    for l in 1:k
+        singp.vmat[:,:,:,k+1] .+= sing_matmul(singp.mmat[:,:,:,l], singp.vmat[:,:,:,k-l+1])
+    end
+    for isol in 1:2*intr.mpert
+        a = copy(singp.m0mat)
+        a[1,1] -= k/2.0 - singp.power[isol]
+        a[2,2] -= k/2.0 - singp.power[isol]
+        det = a[1,1] * a[2,2] - a[1,2] * a[2,1]
+        x = -singp.vmat[singp.r1[1], isol, :, k+1]
+        singp.vmat[singp.r1[1], isol, 1, k+1] = (a[2,2]*x[1] - a[1,2]*x[2]) / det
+        singp.vmat[singp.r1[1], isol, 2, k+1] = (a[1,1]*x[2] - a[2,1]*x[1]) / det
+        singp.vmat[singp.n1, isol, :, k+1] ./= (singp.power[isol] + k/2.0)
+    end
+end
+
+"""
+    sing_matmul(a, b) -> c
+
+Matrix multiplication specific to singular matrices.
+
+Arguments
+---------
+- `a::Array{ComplexF64,3}`: shape (mpert, 2m, 2)
+- `b::Array{ComplexF64,3}`: shape (m, n, 2)
+
+Returns
+-------
+- `c::Array{ComplexF64,3}`: shape (mpert, n, 2)
+"""
+function sing_matmul(a::Array{ComplexF64,3}, b::Array{ComplexF64,3})
+    m = size(b,1)
+    n = size(b,2)
+
+    # consistency check
+    if size(a,2) != 2*m
+        error("Sing_matmul: size(a,2) = $(size(a,2)) != 2*size(b,1) = $(2*m)")
+    end
+
+    c = zeros(ComplexF64, size(a,1), n, 2)
+
+    # main computation
+    for i in 1:n
+        for j in 1:2
+            c[:, i, j] .+= a[:, 1:m, j] * b[:, i, 1] +
+                           a[:, m+1:2*m, j] * b[:, i, 2]
+        end
+    end
+
+    return c
+end
+
 """
     sing_get_ua!(ua::AbstractArray{ComplexF64,3}, intr::DconInternal, ising::Int, psifac::Real)
 
@@ -190,13 +504,12 @@ Fills `ua` with the asymptotic solution for the specified singularity and psi va
 #   ising: index of the singularity
 #   psifac: input psi factor
 #   ua: output 3D complex array (will be mutated)
-function sing_get_ua!(ua::AbstractArray{ComplexF64,3}, intr::DconInternal, ising::Int, psifac::Real) #TODO: ua is being modified so from Julia conventions, it should be listed first. In Fortran, it is listed last
-    error("sing_get_ua! not implemented yet, how did you get here")
-    # Set pointers (aliases) -> TODO: Do we want pointers in Julia?
-    singp = intr.sing[ising] #DconInternal is modified by any modifications made to singp
-    vmat = singp.vmat # 4D array
-    r1 = singp.r1 # Vector{Int}
-    r2 = singp.r2 # Vector{Int}
+function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
+
+    singp = intr.sing[odet.ising]
+    vmat = singp.vmat
+    r1 = singp.r1
+    r2 = singp.r2
 
     # Compute distance from singular surface
     dpsi = odet.psifac - singp.psifac
@@ -204,28 +517,26 @@ function sing_get_ua!(ua::AbstractArray{ComplexF64,3}, intr::DconInternal, ising
     pfac = abs(dpsi)^singp.alpha
 
     # Compute power series via Horner's method
-    ua .= vmat[:,:,:,2*singp.sing_order]   # copy initial term
-    for iorder in (2*singp.sing_order-1):-1:0 #decrement by 1 from 2*sing_order-1 to 0
-        ua .= ua .* sqrtfac .+ vmat[:,:,:,iorder+1]  
+    odet.ua .= vmat[:,:,:,2*ctrl.sing_order]   # copy initial term
+    for iorder in (2*ctrl.sing_order-1):-1:0 #decrement by 1 from 2*sing_order-1 to 0
+        odet.ua .= odet.ua .* sqrtfac .+ vmat[:,:,:,iorder+1]
         # +1 since Julia arrays are 1-based, Fortran arrays start at 0
     end
 
     # Restore powers
-    ua[r1, :, 1] ./= sqrtfac
-    ua[r1, :, 2] .*= sqrtfac
-    ua[:, r2[1], :] ./= pfac
-    ua[:, r2[2], :] .*= pfac
+    odet.ua[r1, :, 1] ./= sqrtfac
+    odet.ua[r1, :, 2] .*= sqrtfac
+    odet.ua[:, r2[1], :] ./= pfac
+    odet.ua[:, r2[2], :] .*= pfac
 
     # Renormalize if psifac < singp.psifac
-    if psifac < singp.psifac
-        factor1 = abs(ua[r1[1], r2[1], 1]) / ua[r1[1], r2[1], 1]
-        factor2 = abs(ua[r1[1], r2[2], 1]) / ua[r1[1], r2[2], 1]
+    if odet.psifac < singp.psifac
+        factor1 = abs(ua[r1[1], r2[1], 1]) / odet.ua[r1[1], r2[1], 1]
+        factor2 = abs(ua[r1[1], r2[2], 1]) / odet.ua[r1[1], r2[2], 1]
 
-        ua[:, r2[1], :] .*= factor1
-        ua[:, r2[2], :] .*= factor2
+        odet.ua[:, r2[1], :] .*= factor1
+        odet.ua[:, r2[2], :] .*= factor2
     end
-
-    return ua
 end
 
 """
@@ -474,157 +785,3 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
     # TODO: clean this up above, can all operations just use du instead of odet.du_temp?
     du .= odet.du_temp
 end
-
-#= Matrix stuff- ignore for now
-
-#solves iteratively for the next in the power series vmat
-function sing_solve(k, power, mmat, vmat) #do these need to have types specified?
-    two = 2.0 #why is this defined like this?
-    for l in 1:k
-        vmat[:,:,:,k+1] .+= sing_matmul(mmat[:,:,:,l], vmat[:,:,:,k-l+1])
-    end
-    for isol in 1:2*intr.mpert
-        a = copy(m0mat)
-        a[1,1] -= k/two - power[isol] #power needs to have a type specified, right?
-        a[2,2] -= k/two - power[isol]
-        det = a[1,1]*a[2,2] - a[1,2]*a[2,1]
-        x = -vmat[r1[1], isol, :, k+1]
-        vmat[r1[1], isol, 1, k+1] = (a[2,2]*x[1] - a[1,2]*x[2]) / det
-        vmat[r1[1], isol, 2, k+1] = (a[1,1]*x[2] - a[2,1]*x[1]) / det
-        vmat[n1, isol, :, k+1] ./= (power[isol] + k/two)
-    end
-end
-
-function sing_matmul(a, b)
-    m = size(b, 1)
-    n = size(b, 2)
-    c = zeros(ComplexF64, size(a,1), size(b,2), 2)
-    for i in 1:n
-        c[:,i,1] = a[:,1:m,1] * b[:,i,1] + a[:,1+m:2*m,1] * b[:,i,2]
-        c[:,i,2] = a[:,1:m,2] * b[:,i,1] + a[:,1+m:2*m,2] * b[:,i,2]
-    end
-    return c
-end
-=#
-
-#more stuff needs to go here
-
-#= AI versions of the functions from sing.F, completely unedited and definitely not supposed to be in here
-
-# Subprogram 4 in GPEC
-function sing_vmat(ising::Int, intr::DconInternal, ctrl::DconControl, equil::PlasmaEquilibrium)
-    if ising < 1 || ising > intr.msing
-        return
-    end
-    singp = sing[ising]
-    singp.vmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 0:2*sing_order)
-    singp.mmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 0:2*sing_order+2)
-
-    ipert0 = round(Int, ctrl.nn * singp.q) - intr.mlow + 1
-    q = singp.q
-    if ipert0 <= 0 || intr.mlow > ctrl.nn*q || mhigh < ctrl.nn*q
-        singp.di = 0
-        return
-    end
-
-    singp.r1 = [ipert0]
-    singp.r2 = [ipert0, ipert0 + intr.mpert]
-    singp.n1 = [i for i in 1:intr.mpert if i != ipert0]
-    singp.n2 = vcat(singp.n1, [i + intr.mpert for i in singp.n1])
-
-    global r1 = singp.r1
-    global r2 = singp.r2
-    global n1 = singp.n1
-    global n2 = singp.n2
-
-    psifac = singp.psifac
-    spline_eval(locstab, psifac, 0)
-    di0 = locstab.f[1] / psifac
-    q1 = singp.q1
-    rho = singp.rho
-
-    sing_mmat(ising)
-    global m0mat = transpose(singp.mmat[r1[1], r2, :, 0])
-    di = m0mat[1,1]*m0mat[2,2] - m0mat[2,1]*m0mat[1,2]
-    singp.di = di
-    singp.alpha = sqrt(-complex(singp.di))
-    singp.power = zeros(ComplexF64, 2*intr.mpert)
-    singp.power[ipert0] = -singp.alpha
-    singp.power[ipert0 + intr.mpert] = singp.alpha
-
-    println(@sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e",
-        ising, psifac, rho, q, q1, di0, singp.di, singp.di/di0-1))
-
-    singp.vmat .= 0
-    for ipert in 1:intr.mpert
-        singp.vmat[ipert, ipert, 1, 0] = 1
-        singp.vmat[ipert, ipert + intr.mpert, 2, 0] = 1
-    end
-
-    singp.vmat[ipert0, ipert0, 1, 0] = 1
-    singp.vmat[ipert0, ipert0 + intr.mpert, 1, 0] = 1
-    singp.vmat[ipert0, ipert0, 2, 0] = -(m0mat[1,1] + singp.alpha) / m0mat[1,2]
-    singp.vmat[ipert0, ipert0 + intr.mpert, 2, 0] = -(m0mat[1,1] - singp.alpha) / m0mat[1,2]
-    det = conj(singp.vmat[ipert0, ipert0, 1, 0]) * singp.vmat[ipert0, ipert0 + intr.mpert, 2, 0] -
-          conj(singp.vmat[ipert0, ipert0 + intr.mpert, 1, 0]) * singp.vmat[ipert0, ipert0, 2, 0]
-    singp.vmat[ipert0, :, :, 0] ./= sqrt(det)
-
-    for k in 1:2*sing_order
-        sing_solve(k, singp.power, singp.mmat, singp.vmat)
-    end
-end
-
-function sing_mmat(ising)
-    # This is a direct translation, but you must define or adapt:
-    # - zgbmv, zpbtrs, zhbmv (BLAS/LAPACK wrappers or custom)
-    # - fmats, gmats, kmats, etc.
-    # - intr.mband, intr.mpert, sing_order, etc.
-    # - r1, r2, n1, n2 as global or passed in
-    # - sing as a global array of SingType
-
-    # ...implement as in Fortran, using Julia's array and BLAS/LAPACK functions...
-    # For brevity, not fully expanded here.
-end
-
-function sing_solve(k, power, mmat, vmat)
-    two = 2.0
-    for l in 1:k
-        vmat[:,:,:,k+1] .+= sing_matmul(mmat[:,:,:,l], vmat[:,:,:,k-l+1])
-    end
-    for isol in 1:2*intr.mpert
-        a = copy(m0mat)
-        a[1,1] -= k/two - power[isol]
-        a[2,2] -= k/two - power[isol]
-        det = a[1,1]*a[2,2] - a[1,2]*a[2,1]
-        x = -vmat[r1[1], isol, :, k+1]
-        vmat[r1[1], isol, 1, k+1] = (a[2,2]*x[1] - a[1,2]*x[2]) / det
-        vmat[r1[1], isol, 2, k+1] = (a[1,1]*x[2] - a[2,1]*x[1]) / det
-        vmat[n1, isol, :, k+1] ./= (power[isol] + k/two)
-    end
-end
-
-function sing_matmul(a, b)
-    m = size(b, 1)
-    n = size(b, 2)
-    c = zeros(ComplexF64, size(a,1), size(b,2), 2)
-    for i in 1:n
-        c[:,i,1] = a[:,1:m,1] * b[:,i,1] + a[:,1+m:2*m,1] * b[:,i,2]
-        c[:,i,2] = a[:,1:m,2] * b[:,i,1] + a[:,1+m:2*m,2] * b[:,i,2]
-    end
-    return c
-end
-
-function sing_vmat_diagnose(ising)
-    singp = sing[ising]
-    # Write diagnostics to file or stdout as needed
-    # For brevity, not implemented here
-end
-
-NOTES
-- You must define or adapt all types, constants, and helper functions (SingType, spline_eval, etc.) to your Julia codebase.
-- For BLAS/LAPACK calls (zgbmv, zpbtrs, zhbmv), use Julia's LinearAlgebra or BLAS/LAPACK wrappers, or write custom code.
-Array indexing in Julia is 1-based, not 0-based as in Fortran.
-For brevity, some repetitive or highly technical code (e.g., the full sing_mmat implementation) is not fully expanded, but the structure is clear for you to fill in.
-If you need a specific subroutine fully expanded, let me know!
-
-=#
