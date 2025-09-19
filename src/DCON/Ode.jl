@@ -19,7 +19,6 @@ including solution vectors, tolerances, and flags for the integration process.
     mpert::Int                  # poloidal mode number count
     msol::Int                   # number of solutions
     psi_save::Float64 = 0.0     # last saved psi value
-    istep::Int= 0               # integration step count
     ix::Int= 0                  # index for psiout in spline #TODO: does this really need to be part of the struct?
     singfac::Float64 = 0.0      # separation from singular surface in terms of m - nq
     psifac::Float64 = 0.0       # normalized flux coordinate
@@ -459,13 +458,12 @@ function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
         odet.next = "finish"
     else
         odet.psimax = intr.sing[odet.ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[odet.ising].q1)
-        odet.m1 = round(Int,ctrl.nn * intr.sing[ising].q, RoundFromZero)
+        odet.m1 = round(Int,ctrl.nn * intr.sing[odet.ising].q, RoundFromZero)
         # println(crit_out_unit, "ising = $ising, psifac = $(intr.sing[ising].psifac), q = $(intr.sing[ising].q), di = $(intr.sing[ising].di), alpha = $(intr.sing[ising].alpha)")
 
     end
 
     # Restart ode solver
-    odet.istep += 1
     odet.new = true
     odet.u_save .= odet.u
     odet.psi_save = odet.psifac
@@ -586,7 +584,6 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
     last_psi = Ref(0.0)
 
     # Advance differential equation to next singular surface or edge
-    # odet.istep += 1 # TODO: I don't think istep is needed anymore
     odet.first = true
     rtol, atol = compute_tols(intr, odet, ctrl) # initial tolerances
     prob = ODEProblem(sing_der!, odet.u, (odet.psifac, psiout), (ctrl, equil, intr, odet, ffit))
@@ -777,8 +774,7 @@ and evaluates a power growth metric to trigger early stopping (TODO: not sure if
 function ode_test(odet::OdeState, intr::DconInternal, ctrl::DconControl)::Bool
 
     # check if we are at end of integration
-    # TODO: get rid of istep?
-    flag = odet.psifac == odet.psimax || odet.istep == ctrl.nstep
+    flag = odet.psifac == odet.psimax
 
     # if not running with res_flag = true this function will exit and return flag here)
     if !ctrl.res_flag || flag || odet.ising > intr.msing || odet.singfac > ctrl.singfac_max

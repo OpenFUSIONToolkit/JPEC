@@ -9,7 +9,7 @@ function MainProgram(in_path::String)
 # -----------------------------------------------------------------------
   inputs = TOML.parsefile(in_path*"/dcon.toml")
   ctrl = DconControl(; (Symbol(k)=>v for (k,v) in inputs["DCON_CONTROL"])...)
-  outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
+  # outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
   intr = DconInternal()
   equil = Equilibrium.setup_equilibrium(in_path*"/equil.toml")
 
@@ -144,6 +144,7 @@ function MainProgram(in_path::String)
     # TODO: these functions need to be converted, need this for con_flag = false
 
     sing_scan!(intr, ctrl, equil, ffit)
+    # TODO: implement resist_eval at some point, not urgent for initial functionality.
     # for ising in 1:msing
     #   resist_eval(sing[ising])
     # end
@@ -174,7 +175,7 @@ function MainProgram(in_path::String)
           # if outp.bin_euler
           #     bin_close(euler_bin_unit) # TODO: Need to decide ho we're handling io
           # end
-          ode_run(ctrl, equil, intr, ffit)
+          nzero = ode_run(ctrl, equil, intr, ffit)
       end
   end
 

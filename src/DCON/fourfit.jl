@@ -310,7 +310,8 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
         kmat .= emat .- (adjoint(kmat) * temp2)
         gmat .= hmat .- (adjoint(cmat) * temp2)
 
-        # TODO: store factorized fmat (does not have to be banded?), improve computation in sing_der
+        # Store factorized F matrix
+        fmat .= cholesky(Hermitian(fmat)).L
 
         # TODO: add kinetic matrices here
 

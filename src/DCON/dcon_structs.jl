@@ -1,4 +1,4 @@
-#TODO: add descriptions of what all variables are and/or explanation of defaults
+# TODO: add descriptions of what all variables are and/or explanation of defaults
 @kwdef mutable struct ResistType
     e::Float64 = 0.0
     f::Float64 = 0.0
@@ -12,10 +12,14 @@
     taur::Float64 = 0.0
 end
 
-# TODO: maybe give this an initialization like OdeState since we know the sizes based on mpert and sing_order?
+# TODO: ideally, everything is allocated at construction, but mpert is determined after
+# since these are allocated in sing_find. What's the best way to handle this?
+# For now, leaving as nothings
+# Something simple could be not creating sing_types within sing_find, but instead saving the data,
+# then creating them all at once after mpert is determined in dcon.jl
+# This wouldn't be as clean, but would allow preallocation. Does this greatly impact performance?
 @kwdef mutable struct SingType
     m::Int = 0
-    order::Int = 0 # TODO: is this really just sing_order? if so, delete
     r1::Vector{Int} = [0]
     r2::Vector{Int} = [0, 0]
     n1::Vector{Int} = Int[]
@@ -32,28 +36,50 @@ end
     m0mat::Union{Nothing, Matrix{ComplexF64}} = zeros(ComplexF64, 2, 2)
     restype::ResistType = ResistType()
 end
+# @kwdef mutable struct SingType
+#     mpert::Int
+#     order::Int
+#     m::Int = 0
+#     psifac::Float64 = 0.0
+#     rho::Float64 = 0.0
+#     q::Float64 = 0.0
+#     q1::Float64 = 0.0
+#     di::Float64 = 0.0
+#     alpha::ComplexF64 = 0.0 + 0.0im
+#     r1::Vector{Int} = [0]
+#     r2::Vector{Int} = [0, 0]
+#     n1::Vector{Int} = Vector{Int}(undef, mpert - 1)
+#     n2::Vector{Int} = Vector{Int}(undef, 2 * mpert - 2)
+#     power::Vector{ComplexF64} = Vector{ComplexF64}(undef, 2 * mpert)
+#     vmat::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, order + 1)
+#     mmat::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, order + 3)
+#     m0mat::Union{Nothing, Matrix{ComplexF64}} = zeros(ComplexF64, 2, 2)
+#     restype::ResistType = ResistType()
+# end
+# # Constructor to allocate matrices
+# SingType(mpert::Int, order::Int; kwargs...) = SingType(; mpert, order, kwargs...)
 
 #TODO: I am assuming this will change - needs discussion of what output files should be
 # we should have a working base case first
-@kwdef mutable struct DconFileNames
-    out_bal1_unit::String = "bal1.out"
-    out_bal2_unit::String = "bal2.out"
-    bin_bal1_unit::String = "bal1.bin"
-    bin_bal2_unit::String = "bal2.bin"
-    fourfit_out_unit::String = "imats.out"
-    fourfit_bin_unit::String = "imats.bin"
-    evals_out_unit::String = "feval.out"
-    evals_bin_unit::String = "feval.bin"
-    crit_out_unit::String = "crit.out"
-    crit_bin_unit::String = "crit.bin"
-    euler_bin_unit::String = "euler.bin"
-    init_out_unit::String = "init.out"
-    reinit_out_unit::String = "reinit.out"
-    dcon_unit::String = "dcon.out"
-    unorm_unit::String = "unorm.bin"
-    ca_unit::String = "ca.out"
-    err_unit::String = "error.bin"
-end
+# @kwdef mutable struct DconFileNames
+#     out_bal1_unit::String = "bal1.out"
+#     out_bal2_unit::String = "bal2.out"
+#     bin_bal1_unit::String = "bal1.bin"
+#     bin_bal2_unit::String = "bal2.bin"
+#     fourfit_out_unit::String = "imats.out"
+#     fourfit_bin_unit::String = "imats.bin"
+#     evals_out_unit::String = "feval.out"
+#     evals_bin_unit::String = "feval.bin"
+#     crit_out_unit::String = "crit.out"
+#     crit_bin_unit::String = "crit.bin"
+#     euler_bin_unit::String = "euler.bin"
+#     init_out_unit::String = "init.out"
+#     reinit_out_unit::String = "reinit.out"
+#     dcon_unit::String = "dcon.out"
+#     unorm_unit::String = "unorm.bin"
+#     ca_unit::String = "ca.out"
+#     err_unit::String = "error.bin"
+# end
 
 @kwdef mutable struct DconInternal
     mlow::Int = 0 #Copy of delta_mlow, but with limits enforced
@@ -80,8 +106,6 @@ end
     q_edge::Union{Nothing, Vector{Float64}} = nothing
     psi_edge::Union{Nothing, Vector{Float64}} = nothing
     dw_edge::Union{Nothing, Vector{ComplexF64}} = nothing
-    ud::Union{Nothing, Array{Float64,3} } = nothing #storage for u-derivative and xss # JMH - is there overlap with OdeState here?
-    # JMH - changed previous line from Matrix to Array due to error - might have to modify depending on what ud looks like
 end
 
 @kwdef mutable struct DconControl
@@ -141,43 +165,44 @@ end
     diagnose_ca::Bool = false
 end
 
-@kwdef mutable struct DconOutput
-    interp::Bool = false
-    crit_break::Bool = true
-    out_bal1::Bool = false
-    bin_bal1::Bool = false
-    out_bal2::Bool = false
-    bin_bal2::Bool = false
-    out_metric::Bool = false
-    bin_metric::Bool = false
-    feval_flag::Bool = false
-    out_fmat::Bool = false
-    bin_fmat::Bool = false
-    out_gmat::Bool = false
-    bin_gmat::Bool = false
-    out_kmat::Bool = false
-    bin_kmat::Bool = false
-    out_sol::Bool = false
-    out_sol_min::Int = 0
-    out_sol_max::Int = 0
-    bin_sol::Bool = false
-    bin_sol_min::Int = 0
-    bin_sol_max::Int = 0
-    out_fl::Bool = false
-    bin_fl::Bool = false
-    out_evals::Bool = false
-    bin_evals::Bool = false
-    bin_euler::Bool = false
-    euler_stride::Int = 1
-    bin_vac::Bool = false
-    ahb_flag::Bool = false
-    mthsurf0::Float64 = 1.0
-    msol_ahb::Int = 0
-    netcdf_out::Bool = true
-    out_fund::Bool = false
-    out_ahg2msc::Bool = true
-end
+# @kwdef mutable struct DconOutput
+#     interp::Bool = false
+#     crit_break::Bool = true
+#     out_bal1::Bool = false
+#     bin_bal1::Bool = false
+#     out_bal2::Bool = false
+#     bin_bal2::Bool = false
+#     out_metric::Bool = false
+#     bin_metric::Bool = false
+#     feval_flag::Bool = false
+#     out_fmat::Bool = false
+#     bin_fmat::Bool = false
+#     out_gmat::Bool = false
+#     bin_gmat::Bool = false
+#     out_kmat::Bool = false
+#     bin_kmat::Bool = false
+#     out_sol::Bool = false
+#     out_sol_min::Int = 0
+#     out_sol_max::Int = 0
+#     bin_sol::Bool = false
+#     bin_sol_min::Int = 0
+#     bin_sol_max::Int = 0
+#     out_fl::Bool = false
+#     bin_fl::Bool = false
+#     out_evals::Bool = false
+#     bin_evals::Bool = false
+#     bin_euler::Bool = false
+#     euler_stride::Int = 1
+#     bin_vac::Bool = false
+#     ahb_flag::Bool = false
+#     mthsurf0::Float64 = 1.0
+#     msol_ahb::Int = 0
+#     netcdf_out::Bool = true
+#     out_fund::Bool = false
+#     out_ahg2msc::Bool = true
+# end
 
+# TODO: how can we initialize the splines to not be nothings?
 @kwdef mutable struct FourFitVars
 
     # Spline matrices
@@ -221,21 +246,4 @@ end
     # kinetic ABCDEH mats for sing_mod
     # kwmats::Vector{JPEC.SplinesMod.CubicSpline{ComplexF64}} = [JPEC.SplinesMod.CubicSpline{ComplexF64}() for _ in 1:6]
     # ktmats::Vector{JPEC.SplinesMod.CubicSpline{ComplexF64}} = [JPEC.SplinesMod.CubicSpline{ComplexF64}() for _ in 1:6]
-end
-
-# TODO: does this need to be a separate type?
-@kwdef mutable struct SingVars
-
-      msol::Int = 0
-      sing_order::Int = 2
-      det_max::Float64 = 0
-      r1::Vector{Int} = Int[]
-      r2::Vector{Int} = Int[]
-      n1::Vector{Int} = Int[]
-      n2::Vector{Int} = Int[]
-
-    #   m0mat::Union{Nothing, Matrix{ComplexF64,2}} = nothing
-    #   sing_detf::Union{Nothing, Matrix{ComplexF64,2}} = nothing
-      m0mat::Union{Nothing, Array{ComplexF64,2}} = nothing # JMH - same as DconInternal - changing to array so it will compile, might be wrong
-      sing_detf::Union{Nothing, Array{ComplexF64,2}} = nothing
 end

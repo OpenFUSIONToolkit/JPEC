@@ -1,14 +1,7 @@
-# Computations relating to singualar surfaces
-#TODO: Assign types to things? 
-
-#keep 1-3, 11 is CRUCIAL
-#13-16 are for kinetic DCON so skip for now
-
-# scans singular surfaces and prints information about them - function 1 from Fortran DCON
 """
     sing_scan!(odet::OdeState, intr::DconInternal)
 
-Scan all singular surfaces and print information about them.
+Scan all singular surfaces and calculate asymptotic vmat and mmat matrices and Mericer criterion.
 """
 function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars)
     println("\n Singular Surfaces:")
@@ -28,7 +21,6 @@ Locate singular rational q-surfaces (q = m/nn) using a bisection method between 
 # Arguments
 - 'itmax::Int`: Maximum number of iterations for the bisection method (default: 200)
 """
-# JMH - I confirmed this function outputs the same sing struct as fortran dcon for DIII_Ideal
 function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
 
     # Shorthand to evaluate q inside bisection search
@@ -172,6 +164,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
     end
 end
 
+# Main differences: using 1 indexing, so zeroth order is the first index, whereas Fortran used 0 indexing for these arrays
 function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
     if ising < 1 || ising > intr.msing
         return
@@ -180,8 +173,10 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # TODO: move these to initialiation by passing in mpert and sing_order
     singp.vmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 2*ctrl.sing_order + 1)
-    singp.mmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 2*ctrl.sing_order+3)
+    singp.mmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 2*ctrl.sing_order + 3)
+    singp.power = zeros(ComplexF64, 2*intr.mpert)
 
+    # Identify the resonant solution
     ipert0 = round(Int, ctrl.nn * singp.q, RoundFromZero) - intr.mlow + 1
     # TODO: is this needed if we initialize di to zero in the struct definition?
     if ipert0 <= 0 || intr.mlow > ctrl.nn * singp.q || intr.mhigh < ctrl.nn * singp.q
@@ -195,23 +190,24 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     singp.n1 = [i for i in 1:intr.mpert if i != ipert0]
     singp.n2 = vcat(singp.n1, [i + intr.mpert for i in singp.n1])
 
-    # TODO: uncomment this once locstab (created in mercier.f) is working
     psifac = singp.psifac
-    q = singp.q
+    q = singp.q    
+    # TODO: uncomment this once locstab (created in mercier.f) is working
     # spline_eval(locstab, singp.psifac, 0)
     # di0 = locstab.f[1] / singp.psifac
-    di0 = 0.0 # TODO: placeholder until locstab is working
+    di0 = 0.0 # placeholder
     q1 = singp.q1
     rho = singp.rho
 
     # Compute Mercier criterion and singular power
     sing_mmat!(intr, ctrl, equil, ffit, ising)
-    # TODO: should m0mat go in a struct somewhere?
     singp.m0mat = transpose(singp.mmat[singp.r1[1], singp.r2, :, 1])
+    # TODO: this is a little odd. di is complex since m0 is complex (but the imaginaries are negligible),
+    # its then stored in singp where the type is real, and then converted to complex again for alpha and power.
+    # There's gotta be a more clear way to do this? But this is the most faithful to the Fortran
     di = singp.m0mat[1,1]*singp.m0mat[2,2] - singp.m0mat[2,1]*singp.m0mat[1,2]
-    singp.di = abs(di) # TODO: this is giving imaginary, but should be real. Work out during debugging
+    singp.di = real(di)
     singp.alpha = sqrt(-complex(singp.di))
-    singp.power = zeros(ComplexF64, 2*intr.mpert)
     singp.power[ipert0] = -singp.alpha
     singp.power[ipert0 + intr.mpert] = singp.alpha
 
@@ -235,12 +231,18 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     singp.vmat[ipert0, :, :, 1] ./= sqrt(det)
 
     # Higher order solutions
-    for k in 1:2*ctrl.sing_order
-        sing_solve!(singp, intr, k)
+    for order in 1:2*ctrl.sing_order
+        sing_solve!(singp, intr, order)
     end
 end
 
+# Main differences: using 1 indexing, so zeroth order is the first index, whereas Fortran used 0 indexing for these arrays. Also adapted for
+# dense f/g/k arrays here, so a lot of the LAPACK operations go under the hood.
 function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
+
+    # ongoing TODO: list here
+    # figure out if there's a direct way of doing the banded->dense matrix conversion to Julia (very messy right now)
+    # avoided hardcoding of binomial coefficients for cleanup
 
     # Initial allocations
     msol = 2 * intr.mpert # TODO: make sure this doesn't get updated as a global elsewhere in the Fortran
@@ -257,16 +259,19 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     v = zeros(ComplexF64, intr.mpert, msol, 2)
     x = zeros(ComplexF64, intr.mpert, msol, 2, ctrl.sing_order + 1)
 
-    # TODO: add singp Shorthand
+    singp = intr.sing[ising]
 
     # Evaluate cubic splines
-    q[1], q[2], q[3], q[4] = SplinesMod.spline_eval(equil.sq, intr.sing[ising].psifac, 3)[4]
-    f_interp[:, :, 1], f_interp[:, :, 2], f_interp[:, :, 3], f_interp[:, :, 4] = SplinesMod.spline_eval(ffit.fmats, intr.sing[ising].psifac, 3)
-    g_interp[:, :, 1], g_interp[:, :, 2], g_interp[:, :, 3], g_interp[:, :, 4] = SplinesMod.spline_eval(ffit.gmats, intr.sing[ising].psifac, 3)
-    k_interp[:, :, 1], k_interp[:, :, 2], k_interp[:, :, 3], k_interp[:, :, 4] = SplinesMod.spline_eval(ffit.kmats, intr.sing[ising].psifac, 3)
+    # TODO: third derivative has some error, but only included via sing_fac[ipert0] for sing_order < 3. Tests with solovev ideal indicate little sensitivity
+    # TODO: this is an annoying way to have to take apart this tuple of vectors, I think
+    # this is a planned fix already (i.e. separating cubic splines)
+    q .= getindex.(SplinesMod.spline_eval(equil.sq, singp.psifac, 3), 4)
+    f_interp[:, :, 1], f_interp[:, :, 2], f_interp[:, :, 3], f_interp[:, :, 4] = SplinesMod.spline_eval(ffit.fmats, singp.psifac, 3)
+    g_interp[:, :, 1], g_interp[:, :, 2], g_interp[:, :, 3], g_interp[:, :, 4] = SplinesMod.spline_eval(ffit.gmats, singp.psifac, 3)
+    k_interp[:, :, 1], k_interp[:, :, 2], k_interp[:, :, 3], k_interp[:, :, 4] = SplinesMod.spline_eval(ffit.kmats, singp.psifac, 3)
 
     # Evaluate singfac and its derivatives
-    ipert0 = intr.sing[ising].m - intr.mlow + 1
+    ipert0 = singp.m - intr.mlow + 1
     mvec = intr.mlow:intr.mhigh
     singfac[:, 1] .= mvec .- ctrl.nn * q[1]
     singfac[:, 2] .= -ctrl.nn * q[2]
@@ -279,8 +284,9 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Compute NON-factored Hermitian F and its derivatives
     # TODO: only supports dense matrices for now, implement Banded?
+    # TODO: this can be simplified to extracting binomial coefficients (see ChatGPT)
     for jpert in 1:intr.mpert
-        for ipert in 1:intr.mpert
+        for ipert in jpert:min(intr.mpert, jpert + intr.mband)
             f[ipert, jpert, 1] = singfac[ipert, 1] * f_interp[ipert, jpert, 1]
             if ctrl.sing_order < 1 continue end
             f[ipert, jpert, 2] = singfac[ipert, 1] * f_interp[ipert, jpert, 2] +
@@ -313,8 +319,8 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
         fac1 = 1
         for j in 0:n
             for jpert in 1:intr.mpert
-                for ipert in 1:intr.mpert
-                    for kpert in 1:intr.mpert
+                for ipert in jpert:min(intr.mpert, jpert + intr.mband)
+                    for kpert in max(1, ipert - intr.mband):jpert
                         ff[ipert, jpert, n + 1] += fac1 * f[ipert, kpert, j + 1] * conj(f[jpert, kpert, n - j + 1])
                     end
                 end
@@ -325,9 +331,20 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
         fac0 *= (n + 1)
     end
 
+    # NOTE: In Fortran, f, g, k are stored as banded Hermitian matrices (lower triangle only), 
+    # with f already factored, this is passed into LAPACK which handles all of this under the hood.
+    # However, for now we are using dense matrices in Julia, so ff is stored as a full matrix (both triangles), 
+    # and we need to fill in the upper triangle here.
+    # Use Hermitian property to fill the upper triangle
+    for i in 1:intr.mpert
+        for j in 1:i-1
+            ff[j, i, 2] = conj(ff[i, j, 2])
+        end
+    end
+
     # Compute non-Hermitian matrix K
     for jpert in 1:intr.mpert
-        for ipert in 1:intr.mpert
+        for ipert in max(1, jpert - intr.mband):min(intr.mpert, jpert + intr.mband)
             k[ipert, jpert, 1] = singfac[ipert, 1] * k_interp[ipert, jpert, 1]
             if ctrl.sing_order < 1 continue end
             k[ipert, jpert, 2] = singfac[ipert, 1] * k_interp[ipert, jpert, 2] +
@@ -355,7 +372,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     
     # Compute Hermitian matrix G
     for jpert in 1:intr.mpert
-        for ipert in 1:intr.mpert
+        for ipert in jpert:min(intr.mpert, jpert + intr.mband)
             g[ipert, jpert, 1] = g_interp[ipert, jpert, 1]
             if ctrl.sing_order < 1 continue end
             g[ipert, jpert, 2] = g_interp[ipert, jpert, 2]
@@ -376,59 +393,54 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     for isol=1:msol
         x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
     end
-    # Solve the linear system f0 * X = x(:,:,1,1) for all solution vectors at once.
-    # x[:, :, 1, 1] = cholesky(Hermitian(f0))  \ x[:, :, 1, 1] # TODO: uncomment once debugging
-    x[:, :, 1, 1] = f0  \ x[:, :, 1, 1]
-
+    # f is prefactorized so can just use this calculation to get F⁻¹x
+    x[:, :, 1, 1] = UpperTriangular(f0') \ (LowerTriangular(f0) \ x[:, :, 1, 1])
 
     # Compute higher-order x1
-    for i=2:ctrl.sing_order
+    for i=1:ctrl.sing_order
         for isol=1:msol
             for j=1:i
-                x[:, isol, 1, i] .+= -ff[:, :, j] * x[:, isol, 1, i - j + 1]
+                x[:, isol, 1, i + 1] .-= ff[:, :, j + 1] * x[:, isol, 1, i - j + 1]
             end
-            x[:, isol, 1, i] .+= -k[:, :, i] * v[:, isol, 1]
+            x[:, isol, 1, i + 1] .-= k[:, :, i + 1] * v[:, isol, 1]
         end
-        # Solve linear system with Hermitian f0
-        # x[:, :, 1, i] = cholesky(Hermitian(f0)) \ x[:, :, 1, i] # TODO: uncomment once debugging
-        x[:, :, 1, i] = f0 \ x[:, :, 1, i]
+        x[:, :, 1, i + 1] = UpperTriangular(f0') \ (LowerTriangular(f0) \ x[:, :, 1, i + 1])
     end
 
     # Compute x2
-    for i=1:ctrl.sing_order
+    for i=0:ctrl.sing_order
         for isol=1:msol
             for j = 0:i
-                x[:, isol, 2, i+1] .+= k[:, :, j+1]' * x[:, isol, 1, i - j + 1]
+                x[:, isol, 2, i + 1] .+= k[:, :, j + 1]' * x[:, isol, 1, i - j + 1]
             end
-            x[:, isol, 2, i+1] .+= g[:, :, i+1] * v[:, isol, 1]
+            x[:, isol, 2, i + 1] .+= g[:, :, i + 1] * v[:, isol, 1]
         end
     end
 
     # Principal terms of mmat
-    intr.sing[ising].mmat .= 0
-    r1 = intr.sing[ising].r1
-    r2 = intr.sing[ising].r2
-    n1 = intr.sing[ising].n1
-    n2 = intr.sing[ising].n2
+    singp.mmat .= 0
+    r1 = singp.r1
+    r2 = singp.r2
+    n1 = singp.n1
+    n2 = singp.n2
     j = 0
-    # TODO: double check all indices, might be double adding one
-    for i = 1:ctrl.sing_order
-        intr.sing[ising].mmat[r1, r2, :, j+1] .= x[r1, r2, :, i+1]
-        intr.sing[ising].mmat[r1, n2, :, j+2] .= x[r1, n2, :, i+1]
-        intr.sing[ising].mmat[n1, r2, :, j+2] .= x[n1, r2, :, i+1]
-        intr.sing[ising].mmat[n1, n2, :, j+3] .= x[n1, n2, :, i+1]
+    for i = 0:ctrl.sing_order
+        singp.mmat[r1, r2, :, j+1] .= x[r1, r2, :, i+1]
+        singp.mmat[r1, n2, :, j+2] .= x[r1, n2, :, i+1]
+        singp.mmat[n1, r2, :, j+2] .= x[n1, r2, :, i+1]
+        singp.mmat[n1, n2, :, j+3] .= x[n1, n2, :, i+1]
         j += 2
     end
 
     # Shearing terms
-    intr.sing[ising].mmat[r1, r2[1], 1, 1] .+= 0.5
-    intr.sing[ising].mmat[r1, r2[2], 2, 1] .-= 0.5
+    singp.mmat[r1, r2[1], 1, 1] .+= 0.5
+    singp.mmat[r1, r2[2], 2, 1] .-= 0.5
 end
 
 """
     sing_solve!(singp::SingType, k::Int)
 
-Solves iteratively for the next order in the power series `singp.vmat`.
+Solves iteratively for the next order in the power series `singp.vmat`. See equation 47 in the Glass 2016 DCON paper.
 
 Arguments
 ---------
@@ -437,7 +449,7 @@ Arguments
 """
 function sing_solve!(singp::SingType, intr::DconInternal, k::Int)
     for l in 1:k
-        singp.vmat[:,:,:,k+1] .+= sing_matmul(singp.mmat[:,:,:,l], singp.vmat[:,:,:,k-l+1])
+        singp.vmat[:,:,:,k + 1] .+= sing_matmul(singp.mmat[:,:,:,l + 1], singp.vmat[:,:,:,k - l + 1])
     end
     for isol in 1:2*intr.mpert
         a = copy(singp.m0mat)
@@ -447,7 +459,7 @@ function sing_solve!(singp::SingType, intr::DconInternal, k::Int)
         x = -singp.vmat[singp.r1[1], isol, :, k+1]
         singp.vmat[singp.r1[1], isol, 1, k+1] = (a[2,2]*x[1] - a[1,2]*x[2]) / det
         singp.vmat[singp.r1[1], isol, 2, k+1] = (a[1,1]*x[2] - a[2,1]*x[1]) / det
-        singp.vmat[singp.n1, isol, :, k+1] ./= (singp.power[isol] + k/2.0)
+        singp.vmat[singp.n1, isol, :, k+1] ./= (singp.power[isol] + (k+1)/2.0)
     end
 end
 
@@ -458,12 +470,12 @@ Matrix multiplication specific to singular matrices.
 
 Arguments
 ---------
-- `a::Array{ComplexF64,3}`: shape (mpert, 2m, 2)
-- `b::Array{ComplexF64,3}`: shape (m, n, 2)
+- `a::Array{ComplexF64,3}`: shape (mpert, 2 * mpert, 2)
+- `b::Array{ComplexF64,3}`: shape (mmpert, 2 * mpert, 2)
 
 Returns
 -------
-- `c::Array{ComplexF64,3}`: shape (mpert, n, 2)
+- `c::Array{ComplexF64,3}`: shape (mpert, 2 * mpert, 2)
 """
 function sing_matmul(a::Array{ComplexF64,3}, b::Array{ComplexF64,3})
     m = size(b,1)
@@ -488,26 +500,19 @@ function sing_matmul(a::Array{ComplexF64,3}, b::Array{ComplexF64,3})
 end
 
 """
-    sing_get_ua!(ua::AbstractArray{ComplexF64,3}, intr::DconInternal, ising::Int, psifac::Real)
+    sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
 
 Compute the asymptotic series solution for a given singularity.
 
-- `ua`: Output 3D complex array (mutated in-place), shape (mpert, 2*mpert, 2)
+- `odet`: Current ODE state (contains psifac, ua, ising, etc.)
 - `intr`: DCON internal state (contains singularity data, mpert, etc.)
-- `ising`: Index of the singularity (integer)
-- `psifac`: Input psi factor (real scalar)
+- `ctrl`: DCON control parameters (contains sing_order, etc.)
 
-Fills `ua` with the asymptotic solution for the specified singularity and psi value.
+Fills `ua` with the asymptotic solution vmat for the specified singular surface and psi value.
 """
-#computes asymptotic series solutions
-# Inputs:
-#   ising: index of the singularity
-#   psifac: input psi factor
-#   ua: output 3D complex array (will be mutated)
 function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
 
     singp = intr.sing[odet.ising]
-    vmat = singp.vmat
     r1 = singp.r1
     r2 = singp.r2
 
@@ -517,10 +522,9 @@ function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
     pfac = abs(dpsi)^singp.alpha
 
     # Compute power series via Horner's method
-    odet.ua .= vmat[:,:,:,2*ctrl.sing_order]   # copy initial term
-    for iorder in (2*ctrl.sing_order-1):-1:0 #decrement by 1 from 2*sing_order-1 to 0
-        odet.ua .= odet.ua .* sqrtfac .+ vmat[:,:,:,iorder+1]
-        # +1 since Julia arrays are 1-based, Fortran arrays start at 0
+    odet.ua .= singp.vmat[:,:,:,2 * ctrl.sing_order + 1]
+    for iorder in (2*ctrl.sing_order-1):-1:0
+        odet.ua .= odet.ua .* sqrtfac .+ singp.vmat[:,:,:,iorder+1]
     end
 
     # Restore powers
@@ -531,11 +535,8 @@ function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
 
     # Renormalize if psifac < singp.psifac
     if odet.psifac < singp.psifac
-        factor1 = abs(ua[r1[1], r2[1], 1]) / odet.ua[r1[1], r2[1], 1]
-        factor2 = abs(ua[r1[1], r2[2], 1]) / odet.ua[r1[1], r2[2], 1]
-
-        odet.ua[:, r2[1], :] .*= factor1
-        odet.ua[:, r2[2], :] .*= factor2
+        odet.ua[:, r2[1], :] .*= abs(odet.ua[r1[1], r2[1], 1]) / odet.ua[r1[1], r2[1], 1]
+        odet.ua[:, r2[2], :] .*= abs(odet.ua[r1[1], r2[2], 1]) / odet.ua[r1[1], r2[2], 1]
     end
 end
 
@@ -759,12 +760,8 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
             #@. odet.du_temp[:, isol, 1] = u[:, isol, 2] .* odet.singfac_vec - odet.du_temp[:, isol, 1]
         end
 
-        # Solve F * X = du
-        odet.Ffact = cholesky(Hermitian(fmat))
-        odet.du_temp[:, :, 1] .= odet.Ffact \ odet.du_temp[:, :, 1]
-        # TODO: haven't been able to get ldiv to work here, why?
-        # copy!(du_slice, du_temp[:, :, 1])
-        # ldiv!(du_temp[:, :, 1], Ffact, du_slice)
+        # du = F⁻¹du
+        odet.du_temp[:, :, 1] .= UpperTriangular(fmat') \ (LowerTriangular(fmat) \ odet.du_temp[:, :, 1])
 
         # Compute du_temp[:,:,2]
         @inbounds for isol in 1:odet.msol
