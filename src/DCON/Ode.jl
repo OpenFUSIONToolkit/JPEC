@@ -84,7 +84,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
 
     # Integration loop
     if ctrl.verbose # mimicing an output from ode_output_open
-        println("   ψ=$(odet.psifac), q=$(SplinesMod.spline_eval(equil.sq, odet.psifac, 0)[4])")
+        println("   ψ=$(odet.psifac), q=$(Spl.spline_eval(equil.sq, odet.psifac, 0)[4])")
     end
     # TODO: Eventually figure out a way to get rid of these - use callbacks in the integrator for the second one? maybe just do while ising != ksing and next != cross for the first?
     while true # inside plasma (break out when at the edge)
@@ -146,8 +146,8 @@ Returns the index of the next relevant singular surface.
 function ode_axis_init!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState; itmax = 50)
 
     # Shorthand to evaluate q/q1 inside newton iteration
-    qval = psi -> SplinesMod.spline_eval(equil.sq, psi, 0)[4]
-    q1val = psi -> SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
+    qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
+    q1val = psi -> Spl.spline_eval(equil.sq, psi, 1)[2][4]
 
     # Preliminary computations
     odet.psifac = equil.sq.xs[1]
@@ -420,7 +420,7 @@ function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
     du1 = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
     du2 = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
     params = (ctrl, equil, intr, odet, ffit)
-    sing_der!(du1, odet.u, params, psi_old) #TODO: where does du1 come from?
+    sing_der!(du1, odet.u, params, psi_old)
     sing_der!(du2, odet.u, params, odet.psifac)
     odet.u .+= (du1 .+ du2) .* dpsi
     if !ctrl.con_flag
@@ -491,7 +491,7 @@ end
     ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
              intr::DconInternal, ctrl::DconControl, ffit::FourFitVars)
 
-Advance one adaptive integration step of the ODE system for a plasma equilibrium calculation.
+Advance to the next rational surface of the E-L equations.
 
 # Arguments
 - `odet::OdeState`: Structure storing the current ODE state and solution arrays.
@@ -505,8 +505,7 @@ This function computes and sets appropriate relative and absolute tolerances
 for the ODE integration depending on proximity to singular surfaces, 
 chooses the next integration endpoint, and advances the solution using 
 an adaptive ODE solver. The state in `odet` is updated in-place with
-the solution at the new point. Designed for use in stability or equilibrium 
-scanning in plasma physics and MHD codes.
+the solution at the new point.
 
 # Notes
 - Tolerance logic distinguishes between "near-singular" and "regular" regions.
@@ -523,9 +522,7 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
         # sing_der!(du, u, params, integrator.t)
         fmt(x) = @sprintf("%.5e", x)
         println("       ψ=", fmt(integrator.t), 
-            ", max|u|=", fmt(maximum(abs.(u))),
-            ", rtol=", fmt(integrator.opts.reltol),
-            ", atol=", fmt(maximum(integrator.opts.abstol)))
+            ", max|u|=", fmt(maximum(abs.(u))))
             # ", max|du|=", fmt(maximum(abs.(du))))
         last_psi[] = integrator.t
     end
@@ -615,7 +612,7 @@ function compute_tols(intr, odet, ctrl)
     end
     rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
     # Absolute tolerances
-    atol = similar(odet.u, Float64) # same shape as u
+    atol = similar(odet.u, Float64)
     for ieq in 1:size(odet.u,3), isol in 1:size(odet.u,2)
         atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
         if (atol0 == 0) atol0 = typemax(Float64) end
@@ -832,7 +829,7 @@ function ode_record_edge!(intr::DconInternal, odet::OdeState, ctrl::DconControl,
     vacuum1 = ComplexF64(0.0, 0.0)
     plasma1 = ComplexF64(0.0, 0.0)
 
-    q_psifac = SplinesMod.spline_eval(equil.sq, odet.psifac, 0)
+    q_psifac = Spl.spline_eval(equil.sq, odet.psifac, 0)
     if intr.size_edge > 0
         #TODO: WTH? fortran has both a psiedge and psi_edge and they appear to be different.
         # someone smarter than me please double check this
