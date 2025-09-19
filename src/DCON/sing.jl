@@ -24,7 +24,7 @@ Locate singular rational q-surfaces (q = m/nn) using a bisection method between 
 function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
 
     # Shorthand to evaluate q inside bisection search
-    qval = psi -> SplinesMod.spline_eval(equil.sq, psi, 0)[4]
+    qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
 
     # Loop over extrema of q, find all rational values in between
     for iex in 2:equil.params.mextrema
@@ -64,11 +64,11 @@ function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, int
                         psifac = psifac,
                         rho = sqrt(psifac),
                         q = m / ctrl.nn,
-                        q1 = SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4],
+                        q1 = Spl.spline_eval(equil.sq, psifac, 1)[2][4],
                 ))
                 intr.msing += 1
                 if ctrl.verbose
-                    println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(SplinesMod.spline_eval(equil.sq, psifac, 1)[2][4])")
+                    println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(Spl.spline_eval(equil.sq, psifac, 1)[2][4])")
                 end
             end
             m += dm
@@ -93,8 +93,8 @@ truncates before the last singular surface.
 function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=50, eps=1e-10)
 
     # Shorthand to evaluate q/q1 inside newton iteration
-    qval = psi -> SplinesMod.spline_eval(equil.sq, psi, 0)[4]
-    q1val = psi -> SplinesMod.spline_eval(equil.sq, psi, 1)[2][4]
+    qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
+    q1val = psi -> Spl.spline_eval(equil.sq, psi, 1)[2][4]
 
     #compute and modify the DconInternal struct 
     intr.qlim   = min(equil.params.qmax, ctrl.qhigh)
@@ -147,7 +147,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
 
     #set up record for determining the peak in dW near the boundary.
     if ctrl.psiedge < intr.psilim
-        qedgestart = trunc(Int, SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
+        qedgestart = trunc(Int, Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
         intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * ctrl.nn * ctrl.nperq_edge)
 
         intr.dw_edge  = fill(-typemax(Float64) * (1 + im), intr.size_edge)
@@ -157,7 +157,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
         # monitor some deeper points for an informative profile
         intr.pre_edge = 1
         for i in 1:intr.size_edge
-            if intr.q_edge[i] < SplinesMod.spline_eval(equil.sq, ctrl.psiedge, 0)[4] 
+            if intr.q_edge[i] < Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4] 
                 intr.pre_edge += 1
             end
         end
@@ -265,10 +265,10 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     # TODO: third derivative has some error, but only included via sing_fac[ipert0] for sing_order < 3. Tests with solovev ideal indicate little sensitivity
     # TODO: this is an annoying way to have to take apart this tuple of vectors, I think
     # this is a planned fix already (i.e. separating cubic splines)
-    q .= getindex.(SplinesMod.spline_eval(equil.sq, singp.psifac, 3), 4)
-    f_interp[:, :, 1], f_interp[:, :, 2], f_interp[:, :, 3], f_interp[:, :, 4] = SplinesMod.spline_eval(ffit.fmats, singp.psifac, 3)
-    g_interp[:, :, 1], g_interp[:, :, 2], g_interp[:, :, 3], g_interp[:, :, 4] = SplinesMod.spline_eval(ffit.gmats, singp.psifac, 3)
-    k_interp[:, :, 1], k_interp[:, :, 2], k_interp[:, :, 3], k_interp[:, :, 4] = SplinesMod.spline_eval(ffit.kmats, singp.psifac, 3)
+    q .= getindex.(Spl.spline_eval(equil.sq, singp.psifac, 3), 4)
+    f_interp[:, :, 1], f_interp[:, :, 2], f_interp[:, :, 3], f_interp[:, :, 4] = Spl.spline_eval(ffit.fmats, singp.psifac, 3)
+    g_interp[:, :, 1], g_interp[:, :, 2], g_interp[:, :, 3], g_interp[:, :, 4] = Spl.spline_eval(ffit.gmats, singp.psifac, 3)
+    k_interp[:, :, 1], k_interp[:, :, 2], k_interp[:, :, 3], k_interp[:, :, 4] = Spl.spline_eval(ffit.kmats, singp.psifac, 3)
 
     # Evaluate singfac and its derivatives
     ipert0 = singp.m - intr.mlow + 1
@@ -631,7 +631,7 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
     odet.du_temp .= 0
 
     # Spline evaluation
-    odet.q = SplinesMod.spline_eval(equil.sq, psieval, 0)[4]
+    odet.q = Spl.spline_eval(equil.sq, psieval, 0)[4]
     @inbounds @simd for i in 1:intr.mpert
         odet.singfac_vec[i] = 1.0 / (intr.mlow - ctrl.nn*odet.q + (i-1))
     end
@@ -715,17 +715,17 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         # # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
     else
         # Evaluate splines at psieval and reshape avoiding new allocations
-        SplinesMod.spline_eval!(odet.amat, ffit.amats, psieval; derivs=0)
+        Spl.spline_eval!(odet.amat, ffit.amats, psieval; derivs=0)
         amat = reshape(odet.amat, intr.mpert, intr.mpert)
-        SplinesMod.spline_eval!(odet.bmat, ffit.bmats, psieval; derivs=0)
+        Spl.spline_eval!(odet.bmat, ffit.bmats, psieval; derivs=0)
         bmat = reshape(odet.bmat, intr.mpert, intr.mpert)
-        SplinesMod.spline_eval!(odet.cmat, ffit.cmats, psieval; derivs=0)
+        Spl.spline_eval!(odet.cmat, ffit.cmats, psieval; derivs=0)
         cmat = reshape(odet.cmat, intr.mpert, intr.mpert)
-        SplinesMod.spline_eval!(odet.fmat, ffit.fmats, psieval; derivs=0)
+        Spl.spline_eval!(odet.fmat, ffit.fmats, psieval; derivs=0)
         fmat = reshape(odet.fmat, intr.mpert, intr.mpert)
-        SplinesMod.spline_eval!(odet.kmat, ffit.kmats, psieval; derivs=0)
+        Spl.spline_eval!(odet.kmat, ffit.kmats, psieval; derivs=0)
         kmat = reshape(odet.kmat, intr.mpert, intr.mpert)
-        SplinesMod.spline_eval!(odet.gmat, ffit.gmats, psieval; derivs=0)
+        Spl.spline_eval!(odet.gmat, ffit.gmats, psieval; derivs=0)
         gmat = reshape(odet.gmat, intr.mpert, intr.mpert)
 
         odet.Afact = cholesky(Hermitian(amat))

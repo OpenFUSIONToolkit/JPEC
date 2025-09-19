@@ -9,7 +9,6 @@ using FFTW
 using OrdinaryDiffEq
 import ..Equilibrium
 import ..Spl
-import ..SplinesMod
 using Printf
 
 # Include all necessary files

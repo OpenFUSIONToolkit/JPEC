@@ -14,7 +14,7 @@ named `metric` in the Fortran `fourfit_make_metric` subroutine.
 - `ys::Vector{Float64}`: Poloidal angle coordinates `θ` in radians (0 to 2π).
 - `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi+1, mtheta+1, 8)`.
   The 8 quantities are: `g¹¹`, `g²²`, `g³³`, `g²³`, `g³¹`, `g¹²`, `J`, `∂J/∂ψ`.
-- `fspline::SplinesMod.FourierSpline`: The fitted Fourier-cubic spline object.
+- `fspline::Spl.FourierSpline`: The fitted Fourier-cubic spline object.
 - `name::String`, `title::Vector{String}`, `xtitle::String`, `ytitle::String`: Metadata.
 """
 @kwdef mutable struct MetricData
@@ -23,7 +23,7 @@ named `metric` in the Fortran `fourfit_make_metric` subroutine.
     xs::Vector{Float64} = zeros(mpsi + 1)
     ys::Vector{Float64} = zeros(mtheta + 1)
     fs::Array{Float64,3} = zeros(mpsi + 1, mtheta + 1, 8)
-    fspline::Union{SplinesMod.FourierSpline,Nothing} = nothing
+    fspline::Union{Spl.FourierSpline,Nothing} = nothing
 end
 
 MetricData(mpsi::Int, mtheta::Int) = MetricData(; mpsi, mtheta)
@@ -47,7 +47,7 @@ Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equili
     A structure containing the metric coefficients, coordinate grids, and Jacobians for the specified equilibrium.
 
 # Details
-- Uses bicubic spline evaluation (`SplinesMod.bicube_eval`) on the equilibrium geometry to compute 
+- Uses bicubic spline evaluation (`Spl.bicube_eval`) on the equilibrium geometry to compute 
   contravariant basis vectors ∇ψ, ∇θ, and ∇ζ at each grid point.
 - The metric coefficients stored in `metric.fs` include:
     1. g^ψψ · J
@@ -89,7 +89,7 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, ff
             theta_norm = rzphi.ys[jtheta] # θ is from 0 to 1
 
             # Evaluate the geometry spline to get (R,Z) and their derivatives
-            f, fx, fy = SplinesMod.bicube_eval(rzphi, psi_norm, theta_norm, 1)
+            f, fx, fy = Spl.bicube_eval(rzphi, psi_norm, theta_norm, 1)
 
             # Extract geometric quantities from the spline data
             # See EquilibriumAPI.txt for `rzphi` quantities
@@ -136,7 +136,7 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, ff
     bctype_x = "not-a-knot"
 
     # The poloidal (y) dimension is handled implicitly as periodic by the Fourier transform.
-    metric.fspline = SplinesMod.FourierSpline(
+    metric.fspline = Spl.FourierSpline(
         metric.xs,
         metric.ys,
         metric.fs,
@@ -320,18 +320,18 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
 
     # --- Fit splines (reshape 3D to 2D: (mpsi+1) × (mpert^2)) ---
     ffit = FourFitVars()
-    ffit.amats = SplinesMod.CubicSpline(metric.xs, reshape(amats, mpsi+1, :); bctype="extrap")
-    ffit.bmats = SplinesMod.CubicSpline(metric.xs, reshape(bmats, mpsi+1, :); bctype="extrap")
-    ffit.cmats = SplinesMod.CubicSpline(metric.xs, reshape(cmats, mpsi+1, :); bctype="extrap")
-    ffit.dmats = SplinesMod.CubicSpline(metric.xs, reshape(dmats, mpsi+1, :); bctype="extrap")
-    ffit.emats = SplinesMod.CubicSpline(metric.xs, reshape(emats, mpsi+1, :); bctype="extrap")
-    ffit.hmats = SplinesMod.CubicSpline(metric.xs, reshape(hmats, mpsi+1, :); bctype="extrap")
-    ffit.fmats = SplinesMod.CubicSpline(metric.xs, reshape(fmats, mpsi+1, :); bctype="extrap")
-    ffit.gmats = SplinesMod.CubicSpline(metric.xs, reshape(gmats, mpsi+1, :); bctype="extrap")
-    ffit.kmats = SplinesMod.CubicSpline(metric.xs, reshape(kmats, mpsi+1, :); bctype="extrap")
-    ffit.dbats = SplinesMod.CubicSpline(metric.xs, reshape(dbats, mpsi+1, :); bctype="extrap")
-    ffit.ebats = SplinesMod.CubicSpline(metric.xs, reshape(ebats, mpsi+1, :); bctype="extrap")
-    ffit.fbats = SplinesMod.CubicSpline(metric.xs, reshape(fbats, mpsi+1, :); bctype="extrap")
+    ffit.amats = Spl.CubicSpline(metric.xs, reshape(amats, mpsi+1, :); bctype="extrap")
+    ffit.bmats = Spl.CubicSpline(metric.xs, reshape(bmats, mpsi+1, :); bctype="extrap")
+    ffit.cmats = Spl.CubicSpline(metric.xs, reshape(cmats, mpsi+1, :); bctype="extrap")
+    ffit.dmats = Spl.CubicSpline(metric.xs, reshape(dmats, mpsi+1, :); bctype="extrap")
+    ffit.emats = Spl.CubicSpline(metric.xs, reshape(emats, mpsi+1, :); bctype="extrap")
+    ffit.hmats = Spl.CubicSpline(metric.xs, reshape(hmats, mpsi+1, :); bctype="extrap")
+    ffit.fmats = Spl.CubicSpline(metric.xs, reshape(fmats, mpsi+1, :); bctype="extrap")
+    ffit.gmats = Spl.CubicSpline(metric.xs, reshape(gmats, mpsi+1, :); bctype="extrap")
+    ffit.kmats = Spl.CubicSpline(metric.xs, reshape(kmats, mpsi+1, :); bctype="extrap")
+    ffit.dbats = Spl.CubicSpline(metric.xs, reshape(dbats, mpsi+1, :); bctype="extrap")
+    ffit.ebats = Spl.CubicSpline(metric.xs, reshape(ebats, mpsi+1, :); bctype="extrap")
+    ffit.fbats = Spl.CubicSpline(metric.xs, reshape(fbats, mpsi+1, :); bctype="extrap")
 
     # TODO: set powers
     # Do we need this yet? Only called if power_flag = true
