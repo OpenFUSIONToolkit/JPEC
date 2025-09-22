@@ -409,8 +409,6 @@ function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
     ipert0 = round(Int, ctrl.nn * intr.sing[odet.ising].q, RoundFromZero) - intr.mlow + 1
     dpsi = intr.sing[odet.ising].psifac - odet.psifac
     odet.psifac = intr.sing[odet.ising].psifac + dpsi
-    # TODO: uncomment this once sing_get_ua! is implemented
-    odet.ua .= 1.0
     sing_get_ua!(odet, intr, ctrl)
     if !ctrl.con_flag
         odet.u[:, odet.index[1], :] .= 0

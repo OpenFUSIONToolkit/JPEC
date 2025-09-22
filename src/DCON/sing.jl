@@ -231,8 +231,8 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     singp.vmat[ipert0, :, :, 1] ./= sqrt(det)
 
     # Higher order solutions
-    for order in 1:2*ctrl.sing_order
-        sing_solve!(singp, intr, order)
+    for k in 1:2*ctrl.sing_order
+        sing_solve!(singp, intr, k)
     end
 end
 
@@ -336,9 +336,11 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     # However, for now we are using dense matrices in Julia, so ff is stored as a full matrix (both triangles), 
     # and we need to fill in the upper triangle here.
     # Use Hermitian property to fill the upper triangle
-    for i in 1:intr.mpert
-        for j in 1:i-1
-            ff[j, i, 2] = conj(ff[i, j, 2])
+    for n in 1:ctrl.sing_order
+        for i in 1:intr.mpert
+            for j in 1:i-1
+                ff[j, i, n + 1] = conj(ff[i, j, n + 1])
+            end
         end
     end
 
@@ -407,6 +409,17 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
         x[:, :, 1, i + 1] = UpperTriangular(f0') \ (LowerTriangular(f0) \ x[:, :, 1, i + 1])
     end
 
+    # Use Hermitian property to fill the upper triangle of g
+    # TODO: very hacky and unclear. Eventually, completely remove all mention of banding/Hermitian storage or make it cleaner
+    # Lots of stuff hidden in LAPACK calls in Fortran that we are doing manually here
+    for n in 0:ctrl.sing_order
+        for i in 1:intr.mpert
+            for j in 1:i-1
+                g[j, i, n + 1] = conj(g[i, j, n + 1])
+            end
+        end
+    end
+
     # Compute x2
     for i=0:ctrl.sing_order
         for isol=1:msol
@@ -453,13 +466,13 @@ function sing_solve!(singp::SingType, intr::DconInternal, k::Int)
     end
     for isol in 1:2*intr.mpert
         a = copy(singp.m0mat)
-        a[1,1] -= k/2.0 - singp.power[isol]
-        a[2,2] -= k/2.0 - singp.power[isol]
+        a[1,1] -= k/2.0 + singp.power[isol]
+        a[2,2] -= k/2.0 + singp.power[isol]
         det = a[1,1] * a[2,2] - a[1,2] * a[2,1]
         x = -singp.vmat[singp.r1[1], isol, :, k+1]
         singp.vmat[singp.r1[1], isol, 1, k+1] = (a[2,2]*x[1] - a[1,2]*x[2]) / det
         singp.vmat[singp.r1[1], isol, 2, k+1] = (a[1,1]*x[2] - a[2,1]*x[1]) / det
-        singp.vmat[singp.n1, isol, :, k+1] ./= (singp.power[isol] + (k+1)/2.0)
+        singp.vmat[singp.n1, isol, :, k+1] ./= (singp.power[isol] + k/2.0)
     end
 end
 
@@ -523,7 +536,7 @@ function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
 
     # Compute power series via Horner's method
     odet.ua .= singp.vmat[:,:,:,2 * ctrl.sing_order + 1]
-    for iorder in (2*ctrl.sing_order-1):-1:0
+    for iorder in (2 * ctrl.sing_order - 1):-1:0
         odet.ua .= odet.ua .* sqrtfac .+ singp.vmat[:,:,:,iorder+1]
     end
 
@@ -533,7 +546,7 @@ function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
     odet.ua[:, r2[1], :] ./= pfac
     odet.ua[:, r2[2], :] .*= pfac
 
-    # Renormalize if psifac < singp.psifac
+    # Renormalize
     if odet.psifac < singp.psifac
         odet.ua[:, r2[1], :] .*= abs(odet.ua[r1[1], r2[1], 1]) / odet.ua[r1[1], r2[1], 1]
         odet.ua[:, r2[2], :] .*= abs(odet.ua[r1[1], r2[2], 1]) / odet.ua[r1[1], r2[2], 1]
