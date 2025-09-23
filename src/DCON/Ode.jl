@@ -64,6 +64,8 @@ Initializes state and iterates through flux surfaces, calling appropriate update
 routines and recording output. Terminates when a target singularity is reached
 or integration ends. Support for `res_flag` and `kin_flag` is not yet implemented.
 
+# TODO: add a detailed description of how the integration loop varies from the Fortran version
+
 ### Returns
 nzero: number of zero crossings of the critical determinant detected during the integration.
 """
@@ -86,8 +88,27 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
     if ctrl.verbose # mimicing an output from ode_output_open
         println("   ψ=$(odet.psifac), q=$(Spl.spline_eval(equil.sq, odet.psifac, 0)[4])")
     end
-    # TODO: Eventually figure out a way to get rid of these - use callbacks in the integrator for the second one? maybe just do while ising != ksing and next != cross for the first?
-    while true # inside plasma (break out when at the edge)
+
+    # TODO: does this exactly reproduce all functionality of the Fortran in all cases?
+    # Always integrate once, even if no rational surfaces are crossed
+    ode_step!(odet, equil, intr, ctrl, ffit)
+
+    # If at a rational surface, do the appropriate crossing routine, then integrate again
+    while odet.ising != ctrl.ksing && odet.next == "cross"
+        if ctrl.res_flag
+            error("res_flag = true not implemented yet!")
+        elseif ctrl.kin_flag
+            error("kin_flag = true not implemented yet!")
+        else
+            ode_ideal_cross!(odet, equil, intr, ctrl, ffit)
+        end
+
+        odet.flag_count = 0
+        ode_step!(odet, equil, intr, ctrl, ffit)
+    end
+
+    # This is a rough sketch of the original Fortran logic for comparison, TODO: get rid of this eventually
+    # while true # inside plasma (break out when at the edge)
         # Rough sketch of Fortran logic for comparison
         # while true # inside sing surface (break out when close to singular surface)
             # if odet.istep > 0
@@ -104,28 +125,24 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
             # ode_step!(odet, equil, intr, ctrl, ffit)
             # odet.first = false
         # end
-        
-        # Now, all the above logic is implemented within callbacks
-        # TODO: This function should be called like integrate! or something if integrate! is taken already
-        ode_step!(odet, equil, intr, ctrl, ffit)
 
-        # Re-initialize
-        odet.ising == ctrl.ksing && break
-        if odet.next == "cross"
-            if ctrl.res_flag
-                error("res_flag = true not implemented yet!")
-                #ode_resist_cross()
-            elseif ctrl.kin_flag
-                error("kin_flag = true not implemented yet!")
-                #ode_kin_cross()
-            else
-                ode_ideal_cross!(odet, equil, intr, ctrl, ffit)
-            end
-        else
-            break
-        end
-        odet.flag_count = 0
-    end
+    #     # Re-initialize
+    #     odet.ising == ctrl.ksing && break
+    #     if odet.next == "cross"
+    #         if ctrl.res_flag
+    #             error("res_flag = true not implemented yet!")
+    #             #ode_resist_cross()
+    #         elseif ctrl.kin_flag
+    #             error("kin_flag = true not implemented yet!")
+    #             #ode_kin_cross()
+    #         else
+    #             ode_ideal_cross!(odet, equil, intr, ctrl, ffit)
+    #         end
+    #     else
+    #         break
+    #     end
+    #     odet.flag_count = 0
+    # end
     return odet.nzero
 end
 

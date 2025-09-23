@@ -156,6 +156,9 @@ function MainProgram(in_path::String)
 # -----------------------------------------------------------------------
 #  TODO     integrate main ODE's.
 # -----------------------------------------------------------------------
+  open("crit.out", "w") do io
+      println(io, "  psifac    dpsi        q       singfac    eval1")
+  end
   if ctrl.ode_flag
       if ctrl.verbose
           println("Starting integration of ODE's")

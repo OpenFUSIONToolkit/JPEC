@@ -163,6 +163,9 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     end
 
     # Write new crit
+    open("crit.out", "a") do io
+        @printf(io, "%.3e %.3e %.3e %.3e %.3e\n", odet.psifac, dpsi, q, singfac, crit)
+    end
     # println("       psifac:  $(odet.psifac), q: $q, singfac: $singfac, crit: $crit, logpsi1: $logpsi1, logpsi2: $logpsi2")
     # println(crit_out_unit, "$(odet.istep) $psifac $dpsi $q $singfac $crit")
     # write(crit_bin_unit, Float32(psifac), Float32(logpsi1),
