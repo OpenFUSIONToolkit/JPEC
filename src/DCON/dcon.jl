@@ -115,9 +115,10 @@ function MainProgram(in_path::String)
     end
 
     # Compute matrices and populate FourFitVars struct
-    ffit = make_matrix(equil, metric_result, nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, mpert=intr.mpert, mband=intr.mband, sas_flag=ctrl.sas_flag, verbose=ctrl.verbose)
+    ffit = make_matrix(equil, metric_result, nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, mpert=intr.mpert, mband=intr.mband, sas_flag=ctrl.sas_flag, verbose=ctrl.verbose, psilim=intr.psilim)
 
     if ctrl.kin_flag
+      error("kin_flag not implemented yet")
       # fourfit_action_matrix()
       # if ctrl.verbose
       #     println("Initializing PENTRC")
@@ -223,6 +224,7 @@ function MainProgram(in_path::String)
 
   # TODO: Handle vacuum/free boundary results
   if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
+    error("vac_flag with free boundary conditions not implemented yet")
     if real(total1) < 0
       if ctrl.verbose
           println("Free-boundary mode unstable for nn = $(ctrl.nn).")

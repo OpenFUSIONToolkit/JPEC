@@ -180,7 +180,7 @@ and returns them as a new `FourFitVars` object.
     A container holding cubic spline fits of the assembled matrices
 """
 function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData; 
-    nn::Int, mlow::Int, mhigh::Int, mpert::Int, mband::Int, sas_flag::Bool, verbose::Bool)
+    nn::Int, mlow::Int, mhigh::Int, mpert::Int, mband::Int, sas_flag::Bool, verbose::Bool, psilim::Float64)
 
     # TODO: add banded matrices (if desired), kinetic matrices, sas_flag
 
@@ -338,7 +338,12 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
 
     # TODO: interpolate matrices to psilim, called if sas_flag is true
     if sas_flag
-        error("sas_flag = true not yet implemented yet")
+        ffit.asmat = reshape(Spl.spline_eval(ffit.amats, psilim), mpert, mpert)
+        ffit.bsmat = reshape(Spl.spline_eval(ffit.bmats, psilim), mpert, mpert)
+        ffit.csmat = reshape(Spl.spline_eval(ffit.cmats, psilim), mpert, mpert)
+        # TODO: this is used in free.f vacuum calculations, verify this is correct
+        # Should we store lower triangular factorization?
+        ffit.asmat .= cholesky(Hermitian(ffit.asmat)).L
     end
 
     return ffit

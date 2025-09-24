@@ -235,9 +235,11 @@ end
     # k0s::JPEC.Spl.SplineType
 
     # ipiva::Union{Nothing,Vector{Int}} = nothing
-    # asmat::Union{Nothing,Array{ComplexF64,2}} = nothing
-    # bsmat::Union{Nothing,Array{ComplexF64,2}} = nothing
-    # csmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    # TODO: these will always be mpert x mpert, do all of these structs need their own constructors
+    # that take in the mpert size to allocate these properly?
+    asmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    bsmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    csmat::Union{Nothing,Array{ComplexF64,2}} = nothing
     # jmat::Union{Nothing,Vector{ComplexF64}} = nothing
 
     parallel_threads::Int = 0
