@@ -310,18 +310,18 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
 
     # --- Fit splines (reshape 3D to 2D: (mpsi+1) × (mpert^2)) ---
     ffit = FourFitVars(mpert=intr.mpert)
-    ffit.amats = Spl.CubicSpline(metric.xs, reshape(amats, mpsi+1, :); bctype="extrap")
-    ffit.bmats = Spl.CubicSpline(metric.xs, reshape(bmats, mpsi+1, :); bctype="extrap")
-    ffit.cmats = Spl.CubicSpline(metric.xs, reshape(cmats, mpsi+1, :); bctype="extrap")
-    ffit.dmats = Spl.CubicSpline(metric.xs, reshape(dmats, mpsi+1, :); bctype="extrap")
-    ffit.emats = Spl.CubicSpline(metric.xs, reshape(emats, mpsi+1, :); bctype="extrap")
-    ffit.hmats = Spl.CubicSpline(metric.xs, reshape(hmats, mpsi+1, :); bctype="extrap")
-    ffit.fmats = Spl.CubicSpline(metric.xs, reshape(fmats, mpsi+1, :); bctype="extrap")
-    ffit.gmats = Spl.CubicSpline(metric.xs, reshape(gmats, mpsi+1, :); bctype="extrap")
-    ffit.kmats = Spl.CubicSpline(metric.xs, reshape(kmats, mpsi+1, :); bctype="extrap")
-    ffit.dbats = Spl.CubicSpline(metric.xs, reshape(dbats, mpsi+1, :); bctype="extrap")
-    ffit.ebats = Spl.CubicSpline(metric.xs, reshape(ebats, mpsi+1, :); bctype="extrap")
-    ffit.fbats = Spl.CubicSpline(metric.xs, reshape(fbats, mpsi+1, :); bctype="extrap")
+    ffit.amats = Spl.CubicSpline(metric.xs, reshape(amats, mpsi+1, :); bctype=3)
+    ffit.bmats = Spl.CubicSpline(metric.xs, reshape(bmats, mpsi+1, :); bctype=3)
+    ffit.cmats = Spl.CubicSpline(metric.xs, reshape(cmats, mpsi+1, :); bctype=3)
+    ffit.dmats = Spl.CubicSpline(metric.xs, reshape(dmats, mpsi+1, :); bctype=3)
+    ffit.emats = Spl.CubicSpline(metric.xs, reshape(emats, mpsi+1, :); bctype=3)
+    ffit.hmats = Spl.CubicSpline(metric.xs, reshape(hmats, mpsi+1, :); bctype=3)
+    ffit.fmats = Spl.CubicSpline(metric.xs, reshape(fmats, mpsi+1, :); bctype=3)
+    ffit.gmats = Spl.CubicSpline(metric.xs, reshape(gmats, mpsi+1, :); bctype=3)
+    ffit.kmats = Spl.CubicSpline(metric.xs, reshape(kmats, mpsi+1, :); bctype=3)
+    ffit.dbats = Spl.CubicSpline(metric.xs, reshape(dbats, mpsi+1, :); bctype=3)
+    ffit.ebats = Spl.CubicSpline(metric.xs, reshape(ebats, mpsi+1, :); bctype=3)
+    ffit.fbats = Spl.CubicSpline(metric.xs, reshape(fbats, mpsi+1, :); bctype=3)
 
     # TODO: set powers
     # Do we need this yet? Only called if power_flag = true

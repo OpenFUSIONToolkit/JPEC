@@ -14,6 +14,7 @@ using Printf
 # Include all necessary files
 include("dcon_structs.jl")
 include("dcon.jl")
+include("mercier.jl")
 include("Ode.jl")
 include("sing.jl")
 include("fourfit.jl")

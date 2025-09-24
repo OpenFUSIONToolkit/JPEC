@@ -40,17 +40,23 @@ function MainProgram(in_path::String)
 #      IF(dump_flag .AND. eq_type /= "dump")CALL equil_out_dump
 
 # -----------------------------------------------------------------------
-# TODO:    prepare local stability criteria.
+#  local stability criteria.
 # -----------------------------------------------------------------------
-      # Initialize local stability structure
-      #IF (mer_flag) THEN
-      #   WRITE(*,*)"Evaluating Mercier criterion"
-      #   CALL mercier_scan
-      #ENDIF
+  # This holds di, dr, h (calculated in mercier_scan), ca1, and ca2 (calculated in ballooning scan)
+  if ctrl.mer_flag
+    locstab_fs = zeros(Float64, length(equil.sq.xs), 5)
+    if ctrl.verbose
+      println("Evaluating Mercier criterion")
+    end
+    mercier_scan!(locstab_fs, equil)
+  end
+  # TODO: ballooning stability
       #IF(bal_flag)THEN
       #   IF(ctrl.verbose) WRITE(*,*)"Evaluating ballooning criterion"
       #   CALL bal_scan
       #ENDIF
+  # Fit stability data to splines
+  intr.locstab = Spl.CubicSpline(Vector(equil.sq.xs), locstab_fs; bctype=3)
 # -----------------------------------------------------------------------
 # TODO:    output surface quantities.
 # -----------------------------------------------------------------------

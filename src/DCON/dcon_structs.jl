@@ -92,11 +92,11 @@ end
     xlmda_out::Bool = false
     fkg_kmats_flag::Bool = false
     sol_base::Int = 50
-    locstab::Any = nothing # Replace Any with actual type if available
+    locstab::Union{Nothing, Spl.CubicSpline{Float64}} = nothing
     msing::Int = 0
     kmsing::Int = 0
     sing::Union{Nothing, Vector{SingType}} = SingType[]
-    kinsing::Union{Nothing, Vector{SingType}} = nothing
+    kinsing::Union{Nothing, Vector{SingType}} = SingType[]
     psilim::Float64 = 0.0
     qlim::Float64 = 0.0
     q1lim::Float64 = 0.0

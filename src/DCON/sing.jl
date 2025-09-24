@@ -191,11 +191,8 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     singp.n2 = vcat(singp.n1, [i + intr.mpert for i in singp.n1])
 
     psifac = singp.psifac
-    q = singp.q    
-    # TODO: uncomment this once locstab (created in mercier.f) is working
-    # spline_eval(locstab, singp.psifac, 0)
-    # di0 = locstab.f[1] / singp.psifac
-    di0 = 0.0 # placeholder
+    q = singp.q
+    di0 = Spl.spline_eval(intr.locstab, singp.psifac, 0)[1] / singp.psifac
     q1 = singp.q1
     rho = singp.rho
 
