@@ -115,7 +115,7 @@ function MainProgram(in_path::String)
     end
 
     # Compute matrices and populate FourFitVars struct
-    ffit = make_matrix(equil, metric_result, nn=ctrl.nn, mlow=intr.mlow, mhigh=intr.mhigh, mpert=intr.mpert, mband=intr.mband, sas_flag=ctrl.sas_flag, verbose=ctrl.verbose, psilim=intr.psilim)
+    ffit = make_matrix(equil, metric_result, ctrl, intr)
 
     if ctrl.kin_flag
       error("kin_flag not implemented yet")

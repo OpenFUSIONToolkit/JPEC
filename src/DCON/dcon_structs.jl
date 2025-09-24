@@ -204,6 +204,7 @@ end
 
 # TODO: how can we initialize the splines to not be nothings?
 @kwdef mutable struct FourFitVars
+    mpert::Int
 
     # Spline matrices
     amats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
@@ -235,11 +236,9 @@ end
     # k0s::JPEC.Spl.SplineType
 
     # ipiva::Union{Nothing,Vector{Int}} = nothing
-    # TODO: these will always be mpert x mpert, do all of these structs need their own constructors
-    # that take in the mpert size to allocate these properly?
-    asmat::Union{Nothing,Array{ComplexF64,2}} = nothing
-    bsmat::Union{Nothing,Array{ComplexF64,2}} = nothing
-    csmat::Union{Nothing,Array{ComplexF64,2}} = nothing
+    asmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
+    bsmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
+    csmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     # jmat::Union{Nothing,Vector{ComplexF64}} = nothing
 
     parallel_threads::Int = 0
@@ -249,3 +248,5 @@ end
     # kwmats::Vector{JPEC.Spl.CubicSpline{ComplexF64}} = [JPEC.Spl.CubicSpline{ComplexF64}() for _ in 1:6]
     # ktmats::Vector{JPEC.Spl.CubicSpline{ComplexF64}} = [JPEC.Spl.CubicSpline{ComplexF64}() for _ in 1:6]
 end
+
+FourFitVars(mpert::Int) = FourFitVars(; mpert)

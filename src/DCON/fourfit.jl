@@ -1,5 +1,3 @@
-# TODO: modify these functions to pass in structs instead of individual parameters?
-
 """
     MetricData
 
@@ -15,7 +13,6 @@ named `metric` in the Fortran `fourfit_make_metric` subroutine.
 - `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi+1, mtheta+1, 8)`.
   The 8 quantities are: `g¹¹`, `g²²`, `g³³`, `g²³`, `g³¹`, `g¹²`, `J`, `∂J/∂ψ`.
 - `fspline::Spl.FourierSpline`: The fitted Fourier-cubic spline object.
-- `name::String`, `title::Vector{String}`, `xtitle::String`, `ytitle::String`: Metadata.
 """
 @kwdef mutable struct MetricData
     mpsi::Int
@@ -149,8 +146,7 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, ff
 end
 
 """
-    make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData;
-                nn::Int=1, mlow::Int=-5, mhigh::Int=5, sas_flag::Bool=false, verbose::Bool=false) -> FourFitVars
+    make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData, ctrl::DconControl, intr::DconInternal) -> FourFitVars
 
 Constructs Fourier–poloidal coupling matrices for a given toroidal mode number `nn`
 and returns them as a new `FourFitVars` object.
@@ -160,57 +156,42 @@ and returns them as a new `FourFitVars` object.
     Plasma equilibrium object providing 1D flux-surface profiles (`sq`) and normalization constants.
 - `metric::MetricData`: 
     Metric coefficients on the (ψ, θ) grid, including Fourier representations of g^ij and J.
-- `nn::Int`: 
-    Toroidal mode number.
-- `mlow::Int`: 
-    Lowest poloidal mode index.
-- `mhigh::Int`: 
-    Highest poloidal mode index.
-- `mpert::Int`: 
-    Number of poloidal modes (`mhigh - mlow + 1`).
-- `mband::Int`: 
-    Bandwidth of solutions to keep on either side of diagonal (for banded matrices).
-- `sas_flag::Bool`: 
-    (not yet implemented).
-- `verbose::Bool`: 
-    If `true`, prints detailed information about mode ranges and matrix bandwidth.
 
 # Returns
 - `ffit::FourFitVars`:
     A container holding cubic spline fits of the assembled matrices
 """
-function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData; 
-    nn::Int, mlow::Int, mhigh::Int, mpert::Int, mband::Int, sas_flag::Bool, verbose::Bool, psilim::Float64)
+function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData, ctrl::DconControl, intr::DconInternal)
 
-    # TODO: add banded matrices (if desired), kinetic matrices, sas_flag
+    # TODO: add banded matrices (if desired), kinetic matrices
 
     # --- Extract inputs ---
     sq = plasma_eq.sq
     mpsi = metric.mpsi
 
-    if verbose
-        println("   Toroidal mode n=$nn, Poloidal modes m=$mlow:$mhigh ($mpert modes)")
-        println("   Matrix bandwidth: $mband")
+    if ctrl.verbose
+        println("   Toroidal mode n=$(ctrl.nn), Poloidal modes m=$(intr.mlow):$(intr.mhigh) ($(intr.mpert) modes)")
+        println("   Matrix bandwidth: $(intr.mband)")
     end
 
     # --- Allocate 3D arrays ---
-    amats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    bmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    cmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    dmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    emats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    hmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    fmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    gmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    kmats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    dbats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    ebats = zeros(ComplexF64, mpsi+1, mpert, mpert)
-    fbats = zeros(ComplexF64, mpsi+1, mpert, mpert)
+    amats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    bmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    cmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    dmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    emats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    hmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    fmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    gmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    kmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    dbats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    ebats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    fbats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
 
     # Instead of using Offset Arrays like in Fortran (-mband:mband), we store everything in
     # a single 1:(2*mband+1) array and map the zero index to the middle
-    mid = mband + 1  # "zero" position in Julia arrays
-    imat = zeros(ComplexF64, 2 * mband + 1)
+    mid = intr.mband + 1  # "zero" position in Julia arrays
+    imat = zeros(ComplexF64, 2 * intr.mband + 1)
     imat[mid] = 1 + 0im
 
     for ipsi in 1:(mpsi+1)
@@ -234,30 +215,30 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
         q1     = sq.fs1[ipsi, 4]
         jtheta = -sq.fs1[ipsi, 1]
         chi1 = 2π * plasma_eq.psio
-        nq = nn * q
+        nq = ctrl.nn * q
 
         # Fourier coefficient extraction
-        g11 = zeros(ComplexF64, 2 * mband + 1)
-        g22 = zeros(ComplexF64, 2 * mband + 1)
-        g33 = zeros(ComplexF64, 2 * mband + 1)
-        g23 = zeros(ComplexF64, 2 * mband + 1)
-        g31 = zeros(ComplexF64, 2 * mband + 1)
-        g12 = zeros(ComplexF64, 2 * mband + 1)
-        jmat = zeros(ComplexF64, 2 * mband + 1)
-        jmat1 = zeros(ComplexF64, 2 * mband + 1)
+        g11 = zeros(ComplexF64, 2 * intr.mband + 1)
+        g22 = zeros(ComplexF64, 2 * intr.mband + 1)
+        g33 = zeros(ComplexF64, 2 * intr.mband + 1)
+        g23 = zeros(ComplexF64, 2 * intr.mband + 1)
+        g31 = zeros(ComplexF64, 2 * intr.mband + 1)
+        g12 = zeros(ComplexF64, 2 * intr.mband + 1)
+        jmat = zeros(ComplexF64, 2 * intr.mband + 1)
+        jmat1 = zeros(ComplexF64, 2 * intr.mband + 1)
 
         # Fill lower half (0, -1, …, -mband)
-        g11[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 1:mband+1]
-        g22[mid:-1:1] .= metric.fspline.cs.fs[ipsi, mband+2:2*mband+2]
-        g33[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 2*mband+3:3*mband+3]
-        g23[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 3*mband+4:4*mband+4]
-        g31[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 4*mband+5:5*mband+5]
-        g12[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 5*mband+6:6*mband+6]
-        jmat[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 6*mband+7:7*mband+7]
-        jmat1[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 7*mband+8:8*mband+8]
+        g11[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 1:intr.mband+1]
+        g22[mid:-1:1] .= metric.fspline.cs.fs[ipsi, intr.mband+2:2*intr.mband+2]
+        g33[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 2*intr.mband+3:3*intr.mband+3]
+        g23[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 3*intr.mband+4:4*intr.mband+4]
+        g31[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 4*intr.mband+5:5*intr.mband+5]
+        g12[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 5*intr.mband+6:6*intr.mband+6]
+        jmat[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 6*intr.mband+7:7*intr.mband+7]
+        jmat1[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 7*intr.mband+8:8*intr.mband+8]
 
         # Fill upper half (+1:mband) with conjugate symmetry
-        for k = 1:mband
+        for k = 1:intr.mband
             g11[mid+k] = conj(g11[mid-k])
             g22[mid+k] = conj(g22[mid-k])
             g33[mid+k] = conj(g33[mid-k])
@@ -270,39 +251,43 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
 
         # Construct primitive matrices via m1/dm loops
         ipert = 0
-        for m1 in mlow:mhigh
+        for m1 in intr.mlow:intr.mhigh
             ipert += 1
             sing1 = m1 - nq
-            for dm in max(1 - ipert, -mband):min(mpert - ipert, mband)
+            for dm in max(1 - ipert, -intr.mband):min(intr.mpert - ipert, intr.mband)
                 m2 = m1 + dm
                 sing2 = m2 - nq
                 jpert = ipert + dm
                 dmidx = dm + mid
 
-                amat[ipert, jpert] = (2π)^2 * (nn^2 * g22[dmidx] + nn * (m1 + m2) * g23[dmidx] + m1 * m2 * g33[dmidx])
-                bmat[ipert, jpert] = -2π * im * chi1 * (nn * g22[dmidx] + (m1 + nq) * g23[dmidx] + m1 * q * g33[dmidx])
-                cmat[ipert, jpert] = 2π * im * ((2π * im * chi1 * sing2 * (nn * g12[dmidx] + m1 * g31[dmidx])) -
-                                                (q1 * chi1 * (nn * g23[dmidx] + m1 * g33[dmidx]))) -
-                                     2π * im * (jtheta * sing1 * imat[dmidx] + nn * p1 / chi1 * jmat[dmidx])
-                dmat[ipert, jpert] = 2π * chi1 * (g23[dmidx] + g33[dmidx] * m1 / nn)
-                emat[ipert, jpert] = -chi1 / nn * (q1 * chi1 * g33[dmidx] - 2π * im * chi1 * g31[dmidx] * sing2 + jtheta * imat[dmidx])
+                amat[ipert, jpert] = (2π)^2 * (ctrl.nn^2 * g22[dmidx] + ctrl.nn * (m1 + m2) * g23[dmidx] + m1 * m2 * g33[dmidx])
+                bmat[ipert, jpert] = -2π * im * chi1 * (ctrl.nn * g22[dmidx] + (m1 + nq) * g23[dmidx] + m1 * q * g33[dmidx])
+                cmat[ipert, jpert] = 2π * im * ((2π * im * chi1 * sing2 * (ctrl.nn * g12[dmidx] + m1 * g31[dmidx])) -
+                                                (q1 * chi1 * (ctrl.nn * g23[dmidx] + m1 * g33[dmidx]))) -
+                                     2π * im * (jtheta * sing1 * imat[dmidx] + ctrl.nn * p1 / chi1 * jmat[dmidx])
+                dmat[ipert, jpert] = 2π * chi1 * (g23[dmidx] + g33[dmidx] * m1 / ctrl.nn)
+                emat[ipert, jpert] = -chi1 / ctrl.nn * (q1 * chi1 * g33[dmidx] - 2π * im * chi1 * g31[dmidx] * sing2 + jtheta * imat[dmidx])
                 hmat[ipert, jpert] = (q1 * chi1)^2 * g33[dmidx] +
                                      (2π * chi1)^2 * sing1 * sing2 * g11[dmidx] -
                                      2π * im * chi1 * dm * q1 * chi1 * g31[dmidx] +
                                      jtheta * q1 * chi1 * imat[dmidx] +
                                      p1 * jmat1[dmidx]
-                fmat[ipert, jpert] = (chi1 / nn)^2 * g33[dmidx]
-                kmat[ipert, jpert] = 2π * im * chi1 * (g23[dmidx] + g33[dmidx] * m1 / nn)
+                fmat[ipert, jpert] = (chi1 / ctrl.nn)^2 * g33[dmidx]
+                kmat[ipert, jpert] = 2π * im * chi1 * (g23[dmidx] + g33[dmidx] * m1 / ctrl.nn)
             end
         end
         dbat .= dmat
         ebat .= emat
         fbat .= fmat
 
-
         # --- Factorize and build composites ---
-        amat_fact = cholesky(Hermitian(amat, :L))
-        # TODO: Fortran used the info output from LAPACK to error out if amat is singular, add something similar here?
+        # TODO: Fortran throws an error if the factorization fails for a/fmat, not sure what this delta_mband comment is referencing. 
+        # I am keeping this here to most closely match the Fortran behavior, but it may be unnecessary if we only use dense matrices.
+        if isposdef(Hermitian(amat, :L))
+            amat_fact = cholesky(Hermitian(amat, :L))
+        else
+            error("cholesky: amat is not positive definite (singular) at ipsi = $ipsi, reduce delta_mband")
+        end
         temp1 = amat_fact \ dmat
         temp2 = amat_fact \ cmat
         # Use * for matrix multiplication (instead of .* for element-wise)
@@ -310,8 +295,13 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
         kmat .= emat .- (adjoint(kmat) * temp2)
         gmat .= hmat .- (adjoint(cmat) * temp2)
 
-        # Store factorized F matrix
-        fmat .= cholesky(Hermitian(fmat)).L
+        # Store factorized F matrix (lower triangular only) since we always will need F⁻¹ later
+        # and this make computation more efficient via combined forward and back substitution
+        if isposdef(Hermitian(fmat, :L))
+            fmat .= cholesky(Hermitian(fmat)).L
+        else
+            error("cholesky: fmat is not positive definite (singular) at ipsi = $ipsi, reduce delta_mband")
+        end
 
         # TODO: add kinetic matrices here
 
@@ -319,7 +309,7 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
     end
 
     # --- Fit splines (reshape 3D to 2D: (mpsi+1) × (mpert^2)) ---
-    ffit = FourFitVars()
+    ffit = FourFitVars(mpert=intr.mpert)
     ffit.amats = Spl.CubicSpline(metric.xs, reshape(amats, mpsi+1, :); bctype="extrap")
     ffit.bmats = Spl.CubicSpline(metric.xs, reshape(bmats, mpsi+1, :); bctype="extrap")
     ffit.cmats = Spl.CubicSpline(metric.xs, reshape(cmats, mpsi+1, :); bctype="extrap")
@@ -336,11 +326,10 @@ function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricDat
     # TODO: set powers
     # Do we need this yet? Only called if power_flag = true
 
-    # TODO: interpolate matrices to psilim, called if sas_flag is true
-    if sas_flag
-        ffit.asmat = reshape(Spl.spline_eval(ffit.amats, psilim), mpert, mpert)
-        ffit.bsmat = reshape(Spl.spline_eval(ffit.bmats, psilim), mpert, mpert)
-        ffit.csmat = reshape(Spl.spline_eval(ffit.cmats, psilim), mpert, mpert)
+    if ctrl.sas_flag
+        ffit.asmat = reshape(Spl.spline_eval(ffit.amats, intr.psilim), intr.mpert, intr.mpert)
+        ffit.bsmat = reshape(Spl.spline_eval(ffit.bmats, intr.psilim), intr.mpert, intr.mpert)
+        ffit.csmat = reshape(Spl.spline_eval(ffit.cmats, intr.psilim), intr.mpert, intr.mpert)
         # TODO: this is used in free.f vacuum calculations, verify this is correct
         # Should we store lower triangular factorization?
         ffit.asmat .= cholesky(Hermitian(ffit.asmat)).L
