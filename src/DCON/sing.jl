@@ -618,12 +618,10 @@ end
         psieval::Float64
     )
 
-Evaluate the Euler-Lagrange differential equations for the DCON system.
+Evaluate the derivative of the Euler-Lagrange equations, i.e. u' in equation 24 of Glasser 2016.
 This follows the Julia DifferentialEquations package format for in place updating.
 
     ode_function!(du, u, p, t)
-
-Fills `du` with the derivatives for the specified state and flux surface.
 
 # "Defining your ODE function to be in-place updating can have performance benefits. 
 # What this means is that, instead of writing a function which outputs its solution, 
@@ -632,6 +630,8 @@ Fills `du` with the derivatives for the specified state and flux surface.
 # amount of array allocations and achieve better performance."
 
 Wherever possible, in-place operations on pre-allocated arrays are used to minimize memory allocations.
+All LAPACK operations are handled under the hood by Julia's LinearAlgebra package, so we can obtain a much
+more simplistic code with similar performance.
 """
 function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
                    params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium,
@@ -640,94 +640,17 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
     # Unpack structs
     ctrl, equil, intr, odet, ffit = params
 
-    # Temp array, make sure zeroed out before calcs
-    odet.du_temp .= 0
-
     # Spline evaluation
     odet.q = Spl.spline_eval(equil.sq, psieval, 0)[4]
-    @inbounds @simd for i in 1:intr.mpert
-        odet.singfac_vec[i] = 1.0 / (intr.mlow - ctrl.nn*odet.q + (i-1))
-    end
+    odet.singfac_vec .= 1.0 ./ (intr.mlow .- ctrl.nn * odet.q .+ (0:intr.mpert-1))
     chi1 = 2π * equil.psio
 
     # kinetic stuff - skip for now
     if false #(TODO: kin_flag)
-        # cspline_eval(ffit.amats, psifac, 0)
-        # cspline_eval(ffit.bmats, psifac, 0)
-        # cspline_eval(ffit.cmats, psifac, 0)
-        # cspline_eval(ffit.dmats, psifac, 0)
-        # cspline_eval(ffit.emats, psifac, 0)
-        # cspline_eval(ffit.hmats, psifac, 0)
-        # cspline_eval(ffit.dbats, psifac, 0)
-        # cspline_eval(ffit.ebats, psifac, 0)
-        # cspline_eval(ffit.fbats, psifac, 0)
-
-        # amat = reshape(ffit.amats.f, intr.mpert, intr.mpert)
-        # bmat = reshape(ffit.bmats.f, intr.mpert, intr.mpert)
-        # cmat = reshape(ffit.cmats.f, intr.mpert, intr.mpert)
-        # dmat = reshape(ffit.dmats.f, intr.mpert, intr.mpert)
-        # emat = reshape(ffit.emats.f, intr.mpert, intr.mpert)
-        # hmat = reshape(ffit.hmats.f, intr.mpert, intr.mpert)
-        # dbat = reshape(ffit.dbats.f, intr.mpert, intr.mpert)
-        # ebat = reshape(ffit.ebats.f, intr.mpert, intr.mpert)
-        # fmat = reshape(ffit.fbats.f, intr.mpert, intr.mpert)
-
-        # kwmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
-        # ktmat = zeros(ComplexF64, intr.mpert, intr.mpert, 6)
-        # for i in 1:6
-        #     cspline_eval(ffit.kwmats[i], psifac, 0)
-        #     cspline_eval(ffit.ktmats[i], psifac, 0)
-        #     kwmat[:,:,i] = reshape(ffit.kwmats[i].f, intr.mpert, intr.mpert)
-        #     ktmat[:,:,i] = reshape(ffit.ktmats[i].f, intr.mpert, intr.mpert)
-        # end
-
-        # if intr.fkg_kmats_flag
-        #     cspline_eval(akmats, psifac, 0)
-        #     cspline_eval(bkmats, psifac, 0)
-        #     cspline_eval(ckmats, psifac, 0)
-        #     cspline_eval(f0mats, psifac, 0)
-        #     cspline_eval(pmats, psifac, 0)
-        #     cspline_eval(paats, psifac, 0)
-        #     cspline_eval(kkmats, psifac, 0)
-        #     cspline_eval(kkaats, psifac, 0)
-        #     cspline_eval(r1mats, psifac, 0)
-        #     cspline_eval(r2mats, psifac, 0)
-        #     cspline_eval(r3mats, psifac, 0)
-        #     cspline_eval(gaats, psifac, 0)
-
-        #     amat = reshape(akmats.f, mpert, mpert)
-        #     bmat = reshape(bkmats.f, mpert, mpert)
-        #     cmat = reshape(ckmats.f, mpert, mpert)
-        #     f0mat = reshape(f0mats.f, mpert, mpert)
-        #     pmat = reshape(pmats.f, mpert, mpert)
-        #     paat = reshape(paats.f, mpert, mpert)
-        #     kkmat = reshape(kkmats.f, mpert, mpert)
-        #     kkaat = reshape(kkaats.f, mpert, mpert)
-        #     r1mat = reshape(r1mats.f, mpert, mpert)
-        #     r2mat = reshape(r2mats.f, mpert, mpert)
-        #     r3mat = reshape(r3mats.f, mpert, mpert)
-
-        #     #TODO: reproduce lines 943-956
-        #     # Factor banded matrix, fill in amatlu, call LAPACK, etc.
-        #     # Use LinearAlgebra.LAPACK.gbtrf! and gbtrs! for banded solves
-        #     # Fill in fmat, kmat, kaat, etc.
-        # else
-        #     amat .+= kwmat[:,:,1] .+ ktmat[:,:,1]
-        #     bmat .+= kwmat[:,:,2] .+ ktmat[:,:,2]
-        #     cmat .+= kwmat[:,:,3] .+ ktmat[:,:,3]
-        #     dmat .+= kwmat[:,:,4] .+ ktmat[:,:,4]
-        #     emat .+= kwmat[:,:,5] .+ ktmat[:,:,5]
-        #     hmat .+= kwmat[:,:,6] .+ ktmat[:,:,6]
-        #     baat = bmat .- 2 .* ktmat[:,:,2]
-        #     caat = cmat .- 2 .* ktmat[:,:,3]
-        #     eaat = emat .- 2 .* ktmat[:,:,5]
-        #     b1mat = ifac * dbat
-        #     # ... (rest of the kinetic matrix setup, as above) ...
-        #     #TODO: reproduc lines 977-1157
-        # end
-        # # ... (store banded matrices fmatb, gmatb, kmatb, kaatb, gaatb as above) ...
+        error("kin_flag not implemented yet")
     else
         # Evaluate splines at psieval and reshape avoiding new allocations
+        # TODO: is this actually more efficient?
         Spl.spline_eval!(odet.amat, ffit.amats, psieval; derivs=0)
         amat = reshape(odet.amat, intr.mpert, intr.mpert)
         Spl.spline_eval!(odet.bmat, ffit.bmats, psieval; derivs=0)
@@ -741,57 +664,36 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         Spl.spline_eval!(odet.gmat, ffit.gmats, psieval; derivs=0)
         gmat = reshape(odet.gmat, intr.mpert, intr.mpert)
 
+        # ldiv!(A,B): Compute A \ B in-place and overwriting B to store the result,
+        # where A is a factorization object.
         odet.Afact = cholesky(Hermitian(amat))
-        # # Solve Afact \ bmat
-        copy!(odet.tmp, bmat)
-        ldiv!(bmat, odet.Afact, odet.tmp)
-        # # Solve Afact \ cmat
-        copy!(odet.tmp, cmat)
-        ldiv!(cmat, odet.Afact, odet.tmp)
+        # Solve Afact \ bmat
+        ldiv!(odet.Afact, bmat)
+        # Solve Afact \ cmat
+        ldiv!(odet.Afact, cmat)
 
         # TODO: banded matrix calculations would go here
     end
     
     # Compute du
     if false #(TODO: kin_flag)
-        # for isol in 1:msol
-        #     du[:,isol,1] .= u[:,isol,2]
-        #     # du[:,isol,1] .+= -kmatb * u[:,isol,1] (banded matvec)
-        #     # Use BLAS.gbmv! or custom banded multiplication
-        # end
-        # Factor fmatlu, solve for du
-        # for isol in 1:msol
-        #     du[:,isol,2] .+= gaatb * u[:,isol,1] + kaatb * du[:,isol,1]
-        # end
+        error("kin_flag not implemented yet")
     else
-        @inbounds for isol in 1:odet.msol
-            # du_temp[:,isol,1] = u[:,isol,2] .* singfac - kmat * u[:,isol,1]
-            odet.du_temp[:, isol, 1] .= u[:, isol, 2] .* odet.singfac_vec
-            odet.du_temp[:, isol, 1] .+= -kmat * u[:, isol, 1]
-            # TODO: this is more allocation efficient, but not safe (needs a temporary buffer)
-            #mul!(odet.du_temp[:, isol, 1], kmat, u[:, isol, 1])
-            #@. odet.du_temp[:, isol, 1] = u[:, isol, 2] .* odet.singfac_vec - odet.du_temp[:, isol, 1]
-        end
+        # See equation 23 in Glasser 2016 DCON paper for derivation
+        # TODO: these comments are a work in progress and should be checked, but I think they're close
+        # main thing is I'm not sure where singfac comes from
 
-        # du = F⁻¹du
-        odet.du_temp[:, :, 1] .= UpperTriangular(fmat') \ (LowerTriangular(fmat) \ odet.du_temp[:, :, 1])
+        # du[1] = - K * u[1] + u[2]
+        du[:, :, 1] .= u[:, :, 2] .* odet.singfac_vec .- kmat * u[:, :, 1]
 
-        # Compute du_temp[:,:,2]
-        @inbounds for isol in 1:odet.msol
-            # du_temp[:,:,2] = G * u[:,:,1] + K_adj * du_temp[:,:,1]
-            # TODO: this is more allocation efficient, but not safe (needs a temporary buffer)
-            # mul!(odet.du_temp[:, isol, 2], gmat, u[:, isol, 1])
-            # mul!(odet.du_temp[:, isol, 2], kmat', odet.du_temp[:, isol, 1], 1.0, 1.0)
-            odet.du_temp[:, isol, 2] .= gmat * u[:, isol, 1]
-            odet.du_temp[:, isol, 2] .+= kmat' * odet.du_temp[:, isol, 1]
-            odet.du_temp[:, isol, 1] .*= odet.singfac_vec
-        end
+        # du[1] = - F⁻¹ * K * u[1] + F⁻¹ * u[2] (remember F is already stored in factored form)
+        du[:, :, 1] .= UpperTriangular(fmat') \ (LowerTriangular(fmat) \ du[:, :, 1])
+
+        # du[2] = G * u[1] + K' * du[1] = G * u[1] - K^† * F⁻¹ * K * u[1] + K^† * F⁻¹ * u[2]
+        du[:, :, 2] .= gmat * u[:, :, 1] .+ adjoint(kmat) * du[:, :, 1]
+        du[:, :, 1] .*= odet.singfac_vec
     end
-    # TODO: this is ud in the Fortran - this is used in GPEC, so will need to dump to file later
-    # du[:,:,1] .= odet.du_temp[:,:,1]
-    # du[:,:,2] .= -bmat * odet.du_temp[:,:,1] - cmat * u[:,:,1]
-
-    # This is the derivative that should be used to advance the ODEs
-    # TODO: clean this up above, can all operations just use du instead of odet.du_temp?
-    du .= odet.du_temp
+    # TODO: this is used in GPEC, so will need to dump to file later
+    # ud[:,:,1] .= du[:,:,1]
+    # ud[:,:,2] .= -bmat * du[:,:,1] - cmat * u[:,:,1]
 end
