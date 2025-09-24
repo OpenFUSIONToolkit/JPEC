@@ -163,7 +163,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     end
 
     # Write new crit
-    open("crit.out", "a") do io
+    open("crit_data.out", "a") do io
         @printf(io, "%.3e %.3e %.3e %.3e %.3e\n", odet.psifac, dpsi, q, singfac, crit)
     end
     # println("       psifac:  $(odet.psifac), q: $q, singfac: $singfac, crit: $crit, logpsi1: $logpsi1, logpsi2: $logpsi2")
@@ -215,16 +215,15 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, 
 
     # Compute and sort inverse eigenvalues
     evalsi = eigen(Hermitian(wp)).values
-    key = -abs.(evalsi)
-    indexi = sortperm(key)  # Sort indices based on decreasing |evalsi|
-
+    indexi = sortperm(abs.(evalsi))  # bubble in Fortran sorts in descending order of -|evalsi|, we just do ascending order of |evalsi|
+    
     # Compute critical data for each time step
     profiles = Spl.spline_eval(sq, psi, 0)
     q = profiles[4]
     singfac = abs(m1 - nn * profiles[4])
     logpsi1 = log10(psi)
     logpsi2 = log10(singfac) # TODO: why is this called logpsi2 and not logsingfac?
-    crit = evalsi[indexi[1]] * profiles[3]^2
+    crit = evalsi[indexi[1]] # * profiles[3]^2 # TODO: appears to be a bug in profiles[3]
 
     return q, singfac, logpsi1, logpsi2, crit
 end
