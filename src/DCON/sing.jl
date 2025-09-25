@@ -166,19 +166,18 @@ end
 
 # Main differences: using 1 indexing, so zeroth order is the first index, whereas Fortran used 0 indexing for these arrays
 function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
-    if ising < 1 || ising > intr.msing
-        return
-    end
+    
+    # Allocations
     singp = intr.sing[ising]
-
-    # TODO: move these to initialiation by passing in mpert and sing_order
     singp.vmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 2*ctrl.sing_order + 1)
     singp.mmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 2*ctrl.sing_order + 3)
     singp.power = zeros(ComplexF64, 2*intr.mpert)
 
-    # Identify the resonant solution
-    ipert0 = round(Int, ctrl.nn * singp.q, RoundFromZero) - intr.mlow + 1
-    # TODO: is this needed if we initialize di to zero in the struct definition?
+    if ising < 1 || ising > intr.msing
+        return
+    end
+
+    ipert0 = round(Int, ctrl.nn * singp.q, RoundFromZero) - intr.mlow + 1 # resonant perturbation
     if ipert0 <= 0 || intr.mlow > ctrl.nn * singp.q || intr.mhigh < ctrl.nn * singp.q
         singp.di = 0
         return
@@ -279,33 +278,38 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     singfac[ipert0, 3] = -ctrl.nn * q[4] / 3
     singfac[ipert0, 4] = 0
 
-    # Compute NON-factored Hermitian F and its derivatives
+    # Compute factored Hermitian F and its derivatives
     # TODO: only supports dense matrices for now, implement Banded?
-    # TODO: this can be simplified to extracting binomial coefficients (see ChatGPT)
     for jpert in 1:intr.mpert
         for ipert in jpert:min(intr.mpert, jpert + intr.mband)
             f[ipert, jpert, 1] = singfac[ipert, 1] * f_interp[ipert, jpert, 1]
-            if ctrl.sing_order < 1 continue end
-            f[ipert, jpert, 2] = singfac[ipert, 1] * f_interp[ipert, jpert, 2] +
-                                 singfac[ipert, 2] * f_interp[ipert, jpert, 1]
-            if ctrl.sing_order < 2 continue end
-            f[ipert, jpert, 3] = singfac[ipert, 1] * f_interp[ipert, jpert, 3] + 
-                                 2 * singfac[ipert, 2] * f_interp[ipert, jpert, 2] + 
-                                 singfac[ipert, 3] * f_interp[ipert, jpert, 1]
-            if ctrl.sing_order < 3 continue end
-            f[ipert, jpert, 4] = singfac[ipert, 1] * f_interp[ipert, jpert, 4] + 
-                                 3 * singfac[ipert, 2] * f_interp[ipert, jpert, 3] + 
-                                 3 * singfac[ipert, 3] * f_interp[ipert, jpert, 2] + 
-                                 singfac[ipert, 4] * f_interp[ipert, jpert, 1]
-            if ctrl.sing_order < 4 continue end
-            f[ipert, jpert, 5] = 4 * singfac[ipert, 2] * f_interp[ipert, jpert, 4] +
-                                 6 * singfac[ipert, 3] * f_interp[ipert, jpert, 3] +
-                                 4 * singfac[ipert, 4] * f_interp[ipert, jpert, 2]
-            if ctrl.sing_order < 5 continue end
-            f[ipert, jpert, 6] = 10 * singfac[ipert, 3] * f_interp[ipert, jpert, 4] +
-                                 10 * singfac[ipert, 4] * f_interp[ipert, jpert, 3]
-            if ctrl.sing_order < 6 continue end
-            f[ipert, jpert, 7] = 20 * singfac[ipert, 4] * f_interp[ipert, jpert, 4]
+            if ctrl.sing_order ≥ 1
+                f[ipert, jpert, 2] = singfac[ipert, 1] * f_interp[ipert, jpert, 2] +
+                                    singfac[ipert, 2] * f_interp[ipert, jpert, 1]
+            end
+            if ctrl.sing_order ≥ 2
+                f[ipert, jpert, 3] = singfac[ipert, 1] * f_interp[ipert, jpert, 3] + 
+                                    2 * singfac[ipert, 2] * f_interp[ipert, jpert, 2] + 
+                                    singfac[ipert, 3] * f_interp[ipert, jpert, 1]
+            end
+            if ctrl.sing_order ≥ 3
+                f[ipert, jpert, 4] = singfac[ipert, 1] * f_interp[ipert, jpert, 4] + 
+                                    3 * singfac[ipert, 2] * f_interp[ipert, jpert, 3] + 
+                                    3 * singfac[ipert, 3] * f_interp[ipert, jpert, 2] + 
+                                    singfac[ipert, 4] * f_interp[ipert, jpert, 1]
+            end
+            if ctrl.sing_order ≥ 4
+                f[ipert, jpert, 5] = 4 * singfac[ipert, 2] * f_interp[ipert, jpert, 4] +
+                                    6 * singfac[ipert, 3] * f_interp[ipert, jpert, 3] +
+                                    4 * singfac[ipert, 4] * f_interp[ipert, jpert, 2]
+            end
+            if ctrl.sing_order ≥ 5
+                f[ipert, jpert, 6] = 10 * singfac[ipert, 3] * f_interp[ipert, jpert, 4] +
+                                    10 * singfac[ipert, 4] * f_interp[ipert, jpert, 3]
+            end
+            if ctrl.sing_order ≥ 6
+                f[ipert, jpert, 7] = 20 * singfac[ipert, 4] * f_interp[ipert, jpert, 4]
+            end
         end
     end
     f0 .= f[:, :, 1]
@@ -345,27 +349,33 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     for jpert in 1:intr.mpert
         for ipert in max(1, jpert - intr.mband):min(intr.mpert, jpert + intr.mband)
             k[ipert, jpert, 1] = singfac[ipert, 1] * k_interp[ipert, jpert, 1]
-            if ctrl.sing_order < 1 continue end
-            k[ipert, jpert, 2] = singfac[ipert, 1] * k_interp[ipert, jpert, 2] +
-                                 singfac[ipert, 2] * k_interp[ipert, jpert, 1]
-            if ctrl.sing_order < 2 continue end
-            k[ipert, jpert, 3] = singfac[ipert, 1] * k_interp[ipert, jpert, 3] / 2 +
-                                 singfac[ipert, 2] * k_interp[ipert, jpert, 2] +
-                                 singfac[ipert, 3] * k_interp[ipert, jpert, 1] / 2
-            if ctrl.sing_order < 3 continue end
-            k[ipert, jpert, 4] = singfac[ipert, 1] * k_interp[ipert, jpert, 4] / 6 +
-                                 singfac[ipert, 2] * k_interp[ipert, jpert, 3] / 2 +
-                                 singfac[ipert, 3] * k_interp[ipert, jpert, 2] / 2 +
-                                 singfac[ipert, 4] * k_interp[ipert, jpert, 1] / 6
-            if ctrl.sing_order < 4 continue end
-            k[ipert, jpert, 5] = singfac[ipert, 2] * k_interp[ipert, jpert, 4] / 6 +
-                                 singfac[ipert, 3] * k_interp[ipert, jpert, 3] / 4 +
-                                 singfac[ipert, 4] * k_interp[ipert, jpert, 2] / 6
-            if ctrl.sing_order < 5 continue end
-            k[ipert, jpert, 6] = singfac[ipert, 3] * k_interp[ipert, jpert, 4] / 12 +
-                                 singfac[ipert, 4] * k_interp[ipert, jpert, 3] / 12
-            if ctrl.sing_order < 6 continue end
-            k[ipert, jpert, 7] = singfac[ipert, 4] * k_interp[ipert, jpert, 4] / 36
+            if ctrl.sing_order ≥ 1
+                k[ipert, jpert, 2] = singfac[ipert, 1] * k_interp[ipert, jpert, 2] +
+                                    singfac[ipert, 2] * k_interp[ipert, jpert, 1]
+            end
+            if ctrl.sing_order ≥ 2
+                k[ipert, jpert, 3] = singfac[ipert, 1] * k_interp[ipert, jpert, 3] / 2 +
+                                    singfac[ipert, 2] * k_interp[ipert, jpert, 2] +
+                                    singfac[ipert, 3] * k_interp[ipert, jpert, 1] / 2
+            end
+            if ctrl.sing_order ≥ 3
+                k[ipert, jpert, 4] = singfac[ipert, 1] * k_interp[ipert, jpert, 4] / 6 +
+                                    singfac[ipert, 2] * k_interp[ipert, jpert, 3] / 2 +
+                                    singfac[ipert, 3] * k_interp[ipert, jpert, 2] / 2 +
+                                    singfac[ipert, 4] * k_interp[ipert, jpert, 1] / 6
+            end
+            if ctrl.sing_order ≥ 4
+                k[ipert, jpert, 5] = singfac[ipert, 2] * k_interp[ipert, jpert, 4] / 6 +
+                                    singfac[ipert, 3] * k_interp[ipert, jpert, 3] / 4 +
+                                    singfac[ipert, 4] * k_interp[ipert, jpert, 2] / 6
+            end
+            if ctrl.sing_order ≥ 5
+                k[ipert, jpert, 6] = singfac[ipert, 3] * k_interp[ipert, jpert, 4] / 12 +
+                                    singfac[ipert, 4] * k_interp[ipert, jpert, 3] / 12
+            end
+            if ctrl.sing_order ≥ 6
+                k[ipert, jpert, 7] = singfac[ipert, 4] * k_interp[ipert, jpert, 4] / 36
+            end
         end
     end
     
@@ -690,7 +700,7 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         du[:, :, 2] .= gmat * u[:, :, 1] .+ adjoint(kmat) * du[:, :, 1]
         du[:, :, 1] .*= odet.singfac_vec
     end
-    # TODO: this is used in GPEC, so will need to dump to file later
+    # TODO: this is used in GPEC, so will need to dump to file or save to an array later
     # ud[:,:,1] .= du[:,:,1]
     # ud[:,:,2] .= -bmat * du[:,:,1] - cmat * u[:,:,1]
 end
