@@ -3,10 +3,10 @@ module DconMod
 # All imports and includes for the DCON module
 using LinearAlgebra
 using LinearAlgebra.LAPACK #required for banded matrix operations
-using BandedMatrices #for banded matrix operations
 using TOML
 using FFTW
 using OrdinaryDiffEq
+using HDF5
 import ..Equilibrium
 import ..Spl
 using Printf

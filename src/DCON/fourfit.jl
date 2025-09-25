@@ -146,22 +146,25 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, ff
 end
 
 """
-    make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData, ctrl::DconControl, intr::DconInternal) -> FourFitVars
+    make_matrix(metric::MetricData, plasma_eq::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal) -> FourFitVars
 
-Constructs Fourier–poloidal coupling matrices for a given toroidal mode number `nn`
-and returns them as a new `FourFitVars` object.
+Constructs Fourier–poloidal coupling matrices for a given toroidal mode number and returns them as a new `FourFitVars` object.
 
 # Arguments
-- `plasma_eq::Equilibrium.PlasmaEquilibrium`: 
-    Plasma equilibrium object providing 1D flux-surface profiles (`sq`) and normalization constants.
 - `metric::MetricData`: 
     Metric coefficients on the (ψ, θ) grid, including Fourier representations of g^ij and J.
+- `plasma_eq::Equilibrium.PlasmaEquilibrium`: 
+    Plasma equilibrium object providing 1D flux-surface profiles (`sq`) and normalization constants.
+- `ctrl::DconControl`: 
+    Control parameters for the DCON calculation, including mode numbers and flags.
+- `intr::DconInternal`:
+    Internal state for the DCON calculation, including mode number ranges and splines.
 
 # Returns
 - `ffit::FourFitVars`:
     A container holding cubic spline fits of the assembled matrices
 """
-function make_matrix(plasma_eq::Equilibrium.PlasmaEquilibrium, metric::MetricData, ctrl::DconControl, intr::DconInternal)
+function make_matrix(metric::MetricData, plasma_eq::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal)
 
     # TODO: add banded matrices (if desired), kinetic matrices
 

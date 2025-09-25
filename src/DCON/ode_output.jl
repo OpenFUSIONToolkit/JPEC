@@ -163,7 +163,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     end
 
     # Write new crit
-    open("crit_data.out", "a") do io
+    open(joinpath(intr.dir_path, "crit_data.out"), "a") do io
         @printf(io, "%.3e %.3e %.3e %.3e %.3e\n", odet.psifac, dpsi, q, singfac, crit)
     end
     # println("       psifac:  $(odet.psifac), q: $q, singfac: $singfac, crit: $crit, logpsi1: $logpsi1, logpsi2: $logpsi2")
@@ -176,7 +176,6 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     odet.crit_save = crit
     odet.u_save .= odet.u
 end
-
 
 """
     ode_output_get_crit(psi, u, mpert, m1, nn, sq) -> (q, singfac, logpsi1, logpsi2, crit)

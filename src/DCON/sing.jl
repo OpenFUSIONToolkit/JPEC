@@ -664,9 +664,9 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         # ldiv!(A,B): Compute A \ B in-place and overwriting B to store the result,
         # where A is a factorization object.
         odet.Afact = cholesky(Hermitian(amat))
-        # Solve Afact \ bmat
+        # bmat = A⁻¹ * bmat
         ldiv!(odet.Afact, bmat)
-        # Solve Afact \ cmat
+        # cmat = A⁻¹ * cmat
         ldiv!(odet.Afact, cmat)
 
         # TODO: banded matrix calculations would go here

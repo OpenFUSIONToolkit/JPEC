@@ -82,6 +82,7 @@ end
 # end
 
 @kwdef mutable struct DconInternal
+    dir_path::String = ""
     mlow::Int = 0 #Copy of delta_mlow, but with limits enforced
     mhigh::Int = 0 #Copy of delta_mhigh, but with limits enforced
     mpert::Int = 0 #mpert = mhigh-mlow+1
