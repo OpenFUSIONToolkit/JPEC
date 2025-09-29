@@ -481,7 +481,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
         println("Writing diagnostics to HDF5 files...")
 
         # Write contour data
-        h5open("gsec.h5", "w") do file
+        h5open(joinpath(dirname(equil.config.control.eq_filename), "gsec.h5"), "w") do file
             file["mpsi"] = mpsi
             file["mtheta"] = mtheta
             file["r"] = Float32.(r)
@@ -495,7 +495,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
         end
 
         # Write xy plot data
-        h5open("gse.h5", "w") do file
+        h5open(joinpath(dirname(equil.config.control.eq_filename), "gse.h5"), "w") do file
             gse_data = Array{Float32, 3}(undef, mpsi+1, mtheta+1, 7)
             for ipsi in 0:mpsi
                 for itheta in 0:mtheta
@@ -512,7 +512,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
         end
 
         # Write integrated error criterion
-        h5open("gsei.h5", "w") do file
+        h5open(joinpath(dirname(equil.config.control.eq_filename), "gsei.h5"), "w") do file
             file["xs"] = Float32.(flux.xs)
             file["term"] = Float32.(term)
             file["totali"] = Float32.(totali)
