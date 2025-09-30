@@ -10,28 +10,28 @@ named `metric` in the Fortran `fourfit_make_metric` subroutine.
 - `mtheta::Int`: Number of poloidal grid points minus one.
 - `xs::Vector{Float64}`: Radial coordinates (normalized poloidal flux `ψ_norm`).
 - `ys::Vector{Float64}`: Poloidal angle coordinates `θ` in radians (0 to 2π).
-- `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi+1, mtheta+1, 8)`.
+- `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi, mtheta, 8)`.
   The 8 quantities are: `g¹¹`, `g²²`, `g³³`, `g²³`, `g³¹`, `g¹²`, `J`, `∂J/∂ψ`.
 - `fspline::Spl.FourierSpline`: The fitted Fourier-cubic spline object.
 """
 @kwdef mutable struct MetricData
     mpsi::Int
     mtheta::Int
-    xs::Vector{Float64} = zeros(mpsi + 1)
-    ys::Vector{Float64} = zeros(mtheta + 1)
-    fs::Array{Float64,3} = zeros(mpsi + 1, mtheta + 1, 8)
+    xs::Vector{Float64} = zeros(mpsi)
+    ys::Vector{Float64} = zeros(mtheta)
+    fs::Array{Float64,3} = zeros(mpsi, mtheta, 8)
     fspline::Union{Spl.FourierSpline,Nothing} = nothing
 end
 
 MetricData(mpsi::Int, mtheta::Int) = MetricData(; mpsi, mtheta)
 
 """
-    make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true) -> MetricData
+    make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true) -> MetricData
 
 Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equilibrium.
 
 # Arguments
-- `plasma_eq::Equilibrium.PlasmaEquilibrium`: 
+- `equil::Equilibrium.PlasmaEquilibrium`: 
     An equilibrium object containing spline data (`rzphi`) for flux coordinates and geometry.
 - `mband::Int=10`: 
     Number of Fourier modes to retain in the metric representation.
@@ -57,16 +57,16 @@ Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equili
     8. ∂J/∂ψ
 - The ψ grid is taken directly from `rzphi.xs`, and θ is scaled from `[0,1]` to `[0, 2π]`.
 """
-function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true)
+function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true)
 
     # TODO: add kinetic metric tensor components
 
     # --- Extract data from the PlasmaEquilibrium object ---
-    rzphi = plasma_eq.rzphi
-    mpsi = length(rzphi.xs) - 1
-    mtheta = length(rzphi.ys) - 1
+    rzphi = equil.rzphi
+    mpsi = length(rzphi.xs)
+    mtheta = length(rzphi.ys)
 
-    println("   Equilibrium grid: $(mpsi+1) (ψ) × $(mtheta+1) (θ)")
+    println("   Equilibrium grid: $mpsi (ψ) × $mtheta (θ)")
     println("   Fourier fit modes (mband): $mband")
 
     metric = MetricData(mpsi, mtheta)
@@ -80,9 +80,9 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, ff
     v = zeros(Float64, 3, 3)
 
     # --- Main computation loop over the (ψ, θ) grid ---
-    for ipsi in 1:(mpsi+1)
+    for ipsi in 1:mpsi
         psi_norm = rzphi.xs[ipsi]
-        for jtheta in 1:(mtheta+1)
+        for jtheta in 1:mtheta
             theta_norm = rzphi.ys[jtheta] # θ is from 0 to 1
 
             # Evaluate the geometry spline to get (R,Z) and their derivatives
@@ -97,7 +97,7 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, ff
 
             rfac = sqrt(r_coord_sq)
             eta = 2π * (theta_norm + eta_offset)
-            r_major = plasma_eq.ro + rfac * cos(eta) # This is the R coordinate
+            r_major = equil.ro + rfac * cos(eta) # This is the R coordinate
 
             # --- Compute contravariant basis vectors ∇ψ, ∇θ, ∇ζ ---
             fx1, fx2, fx3 = fx[1], fx[2], fx[3]
@@ -141,19 +141,18 @@ function make_metric(plasma_eq::Equilibrium.PlasmaEquilibrium; mband::Int=10, ff
         bctype=bctype_x,
         fit_method=fit_method
     )
-
     return metric
 end
 
 """
-    make_matrix(metric::MetricData, plasma_eq::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal) -> FourFitVars
+    make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal) -> FourFitVars
 
 Constructs Fourier–poloidal coupling matrices for a given toroidal mode number and returns them as a new `FourFitVars` object.
 
 # Arguments
 - `metric::MetricData`: 
     Metric coefficients on the (ψ, θ) grid, including Fourier representations of g^ij and J.
-- `plasma_eq::Equilibrium.PlasmaEquilibrium`: 
+- `equil::Equilibrium.PlasmaEquilibrium`: 
     Plasma equilibrium object providing 1D flux-surface profiles (`sq`) and normalization constants.
 - `ctrl::DconControl`: 
     Control parameters for the DCON calculation, including mode numbers and flags.
@@ -164,12 +163,12 @@ Constructs Fourier–poloidal coupling matrices for a given toroidal mode number
 - `ffit::FourFitVars`:
     A container holding cubic spline fits of the assembled matrices
 """
-function make_matrix(metric::MetricData, plasma_eq::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal)
+function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal)
 
     # TODO: add banded matrices (if desired), kinetic matrices
 
     # --- Extract inputs ---
-    sq = plasma_eq.sq
+    sq = equil.sq
     mpsi = metric.mpsi
 
     if ctrl.verbose
@@ -177,19 +176,27 @@ function make_matrix(metric::MetricData, plasma_eq::Equilibrium.PlasmaEquilibriu
         println("   Matrix bandwidth: $(intr.mband)")
     end
 
-    # --- Allocate 3D arrays ---
-    amats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    bmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    cmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    dmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    emats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    hmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    fmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    gmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    kmats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    dbats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    ebats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
-    fbats = zeros(ComplexF64, mpsi+1, intr.mpert, intr.mpert)
+    # Allocations
+    amats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    bmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    cmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    dmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    emats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    hmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    fmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    gmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    kmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    dbats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    ebats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    fbats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    g11 = zeros(ComplexF64, 2 * intr.mband + 1)
+    g22 = zeros(ComplexF64, 2 * intr.mband + 1)
+    g33 = zeros(ComplexF64, 2 * intr.mband + 1)
+    g23 = zeros(ComplexF64, 2 * intr.mband + 1)
+    g31 = zeros(ComplexF64, 2 * intr.mband + 1)
+    g12 = zeros(ComplexF64, 2 * intr.mband + 1)
+    jmat = zeros(ComplexF64, 2 * intr.mband + 1)
+    jmat1 = zeros(ComplexF64, 2 * intr.mband + 1)
 
     # Instead of using Offset Arrays like in Fortran (-mband:mband), we store everything in
     # a single 1:(2*mband+1) array and map the zero index to the middle
@@ -197,7 +204,7 @@ function make_matrix(metric::MetricData, plasma_eq::Equilibrium.PlasmaEquilibriu
     imat = zeros(ComplexF64, 2 * intr.mband + 1)
     imat[mid] = 1 + 0im
 
-    for ipsi in 1:(mpsi+1)
+    for ipsi in 1:mpsi
         # --- Create views for this surface ---
         amat = @view amats[ipsi, :, :]
         bmat = @view bmats[ipsi, :, :]
@@ -217,18 +224,8 @@ function make_matrix(metric::MetricData, plasma_eq::Equilibrium.PlasmaEquilibriu
         q      = sq.fs[ipsi, 4]
         q1     = sq.fs1[ipsi, 4]
         jtheta = -sq.fs1[ipsi, 1]
-        chi1 = 2π * plasma_eq.psio
+        chi1 = 2π * equil.psio
         nq = ctrl.nn * q
-
-        # Fourier coefficient extraction
-        g11 = zeros(ComplexF64, 2 * intr.mband + 1)
-        g22 = zeros(ComplexF64, 2 * intr.mband + 1)
-        g33 = zeros(ComplexF64, 2 * intr.mband + 1)
-        g23 = zeros(ComplexF64, 2 * intr.mband + 1)
-        g31 = zeros(ComplexF64, 2 * intr.mband + 1)
-        g12 = zeros(ComplexF64, 2 * intr.mband + 1)
-        jmat = zeros(ComplexF64, 2 * intr.mband + 1)
-        jmat1 = zeros(ComplexF64, 2 * intr.mband + 1)
 
         # Fill lower half (0, -1, …, -mband)
         g11[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 1:intr.mband+1]
@@ -311,25 +308,26 @@ function make_matrix(metric::MetricData, plasma_eq::Equilibrium.PlasmaEquilibriu
         # TODO: banded matrix calculations would also go here if implemented
     end
 
-    # --- Fit splines (reshape 3D to 2D: (mpsi+1) × (mpert^2)) ---
-    ffit = FourFitVars(mpert=intr.mpert)
-    ffit.amats = Spl.CubicSpline(metric.xs, reshape(amats, mpsi+1, :); bctype=3)
-    ffit.bmats = Spl.CubicSpline(metric.xs, reshape(bmats, mpsi+1, :); bctype=3)
-    ffit.cmats = Spl.CubicSpline(metric.xs, reshape(cmats, mpsi+1, :); bctype=3)
-    ffit.dmats = Spl.CubicSpline(metric.xs, reshape(dmats, mpsi+1, :); bctype=3)
-    ffit.emats = Spl.CubicSpline(metric.xs, reshape(emats, mpsi+1, :); bctype=3)
-    ffit.hmats = Spl.CubicSpline(metric.xs, reshape(hmats, mpsi+1, :); bctype=3)
-    ffit.fmats = Spl.CubicSpline(metric.xs, reshape(fmats, mpsi+1, :); bctype=3)
-    ffit.gmats = Spl.CubicSpline(metric.xs, reshape(gmats, mpsi+1, :); bctype=3)
-    ffit.kmats = Spl.CubicSpline(metric.xs, reshape(kmats, mpsi+1, :); bctype=3)
-    ffit.dbats = Spl.CubicSpline(metric.xs, reshape(dbats, mpsi+1, :); bctype=3)
-    ffit.ebats = Spl.CubicSpline(metric.xs, reshape(ebats, mpsi+1, :); bctype=3)
-    ffit.fbats = Spl.CubicSpline(metric.xs, reshape(fbats, mpsi+1, :); bctype=3)
+    # --- Fit splines (reshape 3D to 2D: (mpsi) × (mpert^2)) ---
+    ffit = FourFitVars(mpert=intr.mpert, mband=intr.mband)
+    ffit.amats = Spl.CubicSpline(metric.xs, reshape(amats, mpsi, :); bctype=3)
+    ffit.bmats = Spl.CubicSpline(metric.xs, reshape(bmats, mpsi, :); bctype=3)
+    ffit.cmats = Spl.CubicSpline(metric.xs, reshape(cmats, mpsi, :); bctype=3)
+    ffit.dmats = Spl.CubicSpline(metric.xs, reshape(dmats, mpsi, :); bctype=3)
+    ffit.emats = Spl.CubicSpline(metric.xs, reshape(emats, mpsi, :); bctype=3)
+    ffit.hmats = Spl.CubicSpline(metric.xs, reshape(hmats, mpsi, :); bctype=3)
+    ffit.fmats = Spl.CubicSpline(metric.xs, reshape(fmats, mpsi, :); bctype=3)
+    ffit.gmats = Spl.CubicSpline(metric.xs, reshape(gmats, mpsi, :); bctype=3)
+    ffit.kmats = Spl.CubicSpline(metric.xs, reshape(kmats, mpsi, :); bctype=3)
+    ffit.dbats = Spl.CubicSpline(metric.xs, reshape(dbats, mpsi, :); bctype=3)
+    ffit.ebats = Spl.CubicSpline(metric.xs, reshape(ebats, mpsi, :); bctype=3)
+    ffit.fbats = Spl.CubicSpline(metric.xs, reshape(fbats, mpsi, :); bctype=3)
 
     # TODO: set powers
     # Do we need this yet? Only called if power_flag = true
 
     if ctrl.sas_flag
+        # TODO: these seem to only be used for the ahb_flag, which I think is deprecated
         ffit.asmat = reshape(Spl.spline_eval(ffit.amats, intr.psilim), intr.mpert, intr.mpert)
         ffit.bsmat = reshape(Spl.spline_eval(ffit.bmats, intr.psilim), intr.mpert, intr.mpert)
         ffit.csmat = reshape(Spl.spline_eval(ffit.cmats, intr.psilim), intr.mpert, intr.mpert)
@@ -337,6 +335,9 @@ function make_matrix(metric::MetricData, plasma_eq::Equilibrium.PlasmaEquilibriu
         # Should we store lower triangular factorization?
         ffit.asmat .= cholesky(Hermitian(ffit.asmat)).L
     end
+
+    # This is used in free_run
+    ffit.jmat = jmat
 
     return ffit
 end

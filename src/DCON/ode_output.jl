@@ -34,7 +34,6 @@ function ode_output_step!(odet::OdeState, intr::DconInternal, ctrl::DconControl,
     #    ode_output_sol(psifac, u, unorm) # again, more outputs
     #end
 
-    # Terminate (function ends)
     return
 end
 

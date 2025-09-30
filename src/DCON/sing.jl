@@ -700,7 +700,8 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         du[:, :, 2] .= gmat * u[:, :, 1] .+ adjoint(kmat) * du[:, :, 1]
         du[:, :, 1] .*= odet.singfac_vec
     end
-    # TODO: this is used in GPEC, so will need to dump to file or save to an array later
-    # ud[:,:,1] .= du[:,:,1]
-    # ud[:,:,2] .= -bmat * du[:,:,1] - cmat * u[:,:,1]
+    
+    # u-derivative used in GPEC
+    odet.ud[:,:,1] .= du[:,:,1]
+    odet.ud[:,:,2] .= -bmat * du[:,:,1] - cmat * u[:,:,1]
 end
