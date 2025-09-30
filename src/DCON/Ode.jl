@@ -22,6 +22,7 @@ including solution vectors, tolerances, and flags for the integration process.
     new::Bool = true            # flag for new solution
     u::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)            # solution vectors
     u_save::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)       # saved solution vectors
+    ud::Array{ComplexF64, 3} = zeros(ComplexF64, mpert, mpert, 2)           # derivative of solution vectors used in GPEC
     index::Vector{Int} = collect(1:mpert)                                   # indices for sorting solutions
     unorm::Vector{Float64} = zeros(Float64, 2*mpert)                        # norms of solution vectors
     unorm0::Vector{Float64} = zeros(Float64, 2*mpert)                       # initial norms of solution vectors
@@ -133,7 +134,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
     #     end
     #     odet.flag_count = 0
     # end
-    return odet.nzero
+    return odet
 end
 
 

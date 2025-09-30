@@ -9,6 +9,7 @@ using OrdinaryDiffEq
 using HDF5
 import ..Equilibrium
 import ..Spl
+import ..VacuumMod
 using Printf
 
 # Include all necessary files
@@ -20,6 +21,7 @@ include("sing.jl")
 include("fourfit.jl")
 include("ode_output.jl")
 include("utils.jl")
+include("free.jl")
 
 const Version = "JULIA-PORT-1.0"
 

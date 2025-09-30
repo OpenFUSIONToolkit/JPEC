@@ -8,8 +8,9 @@ function MainProgram(path::String)
     intr = DconInternal(; dir_path=path)
     inputs = TOML.parsefile(joinpath(intr.dir_path, "dcon.toml"))
     ctrl = DconControl(; (Symbol(k)=>v for (k,v) in inputs["DCON_CONTROL"])...)
-    # outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
+    outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
     equil = Equilibrium.setup_equilibrium(joinpath(intr.dir_path, "equil.toml"))
+    fnames = DconFileNames()
 
     # Set up variables
     # TODO: dcon_kin_threads logic?
@@ -51,24 +52,16 @@ function MainProgram(path::String)
     # Fit stability data to splines and dump to file
     intr.locstab = Spl.CubicSpline(Vector(equil.sq.xs), locstab_fs; bctype=3)
     
-    # Dump equilibrium data to file
-    colnames = ["psi", "f", "mu0p", "dV/dpsi", "q", "di", "dr", "ca1"]
-    eq_data = hcat(
-        equil.sq.xs,
-        equil.sq.fs[:, 1] ./ (2π),
-        equil.sq.fs[:, 2],
-        equil.sq.fs[:, 3],
-        equil.sq.fs[:, 4],
-        locstab_fs[:, 1] ./ equil.sq.xs,
-        locstab_fs[:, 2] ./ equil.sq.xs,
-        locstab_fs[:, 4],
-    )
+    # Dump equilibrium data to file (in Fortran, this was dumped to dcon.bin, but I like this separate)
     h5open(joinpath(intr.dir_path, "equil_data.h5"), "w") do file
-        for j in 1:8
-            data = eq_data[:, j]
-            name = colnames[j]
-            write(file, name, data)
-        end
+        file["psi"] = Vector(equil.sq.xs)
+        file["f"] = Vector(equil.sq.fs[:, 1] ./ (2π))
+        file["mu0p"] = Vector(equil.sq.fs[:, 2])
+        file["dV/dpsi"] = Vector(equil.sq.fs[:, 3])
+        file["q"] = Vector(equil.sq.fs[:, 4])
+        file["di"] = Vector(locstab_fs[:, 1] ./ equil.sq.xs)
+        file["dr"] = Vector(locstab_fs[:, 2] ./ equil.sq.xs)
+        file["ca1"] = Vector(locstab_fs[:, 4])
     end
 
     # Find all singular surfaces in the equilibrium
@@ -126,12 +119,14 @@ function MainProgram(path::String)
         end
     end
 
+    open(joinpath(intr.dir_path, "crit_data.out"), "w") do io
+    end
     # Integrate Euler-Lagrange Equation
     if ctrl.ode_flag
         if ctrl.verbose
             println("Integrating Euler-Lagrange equation")
         end
-        nzero = ode_run(ctrl, equil, intr, ffit)
+        odet = ode_run(ctrl, equil, intr, ffit)
         if intr.size_edge > 0
             # Find peak index in dw_edge[pre_edge:i_edge]
             dw_slice = real.(intr.dw_edge[intr.pre_edge:intr.i_edge])
@@ -146,43 +141,39 @@ function MainProgram(path::String)
             # if outp.bin_euler
             #    bin_close(euler_bin_unit) # TODO: Need to decide ho we're handling io
             # end
-            nzero = ode_run(ctrl, equil, intr, ffit)
+            odet = ode_run(ctrl, equil, intr, ffit)
         end
     end
 
     # Compute free boundary energies
-    # TODO: Add free_run implementation from VACUUM code
+    plasma1 = 0
+    vacuum1 = 0
+    total1 = 0
     if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1)
         if ctrl.verbose
             println("Computing free boundary energies")
         end
-        # free_run(plasma1, vacuum1, total1, nzero, netcdf_out) # TODO: this needs love
-    else
-        plasma1 = 0
-        vacuum1 = 0
-        total1 = 0
+        plasma1, vacuum1, total1 = free_run(odet, ctrl, intr, equil, ffit; op_netcdf_out=false) # outp.netcdf_out)
     end
 
     # Output results of fixed-boundary stability calculations
-    if ctrl.ode_flag && nzero != 0
+    if ctrl.ode_flag && odet.nzero != 0
         if ctrl.verbose
             println("Fixed-boundary mode unstable for nn = $(ctrl.nn).")
         end
     end
   
     # Output results of free-boundary stability calculations
-    # TODO: Handle vacuum/free boundary results
     if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
-        error("vac_flag with free boundary conditions not implemented yet")
         if real(total1) < 0
             if ctrl.verbose
                 println("Free-boundary mode unstable for nn = $(ctrl.nn).")
             end
         else
-        if ctrl.verbose
-            println("All free-boundary modes stable for nn = $(ctrl.nn).")
+            if ctrl.verbose
+                println("All free-boundary modes stable for nn = $(ctrl.nn).")
+            end
         end
-      end
     end
 
     end_time = time() - start_time

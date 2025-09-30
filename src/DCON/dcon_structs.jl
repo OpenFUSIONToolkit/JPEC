@@ -22,18 +22,18 @@ end
     m::Int = 0
     r1::Vector{Int} = [0]
     r2::Vector{Int} = [0, 0]
-    n1::Vector{Int} = Int[]
-    n2::Vector{Int} = Int[]
     psifac::Float64 = 0.0
     rho::Float64 = 0.0
     q::Float64 = 0.0
     q1::Float64 = 0.0
     di::Float64 = 0.0
     alpha::ComplexF64 = 0.0 + 0.0im
+    n1::Vector{Int} = Int[]
+    n2::Vector{Int} = Int[]
     power::Union{Nothing, Vector{ComplexF64}} = nothing
     vmat::Union{Nothing, Array{ComplexF64,4}} = nothing
     mmat::Union{Nothing, Array{ComplexF64,4}} = nothing
-    m0mat::Union{Nothing, Matrix{ComplexF64}} = zeros(ComplexF64, 2, 2)
+    m0mat::Matrix{ComplexF64} = zeros(ComplexF64, 2, 2)
     restype::ResistType = ResistType()
 end
 # @kwdef mutable struct SingType
@@ -60,26 +60,25 @@ end
 # SingType(mpert::Int, order::Int; kwargs...) = SingType(; mpert, order, kwargs...)
 
 #TODO: I am assuming this will change - needs discussion of what output files should be
-# we should have a working base case first
-# @kwdef mutable struct DconFileNames
-#     out_bal1_unit::String = "bal1.out"
-#     out_bal2_unit::String = "bal2.out"
-#     bin_bal1_unit::String = "bal1.bin"
-#     bin_bal2_unit::String = "bal2.bin"
-#     fourfit_out_unit::String = "imats.out"
-#     fourfit_bin_unit::String = "imats.bin"
-#     evals_out_unit::String = "feval.out"
-#     evals_bin_unit::String = "feval.bin"
-#     crit_out_unit::String = "crit.out"
-#     crit_bin_unit::String = "crit.bin"
-#     euler_bin_unit::String = "euler.bin"
-#     init_out_unit::String = "init.out"
-#     reinit_out_unit::String = "reinit.out"
-#     dcon_unit::String = "dcon.out"
-#     unorm_unit::String = "unorm.bin"
-#     ca_unit::String = "ca.out"
-#     err_unit::String = "error.bin"
-# end
+@kwdef mutable struct DconFileNames
+    out_bal1_unit::String = "bal1.out"
+    out_bal2_unit::String = "bal2.out"
+    bin_bal1_unit::String = "bal1.bin"
+    bin_bal2_unit::String = "bal2.bin"
+    fourfit_out_unit::String = "imats.out"
+    fourfit_bin_unit::String = "imats.bin"
+    evals_out_unit::String = "feval.out"
+    evals_bin_unit::String = "feval.bin"
+    crit_out_unit::String = "crit.out"
+    crit_bin_unit::String = "crit.bin"
+    euler_bin_unit::String = "euler.bin"
+    init_out_unit::String = "init.out"
+    reinit_out_unit::String = "reinit.out"
+    dcon_unit::String = "dcon.out"
+    unorm_unit::String = "unorm.bin"
+    ca_unit::String = "ca.out"
+    err_unit::String = "error.bin"
+end
 
 @kwdef mutable struct DconInternal
     dir_path::String = ""
@@ -87,7 +86,7 @@ end
     mhigh::Int = 0 #Copy of delta_mhigh, but with limits enforced
     mpert::Int = 0 #mpert = mhigh-mlow+1
     mband::Int = 0 #mband = mpert-1-delta_mband
-    vac_memory::Bool = false
+    vac_memory::Bool = true # TODO: most likely just remove, always true in ahg_flag is deprecated
     keq_out::Bool = false
     theta_out::Bool = false
     xlmda_out::Bool = false
@@ -166,46 +165,47 @@ end
     diagnose_ca::Bool = false
 end
 
-# @kwdef mutable struct DconOutput
-#     interp::Bool = false
-#     crit_break::Bool = true
-#     out_bal1::Bool = false
-#     bin_bal1::Bool = false
-#     out_bal2::Bool = false
-#     bin_bal2::Bool = false
-#     out_metric::Bool = false
-#     bin_metric::Bool = false
-#     feval_flag::Bool = false
-#     out_fmat::Bool = false
-#     bin_fmat::Bool = false
-#     out_gmat::Bool = false
-#     bin_gmat::Bool = false
-#     out_kmat::Bool = false
-#     bin_kmat::Bool = false
-#     out_sol::Bool = false
-#     out_sol_min::Int = 0
-#     out_sol_max::Int = 0
-#     bin_sol::Bool = false
-#     bin_sol_min::Int = 0
-#     bin_sol_max::Int = 0
-#     out_fl::Bool = false
-#     bin_fl::Bool = false
-#     out_evals::Bool = false
-#     bin_evals::Bool = false
-#     bin_euler::Bool = false
-#     euler_stride::Int = 1
-#     bin_vac::Bool = false
-#     ahb_flag::Bool = false
-#     mthsurf0::Float64 = 1.0
-#     msol_ahb::Int = 0
-#     netcdf_out::Bool = true
-#     out_fund::Bool = false
-#     out_ahg2msc::Bool = true
-# end
+@kwdef mutable struct DconOutput
+    interp::Bool = false
+    crit_break::Bool = true
+    out_bal1::Bool = false
+    bin_bal1::Bool = false
+    out_bal2::Bool = false
+    bin_bal2::Bool = false
+    out_metric::Bool = false
+    bin_metric::Bool = false
+    feval_flag::Bool = false
+    out_fmat::Bool = false
+    bin_fmat::Bool = false
+    out_gmat::Bool = false
+    bin_gmat::Bool = false
+    out_kmat::Bool = false
+    bin_kmat::Bool = false
+    out_sol::Bool = false
+    out_sol_min::Int = 0
+    out_sol_max::Int = 0
+    bin_sol::Bool = false
+    bin_sol_min::Int = 0
+    bin_sol_max::Int = 0
+    out_fl::Bool = false
+    bin_fl::Bool = false
+    out_evals::Bool = false
+    bin_evals::Bool = false
+    bin_euler::Bool = false
+    euler_stride::Int = 1
+    bin_vac::Bool = false # TODO: deprecated
+    ahb_flag::Bool = false # TODO: deprecated
+    mthsurf0::Float64 = 1.0 # TODO: deprecated
+    msol_ahb::Int = 0 # TODO: deprecated
+    netcdf_out::Bool = true # TODO: might be deprecated
+    out_fund::Bool = false
+    out_ahg2msc::Bool = false # TODO: deprecated
+end
 
 # TODO: how can we initialize the splines to not be nothings?
 @kwdef mutable struct FourFitVars
     mpert::Int
+    mband::Int
 
     # Spline matrices
     amats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
@@ -237,10 +237,11 @@ end
     # k0s::JPEC.Spl.SplineType
 
     # ipiva::Union{Nothing,Vector{Int}} = nothing
+    # TODO: these might be deprecated
     asmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     bsmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     csmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
-    # jmat::Union{Nothing,Vector{ComplexF64}} = nothing
+    jmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, 2 * mband + 1)
 
     parallel_threads::Int = 0
     dcon_kin_threads::Int = 0
