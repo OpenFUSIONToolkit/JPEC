@@ -1,4 +1,45 @@
 """
+    ode_output_init(ctrl, equil, fnames, intr, odet)
+
+    Write header info to output files at the start of the integration.
+"""
+function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, fnames::DconFileNames, intr::DconInternal, odet::OdeState)
+    
+    # Write euler.bin header
+
+    # Write equilibrium grid and parameters
+    write_to!(fnames, :euler_bin_unit, intr.mlow, intr.mhigh, ctrl.nn, length(equil.rzphi.xs), length(equil.rzphi.ys), equil.ro, equil.zo)
+    write_to!(fnames, :euler_bin_unit, intr.mband, NaN, ctrl.mthvac, equil.psio, equil.config.control.psilow, intr.psilim, intr.qlim, ctrl.singfac_min) #TODO: mthsurf0
+    write_to!(fnames, :euler_bin_unit, equil.config.control.power_b, equil.config.control.power_r, equil.config.control.power_bp)
+    write_to!(fnames, :euler_bin_unit, ctrl.kin_flag, ctrl.con_flag)
+
+    # Write equilibrium summary parameters
+    write_to!(fnames, :euler_bin_unit, equil.params.amean, equil.params.rmean, equil.params.aratio, equil.params.kappa, equil.params.delta1, equil.params.delta2,
+        equil.params.li1, equil.params.li2, equil.params.li3, equil.params.betap1, equil.params.betap2, equil.params.betap3, equil.params.betat, equil.params.betan, equil.params.bt0,
+        equil.params.q0, equil.params.qmin, equil.params.qmax, equil.params.qa, equil.params.crnt, equil.params.q95, NaN, NaN) # TODO: , equil.params.shotnum, equil.params.shottime)
+
+    # Write spline and grid arrays
+    write_to!(fnames, :euler_bin_unit, equil.sq.xs, equil.sq.fs, equil.sq.fs1, 0) # TODO:, equil.sq.xpower)
+    write_to!(fnames, :euler_bin_unit, equil.rzphi.xs, equil.rzphi.ys,
+        equil.rzphi.fs, equil.rzphi.fsx, equil.rzphi.fsy, equil.rzphi.fsxy,
+        NaN, NaN, NaN, NaN) # TODO:equil.rzphi.x0, equil.rzphi.y0,, equil.rzphi.xpower, equil.rzphi.ypower)
+
+    # Write crit.out header
+    if odet.ising > 0 && odet.ising <= intr.msing 
+        write_to!(fnames, :crit_out_unit, @sprintf(
+            "   ising   psi         q          di      re alpha   im alpha\n\n%6d%11.3e%11.3e%11.3e%11.3e%11.3e\n",
+            odet.ising,
+            intr.sing[odet.ising].psifac,
+            intr.sing[odet.ising].q,
+            intr.sing[odet.ising].di,
+            real(intr.sing[odet.ising].alpha),
+            imag(intr.sing[odet.ising].alpha))
+        )
+    end
+    write_to!(fnames, :crit_out_unit, "    psifac      dpsi        q       singfac     eval1\n")
+end
+
+"""
     ode_output_step(odet, intr, ctrl, equil; force=false)
 
 Performs output and monitoring tasks at each integration step.
@@ -9,25 +50,27 @@ Additional output (e.g., eigenvalue dumps, binary solution logging) may be added
 """
 #TODO: depending on how we restructure our outputs, this function might be uncessary.
 # It currently just calls ode_output_monitor! and does not write any outputs.
-#function ode_output_step(unorm::Vector{Float64}, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, odet::OdeState, equil::Equilibrium.PlasmaEquilibrium; op_force::Union{Bool,Nothing}=nothing)
-function ode_output_step!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; force::Bool=false)
-
-    # dout = DconOutput() #TODO: this probably needs to be passed in instead
+function ode_output_step!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, fnames::DconFileNames; force::Bool=false)
 
     # Compute and print critical data for each time step
-    ode_output_monitor!(odet, intr, ctrl, equil)
+    ode_output_monitor!(odet, intr, ctrl, equil, fnames)
     # if dout.out_evals || dout.bin_evals
     #     ode_output_get_evals(intr, ctrl, dout, fNames, equil, odet) # this is just outputs
     # end
 
-    # Write solutions
-    #if bin_euler && (mod(odet.istep, euler_stride) == 0 || force)
-    #    sing_der(neq, psifac, u, du)
-    #    write(euler_bin_unit, 1)
-    #    write(euler_bin_unit, psifac, q, msol)
-    #    write(euler_bin_unit, u)
-    #    write(euler_bin_unit, du)
-    #end
+    # Write solutions to euler.bin
+    # TODO: for now, always writing to euler.bin every step. Can add option to write at all (through outp data struct)
+    # or multiples of steps through eulers_stride. However, we don't have an istep in this version, so might need to do
+    # multiples of psi instead of integer steps?
+    # if bin_euler && (mod(odet.istep, euler_stride) == 0 || force)
+    du = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
+    params = (ctrl, equil, intr, odet, ffit, fnames)
+    sing_der!(du, odet.u, params, odet.psifac)
+    write_to!(fnames, :euler_bin_unit, 1)
+    write_to!(fnames, :euler_bin_unit, odet.psifac, odet.q, odet.msol)
+    write_to!(fnames, :euler_bin_unit, odet.u)
+    write_to!(fnames, :euler_bin_unit, odet.ud)
+    # end
 
     # Output solutions components for each time step
     #if bin_sol
@@ -110,7 +153,7 @@ end
 # end
 
 """
-    ode_output_monitor!(odet, intr, ctrl, equil)
+    ode_output_monitor!(odet, intr, ctrl, equil, fnames)
 
 Monitor the evolution of a critical eigenvalue (`crit`) during ODE integration and detect zero crossings, which indicate resonant or singular behavior.
 The function evaluates `crit` using `ode_output_get_crit`, and if a sign change is found, it estimates the crossing point via linear interpolation.
@@ -127,7 +170,7 @@ A termination flag (`termbycross_flag`) set within DconControl can be used to st
 - Replace `error(...)` with graceful shutdown if zero crossing is an intended exit condition.
 """
 #function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconControl, fNames::DconFileNames, equil::Equilibrium.PlasmaEquilibrium)#, sVars::SingVars)
-function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
+function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, fnames::DconFileNames)
 
     # Compute new crit
     dpsi = odet.psifac - odet.psi_save
@@ -146,10 +189,9 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
             # Very basic terminal printing for now
             println("Zero crossing detected at psi = $psi_med, q = $q_med")
             # println(term_unit, "Zero crossing at psi = $psi_med, q = $q_med")
-            # println(out_unit, "Zero crossing at psi = $psi_med, q = $q_med")
-            # println(crit_out_unit, "Zero crossing at psi = $psi_med, q = $q_med")
-            println("$psi_med $q_med $singfac_med $crit_med")
-            # println(crit_out_unit, "$(odet.istep) $psi_med $dpsi_med $q_med $singfac_med $crit_med")
+            write_to!(fnames, :dcon_unit, @sprintf("Zero crossing at psi = %10.3e, q = %10.3e", psi_med, q_med))
+            write_to!(fnames, :crit_out_unit, @sprintf("Zero crossing at psi = %10.3e, q = %10.3e", psi_med, q_med))
+            write_to!(fnames, :crit_out_unit, @sprintf("%11.3e%11.3e%11.3e%11.3e%11.3e", psi_med,dpsi,q_med,singfac_med,crit_med))
             # write(crit_bin_unit, Float32(psi_med), Float32(logpsi1_med),
             #       Float32(logpsi2_med), Float32(q_med), Float32(crit_med))
             odet.nzero += 1
@@ -162,11 +204,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     end
 
     # Write new crit
-    open(joinpath(intr.dir_path, "crit_data.out"), "a") do io
-        @printf(io, "%.3e %.3e %.3e %.3e %.3e\n", odet.psifac, dpsi, q, singfac, crit)
-    end
-    # println("       psifac:  $(odet.psifac), q: $q, singfac: $singfac, crit: $crit, logpsi1: $logpsi1, logpsi2: $logpsi2")
-    # println(crit_out_unit, "$(odet.istep) $psifac $dpsi $q $singfac $crit")
+    write_to!(fnames, :crit_out_unit, @sprintf("%11.3e%11.3e%11.3e%11.3e%11.3e", odet.psifac,dpsi,odet.q,singfac,crit))
     # write(crit_bin_unit, Float32(psifac), Float32(logpsi1),
     #       Float32(logpsi2), Float32(q), Float32(crit))
 

@@ -61,23 +61,24 @@ end
 
 #TODO: I am assuming this will change - needs discussion of what output files should be
 @kwdef mutable struct DconFileNames
-    out_bal1_unit::String = "bal1.out"
-    out_bal2_unit::String = "bal2.out"
-    bin_bal1_unit::String = "bal1.bin"
-    bin_bal2_unit::String = "bal2.bin"
-    fourfit_out_unit::String = "imats.out"
-    fourfit_bin_unit::String = "imats.bin"
-    evals_out_unit::String = "feval.out"
-    evals_bin_unit::String = "feval.bin"
+    handles::Dict{String,IO} = Dict()
+    # out_bal1_unit::String = "bal1.out"
+    # out_bal2_unit::String = "bal2.out"
+    # bin_bal1_unit::String = "bal1.bin"
+    # bin_bal2_unit::String = "bal2.bin"
+    # fourfit_out_unit::String = "imats.out"
+    # fourfit_bin_unit::String = "imats.bin"
+    # evals_out_unit::String = "feval.out"
+    # evals_bin_unit::String = "feval.bin"
     crit_out_unit::String = "crit.out"
-    crit_bin_unit::String = "crit.bin"
+    # crit_bin_unit::String = "crit.bin"
     euler_bin_unit::String = "euler.bin"
-    init_out_unit::String = "init.out"
-    reinit_out_unit::String = "reinit.out"
+    # init_out_unit::String = "init.out"
+    # reinit_out_unit::String = "reinit.out"
     dcon_unit::String = "dcon.out"
-    unorm_unit::String = "unorm.bin"
-    ca_unit::String = "ca.out"
-    err_unit::String = "error.bin"
+    # unorm_unit::String = "unorm.bin"
+    # ca_unit::String = "ca.out"
+    # err_unit::String = "error.bin"
 end
 
 @kwdef mutable struct DconInternal

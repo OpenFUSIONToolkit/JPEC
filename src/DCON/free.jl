@@ -1,4 +1,4 @@
-function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars; op_netcdf_out::Bool=false)
+function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, fnames::DconFileNames; op_netcdf_out::Bool=false)
 
     # TODO: it looks like vac_memory is always true - remove all ahg things and just assume true?
     vac_memory = true
@@ -138,6 +138,7 @@ function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::
     end
 
     # Normalize phase and label largest component.
+    imax = 0
     for isol in 1:intr.mpert
         # get index of largest absolute component (first occurrence)
         imax = argmax(abs.(wt[:, isol]))
@@ -168,14 +169,14 @@ function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::
     #     # and will be GC'd or freed by dcon_dealloc below
     # end
 
-    # Save eigenvalues and eigenvectors to file (binary)
+    # Write to euler.bin
     # if bin_euler
-    #     write(euler_bin_unit, 3)
-    #     write(euler_bin_unit, ep)
-    #     write(euler_bin_unit, et)
-    #     write(euler_bin_unit, wt)
-    #     write(euler_bin_unit, wt0)
-    #     write(euler_bin_unit, wv_farwall_flag)
+    write_to!(fnames, :euler_bin_unit, 3)
+    write_to!(fnames, :euler_bin_unit, ep)
+    write_to!(fnames, :euler_bin_unit, et)
+    write_to!(fnames, :euler_bin_unit, wt)
+    write_to!(fnames, :euler_bin_unit, wt0)
+    write_to!(fnames, :euler_bin_unit, ctrl.wv_farwall_flag)
     # end
 
     # Write to screen and copy to output.
@@ -185,33 +186,41 @@ function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::
     end
 
     # Write eigenvalues to file
-    # message .= ""
-    # write(out_unit, "Total Energy Eigenvalues:\n")
-    # # Fortran printed table header then looped; mimic minimal form
-    # for isol in 1:mpert
-    #     write(out_unit, "$(isol)  $(real(ep[isol]))  $(real(ev[isol]))  $(real(et[isol]))  $(imag(et[isol]))  $(message[isol])\n")
-    # end
+    write_to!(fnames, :dcon_unit, "\nTotal Energy Eigenvalues:")
+    write_to!(fnames, :dcon_unit, "\n   isol   plasma      vacuum   re total   im total\n")
+    for isol in 1:intr.mpert
+        write_to!(fnames, :dcon_unit, @sprintf("%6d %11.3e %11.3e %11.3e %11.3e",
+                    isol, real(ep[isol]), real(ev[isol]), real(et[isol]), imag(et[isol])))
+    end
+    write_to!(fnames, :dcon_unit, "\n   isol   plasma      vacuum   re total   im total\n")
 
-    # Write eigenvectors to file.
-    # write(out_unit, "Total Energy Eigenvectors:\n")
-    # m .= mlow .+ collect(0:mpert-1)  # note: Fortran had m = mlow + (/isol,isol=0,mpert-1/)
-    # for isol in 1:mpert
-    #     # print header & info similar to Fortran
-    #     write(out_unit, "isol = $(isol), m = $(m[isol])\n")
-    #     # details per ipert
-    #     for ipert in 1:mpert
-    #         write(out_unit, "$(ipert)  $(m[ipert])  $(wt[ipert,isol])  $(abs(wt[ipert,isol]))  $(star[ipert, isol])\n")
-    #     end
-    # end
+    # Write eigenvectors to file
+    write_to!(fnames, :dcon_unit, "Total Energy Eigenvectors:")
+    m = intr.mlow .+ collect(0:intr.mpert-1)
+    for isol in 1:intr.mpert
+        write_to!(fnames, :dcon_unit, "\n   isol   imax   plasma      vacuum   re total   im total\n")
+        write_to!(fnames, :dcon_unit, @sprintf("%6d %6d %11.3e %11.3e %11.3e %11.3e",
+            isol, imax, real(ep[isol]), real(ev[isol]), real(et[isol]), imag(et[isol])))
+        write_to!(fnames, :dcon_unit, "\n  ipert     m      re wt      im wt      abs wt\n")
+        for ipert in 1:intr.mpert
+            write_to!(fnames, :dcon_unit,
+            @sprintf("%6d %6d %11.3e %11.3e %11.3e %s",
+                ipert, m[ipert], real(wt[ipert, isol]), imag(wt[ipert, isol]), abs(wt[ipert, isol]), star[ipert, isol]))
+        end
+        write_to!(fnames, :dcon_unit, "\n  ipert     m      re wt      im wt      abs wt\n")
+    end
 
     # Write the plasma matrix.
-    # write(out_unit, "Plasma Energy Matrix:\n")
-    # for isol in 1:mpert
-    #     write(out_unit, "isol = $(isol), m = $(m[isol])\n")
-    #     for ipert in 1:mpert
-    #         write(out_unit, "i=$(ipert)  re wp=$(real(wp[ipert, isol]))  im wp=$(imag(wp[ipert, isol]))  abs wp=$(abs(wp[ipert, isol]))\n")
-    #     end
-    # end
+    write_to!(fnames, :dcon_unit, "Plasma Energy Matrix:\n")
+    for isol in 1:intr.mpert
+        write_to!(fnames, :dcon_unit, "isol = $(isol), m = $(m[isol])")
+        write_to!(fnames, :dcon_unit, "\n  i     re wp        im wp        abs wp\n")
+        for ipert in 1:intr.mpert
+            write_to!(fnames, :dcon_unit, @sprintf("%3d%13.5e%13.5e%13.5e",
+                ipert, real(wp[ipert, isol]), imag(wp[ipert, isol]), abs(wp[ipert, isol])))
+        end
+        write_to!(fnames, :dcon_unit, "\n  i     re wp        im wp        abs wp\n")
+    end
 
     # Compute separate plasma and vacuum eigenvalues.
     # Right eigenvalues/vectors of wp

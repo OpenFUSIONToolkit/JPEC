@@ -3,14 +3,14 @@
 
 Scan all singular surfaces and calculate asymptotic vmat and mmat matrices and Mericer criterion.
 """
-function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars)
-    println("\n Singular Surfaces:")
-    println("  i    psi      rho      q        q1      di0      di      err")
+function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, fnames::DconFileNames)
+    write_to!(fnames, :dcon_unit, "\n Singular Surfaces:")
+    write_to!(fnames, :dcon_unit, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
     # msol = intr.mpert # TODO: is msol used anywhere else? It's a global in Fortran and very confusing
     for ising in 1:intr.msing
-        sing_vmat!(intr, ctrl, equil, ffit, ising)
+        sing_vmat!(intr, ctrl, equil, ffit, fnames, ising)
     end
-    println("  i    psi      rho      q        q1      di0      di      err")
+    write_to!(fnames, :dcon_unit, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
 end
 
 """
@@ -67,9 +67,6 @@ function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, int
                         q1 = Spl.spline_eval(equil.sq, psifac, 1)[2][4],
                 ))
                 intr.msing += 1
-                if ctrl.verbose
-                    println("Found singular surface: m=$(m), psifac=$(psifac), rho=$(sqrt(psifac)), q=$(m / ctrl.nn), q1=$(Spl.spline_eval(equil.sq, psifac, 1)[2][4])")
-                end
             end
             m += dm
         end
@@ -165,8 +162,8 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
 end
 
 # Main differences: using 1 indexing, so zeroth order is the first index, whereas Fortran used 0 indexing for these arrays
-function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
-    
+function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, fnames::DconFileNames, ising::Int)
+
     # Allocations
     singp = intr.sing[ising]
     singp.vmat = zeros(ComplexF64, intr.mpert, 2*intr.mpert, 2, 2*ctrl.sing_order + 1)
@@ -207,8 +204,7 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     singp.power[ipert0] = -singp.alpha
     singp.power[ipert0 + intr.mpert] = singp.alpha
 
-    println(@sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e",
-        ising, psifac, rho, q, q1, di0, singp.di, singp.di/di0-1))
+    write_to!(fnames, :dcon_unit, @sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e", ising, psifac, rho, q, q1, di0, singp.di, singp.di/di0-1))
 
     # Zeroth-order non-resonant solutions
     singp.vmat .= 0
@@ -538,7 +534,7 @@ function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
 
     # Compute distance from singular surface
     dpsi = odet.psifac - singp.psifac
-    sqrtfac = sqrt(dpsi)
+    sqrtfac = sqrt(complex(dpsi))
     pfac = abs(dpsi)^singp.alpha
 
     # Compute power series via Horner's method
@@ -561,67 +557,35 @@ function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
 end
 
 """
-    sing_get_ca!(ca::AbstractArray{ComplexF64,3}, intr::DconInternal, ising::Int, psifac::Real, u::AbstractArray{ComplexF64,3})
+    sing_get_ca!(odet::OdeState, intr::DconInternal)
 
-Compute the asymptotic expansion coefficients for a given singularity and solution array.
-
-- `ca`: Output 3D complex array (mutated in-place), shape (mpert, msol, 2)
-- `intr`: DCON internal state (contains singularity data, mpert, etc.)
-- `ising`: Index of the singularity (integer)
-- `psifac`: Input psi factor (real scalar)
-- `u`: Input 3D complex array (solution array), shape (mpert, msol, 2)
-
-Fills `ca` with the expansion coefficients for the specified singularity and psi value.
+Compute the asymptotic expansion coefficients according to equation 50 in Glasser 2016 DCON paper.
 """
-#TODO: Are these comments correct?
-#Compute asymptotic coefficients 
-# Inputs:
-#   ising is just passed through if needed externally
-#   psifac: input psi factor
-#   u: input array
-# Output:
-#   ca::Array{ComplexF64,3}
-function sing_get_ca!(ca::AbstractArray{ComplexF64,3},
-    intr::DconInternal,
-    ising::Int,
-    psifac::Real,
-    u::AbstractArray{ComplexF64,3}) #TODO: ca is being modified so from Julia conventions, it should be listed first. In Fortran, it is listed last
+function sing_get_ca!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
 
-    # number of solutions
-    msol = size(u,2)
-    mpert = intr.mpert
+    sing_get_ua!(odet, intr, ctrl)
 
-    # call asymptotic solution generator
-    ua = similar(u)
-    ua = sing_get_ua!(ua,intr, ising, psifac)
+    # Build temp1
+    temp1 = zeros(ComplexF64, 2*intr.mpert, 2*intr.mpert)
+    temp1[1:intr.mpert, :] .= odet.ua[:, :, 1]
+    temp1[intr.mpert+1:2*intr.mpert, :] .= odet.ua[:, :, 2]
 
-    # build system matrix temp1 (2*mpert × 2*mpert)
-    temp1 = Array{ComplexF64}(undef, 2*mpert, 2*mpert)
-    temp1[1:mpert, :] .= ua[:, :, 1]
-    temp1[mpert+1:2*mpert, :] .= ua[:, :, 2]
-
-    # build right-hand side temp2 (2*mpert × msol)
-    temp2 = Array{ComplexF64}(undef, 2*mpert, msol)
-    temp2[1:mpert, :] .= u[:, :, 1]
-    temp2[mpert+1:2*mpert, :] .= u[:, :, 2]
+    # Built temp2
+    temp2 = zeros(ComplexF64, 2*intr.mpert, odet.msol)
+    temp2[1:intr.mpert, :] .= odet.u[:, :, 1]
+    temp2[intr.mpert+1:2*intr.mpert, :] .= odet.u[:, :, 2]
 
     # LU factorization and solve
-    F = lu(temp1)
-    temp2 .= F \ temp2
-
-    # output coefficients ca (mpert × msol × 2)
-    #ca = Array{ComplexF64}(undef, mpert, msol, 2) #don't think we need this
-    ca[:, 1:msol, 1] .= temp2[1:mpert, :]
-    ca[:, 1:msol, 2] .= temp2[mpert+1:2*mpert, :]
-
-    return ca
+    temp2 .= lu(temp1) \ temp2
+    odet.ca[:, 1:odet.msol, 1] .= temp2[1:intr.mpert, :]
+    odet.ca[:, 1:odet.msol, 2] .= temp2[intr.mpert+1:2*intr.mpert, :]
 end
 
 """
     sing_der!(
         du::Array{ComplexF64,3},
         u::Array{ComplexF64,3},
-        params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, FourFitVars},
+        params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, FourFitVars, DconFileNames},
         psieval::Float64
     )
 
@@ -642,10 +606,10 @@ more simplistic code with similar performance.
 """
 function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
                    params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium,
-                                 DconInternal, OdeState, FourFitVars},
+                                 DconInternal, OdeState, FourFitVars, DconFileNames},
                    psieval::Float64)
     # Unpack structs
-    ctrl, equil, intr, odet, ffit = params
+    ctrl, equil, intr, odet, ffit, _ = params
 
     # Spline evaluation
     odet.q = Spl.spline_eval(equil.sq, psieval, 0)[4]
