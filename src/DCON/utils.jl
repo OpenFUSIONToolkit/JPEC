@@ -40,65 +40,83 @@ function load_u_matrix(filename)
 end
 
 """
-    init_files!(df::DconFileNames; append=false, dir=nothing)
+    init_files(out::DconOutput, path::String)
 
-Open all files in the struct and store the handles in `df.handles`.
-If `append=true`, open in append mode; otherwise overwrite.
-If `dir` is provided, files will be created in that directory.
+Open all requested output files into `path` and store handles.
 """
-function init_files!(df::DconFileNames; append=false, dir::Union{Nothing,String}=nothing)
-    mode = append ? "a" : "w"
+function init_files(out::DconOutput, path::String)
+    for pname in propertynames(out)
+        if startswith(String(pname), "write_") && getproperty(out, pname)
+            base_str = String(pname)[7:end]          # remove write_ prefix
+            base = Symbol(base_str)                       # key for handles
+            fname_field = Symbol("fname_" * base_str) # add fname_ prefix
+            fname = getproperty(out, fname_field)
 
-    for field in fieldnames(DconFileNames)
-        if field == :handles
-            continue
+            full_path = joinpath(path, fname)
+
+            if endswith(fname, ".out") || endswith(fname, ".txt")
+                out.handles[base] = open(full_path, "w")
+
+            elseif endswith(fname, ".h5") && !haskey(out.handles, base)
+                fid = h5open(full_path, "w")
+                out.handles[base] = fid
+
+            else
+                error("Unknown file extension for $fname, need to add to init_files!")
+            end
         end
-        filename = getfield(df, field)
-
-        # if dir is given, join it with the filename
-        fullpath = isnothing(dir) ? filename : joinpath(dir, filename)
-
-        # make sure the directory exists
-        if !isnothing(dir)
-            mkpath(dir)
-        end
-        io = open(fullpath, mode)
-        df.handles[String(field)] = io
     end
-    return df
+    return out
 end
 
 """
-    write_to!(df::DconFileNames, field::Symbol, data::AbstractString)
+    write_output(out::DconOutput, key::Symbol, data; dsetname=nothing, slice=:)
 
-Write data to the file associated with `field` in `df`.
-
-- If all `args` are strings, they are joined with spaces and written
-  as a line of text (terminated with a newline).
-- Otherwise, `args` are written in sequence as raw binary values,
-  matching Fortran-style `WRITE` behavior.
+Writes `data` to the file corresponding to `key`.
+- For text files: appends a line.
+- For HDF5 files: writes into `dsetname` at `slice`.
 """
-function write_to!(df::DconFileNames, field::Symbol, args...)
-    io = df.handles[String(field)]
+function write_output(out::DconOutput, key::Symbol, data; dsetname=nothing, slice=:)
+    handle = out.handles[key]
 
-    if all(x -> x isa AbstractString, args)
-        # if all arguments are strings, treat as text line
-        println(io, join(args, " "))
+    if handle isa IOStream
+        println(handle, data)
+
+    elseif handle isa HDF5.File
+        if dsetname === nothing
+            error("Must specify dsetname when writing to HDF5 file $key")
+        end
+        if haskey(handle, dsetname)
+            handle[dsetname][slice...] = data
+        else
+            # create dataset if not present
+            handle[dsetname] = data
+        end
+
     else
-        # otherwise, dump binary representations
-        write(io, args...)
+        error("Unsupported handle type for key $key")
     end
-    flush(io)
 end
 
 """
-    close_files!(df::DconFileNames)
+    close_files(out::DconOutput)
 
-Close all open file handles.
+Closes all open files.
 """
-function close_files!(df::DconFileNames)
-    for io in values(df.handles)
-        close(io)
+function close_files(out::DconOutput)
+    for (key, handle) in out.handles
+        close(handle)
     end
-    empty!(df.handles)
+    empty!(out.handles)
+end
+
+"""
+    chebyshev_nodes(a::Float64, b::Float64, N::Int)
+Generates `N+1` Chebyshev-Lobatto nodes in the interval `[a, b]`
+in ascending order.
+"""
+function chebyshev_nodes(a::Float64, b::Float64, N::Int)
+    j = 0:N
+    nodes = (a+b)/2 .+ (b-a)/2 .* cos.(pi * j ./ N)
+    return reverse(nodes)
 end

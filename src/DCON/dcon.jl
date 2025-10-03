@@ -10,8 +10,7 @@ function MainProgram(path::String)
     ctrl = DconControl(; (Symbol(k)=>v for (k,v) in inputs["DCON_CONTROL"])...)
     outp = DconOutput(; (Symbol(k)=>v for (k,v) in inputs["DCON_OUTPUT"])...)
     equil = Equilibrium.setup_equilibrium(joinpath(intr.dir_path, "equil.toml"))
-    fnames = DconFileNames()
-    init_files!(fnames; dir=intr.dir_path)
+    init_files(outp, intr.dir_path)
 
     # Set up variables
     # TODO: dcon_kin_threads logic?
@@ -47,35 +46,37 @@ function MainProgram(path::String)
     # Fit stability data to splines and dump to file
     intr.locstab = Spl.CubicSpline(Vector(equil.sq.xs), locstab_fs; bctype=3)
     
-    # Dump equilibrium data to file (in Fortran, this was dumped to dcon.bin, but I like this separate)
-    h5open(joinpath(intr.dir_path, "equil_data.h5"), "w") do file
-        file["psi"] = Vector(equil.sq.xs)
-        file["f"] = Vector(equil.sq.fs[:, 1] ./ (2π))
-        file["mu0p"] = Vector(equil.sq.fs[:, 2])
-        file["dV/dpsi"] = Vector(equil.sq.fs[:, 3])
-        file["q"] = Vector(equil.sq.fs[:, 4])
-        file["di"] = Vector(locstab_fs[:, 1] ./ equil.sq.xs)
-        file["dr"] = Vector(locstab_fs[:, 2] ./ equil.sq.xs)
-        file["ca1"] = Vector(locstab_fs[:, 4])
+    # Dump equilibrium data to files
+    if outp.write_eqdata_h5
+        write_output(outp, :eqdata_h5, Vector(equil.sq.xs); dsetname="psi")
+        write_output(outp, :eqdata_h5, Vector(equil.sq.fs[:, 1] ./ (2π)); dsetname="f")
+        write_output(outp, :eqdata_h5, Vector(equil.sq.fs[:, 2]); dsetname="mu0p")
+        write_output(outp, :eqdata_h5, Vector(equil.sq.fs[:, 3]); dsetname="dV/dpsi")
+        write_output(outp, :eqdata_h5, Vector(equil.sq.fs[:, 4]); dsetname="q")
+        write_output(outp, :eqdata_h5, Vector(locstab_fs[:, 1] ./ equil.sq.xs); dsetname="di")
+        write_output(outp, :eqdata_h5, Vector(locstab_fs[:, 2] ./ equil.sq.xs); dsetname="dr")
+        write_output(outp, :eqdata_h5, Vector(locstab_fs[:, 4]); dsetname="ca1")
     end
 
-    write_to!(fnames, :dcon_unit, @sprintf("%4s %12s %12s %12s %12s %12s %12s %12s %12s", "ipsi","psifac","f","mu0 p","dvdpsi","q","di","dr","ca1"))
-    for ipsi in 1:length(equil.sq.xs)
-        write_to!(fnames, :dcon_unit,
-            @sprintf("%4d %12.4e %12.4e %12.4e %12.4e %12.4e %12.4e %12.4e %12.4e",
-                    ipsi, 
-                    equil.sq.xs[ipsi], 
-                    equil.sq.fs[ipsi, 1] / (2π), 
-                    equil.sq.fs[ipsi, 2], 
-                    equil.sq.fs[ipsi, 3], 
-                    equil.sq.fs[ipsi, 4], 
-                    locstab_fs[ipsi, 1] / equil.sq.xs[ipsi], 
-                    locstab_fs[ipsi, 2] / equil.sq.xs[ipsi], 
-                    locstab_fs[ipsi, 4]
+    if outp.write_dcon_out
+        write_output(outp, :dcon_out, @sprintf("%4s %12s %12s %12s %12s %12s %12s %12s %12s", "ipsi","psifac","f","mu0 p","dvdpsi","q","di","dr","ca1"))
+        for ipsi in 1:length(equil.sq.xs)
+            write_output(outp, :dcon_out,
+                @sprintf("%4d %12.4e %12.4e %12.4e %12.4e %12.4e %12.4e %12.4e %12.4e",
+                        ipsi, 
+                        equil.sq.xs[ipsi], 
+                        equil.sq.fs[ipsi, 1] / (2π), 
+                        equil.sq.fs[ipsi, 2], 
+                        equil.sq.fs[ipsi, 3], 
+                        equil.sq.fs[ipsi, 4], 
+                        locstab_fs[ipsi, 1] / equil.sq.xs[ipsi], 
+                        locstab_fs[ipsi, 2] / equil.sq.xs[ipsi], 
+                        locstab_fs[ipsi, 4]
+                )
             )
-        )
+        end
+        write_output(outp, :dcon_out, @sprintf("%4s %12s %12s %12s %12s %12s %12s %12s %12s", "ipsi","psifac","f","mu0 p","dvdpsi","q","di","dr","ca1"))
     end
-    write_to!(fnames, :dcon_unit, @sprintf("%4s %12s %12s %12s %12s %12s %12s %12s %12s", "ipsi","psifac","f","mu0 p","dvdpsi","q","di","dr","ca1"))
 
     # Find all singular surfaces in the equilibrium
     sing_find!(ctrl, equil, intr)
@@ -109,10 +110,12 @@ function MainProgram(path::String)
             println(" Fourier analysis of metric tensor components")
         end
 
-        write_to!(fnames, :dcon_unit, @sprintf("\n   mlow   mhigh   mpert   mband   nn   lim_fl   dmlim      qlim      psilim"))
-        write_to!(fnames, :dcon_unit, @sprintf("%6d %6d %6d %6d %6d %6s %11.3e %11.3e %11.3e",
-            intr.mlow, intr.mhigh, intr.mpert, intr.mband, ctrl.nn,
-            string(ctrl.sas_flag), ctrl.dmlim, intr.qlim, intr.psilim))
+        if outp.write_dcon_out
+            write_output(outp, :dcon_out, @sprintf("\n   mlow   mhigh   mpert   mband   nn   lim_fl   dmlim      qlim      psilim"))
+            write_output(outp, :dcon_out, @sprintf("%6d %6d %6d %6d %6d %6s %11.3e %11.3e %11.3e",
+                intr.mlow, intr.mhigh, intr.mpert, intr.mband, ctrl.nn,
+                string(ctrl.sas_flag), ctrl.dmlim, intr.qlim, intr.psilim))
+        end
         
         # Compute metric tensor
         metric = make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag)
@@ -127,7 +130,7 @@ function MainProgram(path::String)
         if ctrl.kin_flag
             error("kin_flag not implemented yet")
         end
-        sing_scan!(intr, ctrl, equil, ffit, fnames)
+        sing_scan!(intr, ctrl, equil, ffit, outp)
         # TODO: implement resist_eval at some point, not urgent for initial functionality.
         # for ising in 1:msing
         #  resist_eval(sing[ising])
@@ -137,14 +140,12 @@ function MainProgram(path::String)
         end
     end
 
-    open(joinpath(intr.dir_path, "crit_data.out"), "w") do io
-    end
     # Integrate Euler-Lagrange Equation
     if ctrl.ode_flag
         if ctrl.verbose
             println("Integrating Euler-Lagrange equation")
         end
-        odet = ode_run(ctrl, equil, intr, ffit, fnames)
+        odet = ode_run(ctrl, equil, intr, ffit, outp)
         if intr.size_edge > 0
             # Find peak index in dw_edge[pre_edge:i_edge]
             dw_slice = real.(intr.dw_edge[intr.pre_edge:intr.i_edge])
@@ -159,7 +160,7 @@ function MainProgram(path::String)
             # if outp.bin_euler
             #    bin_close(euler_bin_unit) # TODO: Need to decide ho we're handling io
             # end
-            odet = ode_run(ctrl, equil, intr, ffit, fnames)
+            odet = ode_run(ctrl, equil, intr, ffit, outp)
         end
     end
 
@@ -171,7 +172,7 @@ function MainProgram(path::String)
         if ctrl.verbose
             println("Computing free boundary energies")
         end
-        plasma1, vacuum1, total1 = free_run(odet, ctrl, intr, equil, ffit, fnames; op_netcdf_out=false) # outp.netcdf_out)
+        plasma1, vacuum1, total1 = free_run(odet, ctrl, intr, equil, ffit, outp; op_netcdf_out=false) # outp.netcdf_out)
     end
 
     # Output results of fixed-boundary stability calculations
@@ -195,7 +196,7 @@ function MainProgram(path::String)
     end
 
     end_time = time() - start_time
-    close_files!(fnames)
+    close_files(outp)
     println("----------------------------------")
     println("Run time: $end_time seconds")
     println("Normal termination.")

@@ -1,16 +1,16 @@
 """
-    sing_scan!(odet::OdeState, intr::DconInternal)
+    sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput)
 
 Scan all singular surfaces and calculate asymptotic vmat and mmat matrices and Mericer criterion.
 """
-function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, fnames::DconFileNames)
-    write_to!(fnames, :dcon_unit, "\n Singular Surfaces:")
-    write_to!(fnames, :dcon_unit, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
+function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput)
+    write_output(outp, :dcon_out, "\n Singular Surfaces:")
+    write_output(outp, :dcon_out, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
     # msol = intr.mpert # TODO: is msol used anywhere else? It's a global in Fortran and very confusing
     for ising in 1:intr.msing
-        sing_vmat!(intr, ctrl, equil, ffit, fnames, ising)
+        sing_vmat!(intr, ctrl, equil, ffit, outp, ising)
     end
-    write_to!(fnames, :dcon_unit, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
+    write_output(outp, :dcon_out, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
 end
 
 """
@@ -162,7 +162,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
 end
 
 # Main differences: using 1 indexing, so zeroth order is the first index, whereas Fortran used 0 indexing for these arrays
-function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, fnames::DconFileNames, ising::Int)
+function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput, ising::Int)
 
     # Allocations
     singp = intr.sing[ising]
@@ -204,7 +204,7 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     singp.power[ipert0] = -singp.alpha
     singp.power[ipert0 + intr.mpert] = singp.alpha
 
-    write_to!(fnames, :dcon_unit, @sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e", ising, psifac, rho, q, q1, di0, singp.di, singp.di/di0-1))
+    write_output(outp, :dcon_out, @sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e", ising, psifac, rho, q, q1, di0, singp.di, singp.di/di0-1))
 
     # Zeroth-order non-resonant solutions
     singp.vmat .= 0
@@ -585,7 +585,7 @@ end
     sing_der!(
         du::Array{ComplexF64,3},
         u::Array{ComplexF64,3},
-        params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, FourFitVars, DconFileNames},
+        params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, FourFitVars, DconOutput},
         psieval::Float64
     )
 
@@ -606,7 +606,7 @@ more simplistic code with similar performance.
 """
 function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
                    params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium,
-                                 DconInternal, OdeState, FourFitVars, DconFileNames},
+                                 DconInternal, OdeState, FourFitVars, DconOutput},
                    psieval::Float64)
     # Unpack structs
     ctrl, equil, intr, odet, ffit, _ = params

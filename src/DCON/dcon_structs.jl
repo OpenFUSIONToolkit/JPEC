@@ -1,4 +1,5 @@
 # TODO: add descriptions of what all variables are and/or explanation of defaults
+# TODO: remove all unused variables before first pull request
 @kwdef mutable struct ResistType
     e::Float64 = 0.0
     f::Float64 = 0.0
@@ -59,28 +60,6 @@ end
 # # Constructor to allocate matrices
 # SingType(mpert::Int, order::Int; kwargs...) = SingType(; mpert, order, kwargs...)
 
-#TODO: I am assuming this will change - needs discussion of what output files should be
-@kwdef mutable struct DconFileNames
-    handles::Dict{String,IO} = Dict()
-    # out_bal1_unit::String = "bal1.out"
-    # out_bal2_unit::String = "bal2.out"
-    # bin_bal1_unit::String = "bal1.bin"
-    # bin_bal2_unit::String = "bal2.bin"
-    # fourfit_out_unit::String = "imats.out"
-    # fourfit_bin_unit::String = "imats.bin"
-    # evals_out_unit::String = "feval.out"
-    # evals_bin_unit::String = "feval.bin"
-    crit_out_unit::String = "crit.out"
-    # crit_bin_unit::String = "crit.bin"
-    euler_bin_unit::String = "euler.bin"
-    # init_out_unit::String = "init.out"
-    # reinit_out_unit::String = "reinit.out"
-    dcon_unit::String = "dcon.out"
-    # unorm_unit::String = "unorm.bin"
-    # ca_unit::String = "ca.out"
-    # err_unit::String = "error.bin"
-end
-
 @kwdef mutable struct DconInternal
     dir_path::String = ""
     mlow::Int = 0 #Copy of delta_mlow, but with limits enforced
@@ -119,8 +98,10 @@ end
     res_flag::Bool = false
     fft_flag::Bool = false
     node_flag::Bool = false
+    saves_per_region::Int = 2 # number of u to save per interrational region, must be >> 0 to run GPEC
+    save_spacing::String = "Chebyshev" # method for determining spacing of saved u points
     mthvac::Int = 480
-    sing_start::Float64 = 0.0
+    sing_start::Int = 0
     nn::Int = 0
     delta_mlow::Int = 0
     delta_mhigh::Int = 0
@@ -166,7 +147,24 @@ end
     diagnose_ca::Bool = false
 end
 
+# TODO: a lot of these will be deprecated, this will be a general data structure that handles output
+# Since file I/O in Julia will be very different than Fortran, this will likely be reworked significantly
 @kwdef mutable struct DconOutput
+    # output switches
+    write_crit_out::Bool   = true
+    write_dcon_out::Bool   = true
+    write_euler_h5::Bool   = false
+    write_eqdata_h5::Bool  = false
+
+    # filenames
+    fname_crit_out::String  = "crit.out"
+    fname_dcon_out::String  = "dcon.out"
+    fname_euler_h5::String  = "euler.h5"
+    fname_eqdata_h5::String = "eqdata.h5"
+
+    handles::Dict{Symbol,Any} = Dict()
+
+    # Old or unused yet
     interp::Bool = false
     crit_break::Bool = true
     out_bal1::Bool = false

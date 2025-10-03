@@ -1,4 +1,4 @@
-function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, fnames::DconFileNames; op_netcdf_out::Bool=false)
+function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput; op_netcdf_out::Bool=false)
 
     # TODO: it looks like vac_memory is always true - remove all ahg things and just assume true?
     vac_memory = true
@@ -169,15 +169,16 @@ function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::
     #     # and will be GC'd or freed by dcon_dealloc below
     # end
 
-    # Write to euler.bin
-    # if bin_euler
-    write_to!(fnames, :euler_bin_unit, 3)
-    write_to!(fnames, :euler_bin_unit, ep)
-    write_to!(fnames, :euler_bin_unit, et)
-    write_to!(fnames, :euler_bin_unit, wt)
-    write_to!(fnames, :euler_bin_unit, wt0)
-    write_to!(fnames, :euler_bin_unit, ctrl.wv_farwall_flag)
-    # end
+    # Write to euler.h5
+    if outp.write_euler_h5
+        write_output(outp, :euler_h5, 3)
+        write_output(outp, :euler_h5, ep)
+        write_output(outp, :euler_h5, ev)
+        write_output(outp, :euler_h5, et)
+        write_output(outp, :euler_h5, wt)
+        write_output(outp, :euler_h5, wt0)
+        write_output(outp, :euler_h5, ctrl.wv_farwall_flag)
+    end
 
     # Write to screen and copy to output.
     if ctrl.verbose
@@ -186,40 +187,40 @@ function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::
     end
 
     # Write eigenvalues to file
-    write_to!(fnames, :dcon_unit, "\nTotal Energy Eigenvalues:")
-    write_to!(fnames, :dcon_unit, "\n   isol   plasma      vacuum   re total   im total\n")
+    write_output(outp, :dcon_out, "\nTotal Energy Eigenvalues:")
+    write_output(outp, :dcon_out, "\n   isol   plasma      vacuum   re total   im total\n")
     for isol in 1:intr.mpert
-        write_to!(fnames, :dcon_unit, @sprintf("%6d %11.3e %11.3e %11.3e %11.3e",
+        write_output(outp, :dcon_out, @sprintf("%6d %11.3e %11.3e %11.3e %11.3e",
                     isol, real(ep[isol]), real(ev[isol]), real(et[isol]), imag(et[isol])))
     end
-    write_to!(fnames, :dcon_unit, "\n   isol   plasma      vacuum   re total   im total\n")
+    write_output(outp, :dcon_out, "\n   isol   plasma      vacuum   re total   im total\n")
 
     # Write eigenvectors to file
-    write_to!(fnames, :dcon_unit, "Total Energy Eigenvectors:")
+    write_output(outp, :dcon_out, "Total Energy Eigenvectors:")
     m = intr.mlow .+ collect(0:intr.mpert-1)
     for isol in 1:intr.mpert
-        write_to!(fnames, :dcon_unit, "\n   isol   imax   plasma      vacuum   re total   im total\n")
-        write_to!(fnames, :dcon_unit, @sprintf("%6d %6d %11.3e %11.3e %11.3e %11.3e",
+        write_output(outp, :dcon_out, "\n   isol   imax   plasma      vacuum   re total   im total\n")
+        write_output(outp, :dcon_out, @sprintf("%6d %6d %11.3e %11.3e %11.3e %11.3e",
             isol, imax, real(ep[isol]), real(ev[isol]), real(et[isol]), imag(et[isol])))
-        write_to!(fnames, :dcon_unit, "\n  ipert     m      re wt      im wt      abs wt\n")
+        write_output(outp, :dcon_out, "\n  ipert     m      re wt      im wt      abs wt\n")
         for ipert in 1:intr.mpert
-            write_to!(fnames, :dcon_unit,
+            write_output(outp, :dcon_out,
             @sprintf("%6d %6d %11.3e %11.3e %11.3e %s",
                 ipert, m[ipert], real(wt[ipert, isol]), imag(wt[ipert, isol]), abs(wt[ipert, isol]), star[ipert, isol]))
         end
-        write_to!(fnames, :dcon_unit, "\n  ipert     m      re wt      im wt      abs wt\n")
+       write_output(outp, :dcon_out, "\n  ipert     m      re wt      im wt      abs wt\n")
     end
 
     # Write the plasma matrix.
-    write_to!(fnames, :dcon_unit, "Plasma Energy Matrix:\n")
+    write_output(outp, :dcon_out, "Plasma Energy Matrix:\n")
     for isol in 1:intr.mpert
-        write_to!(fnames, :dcon_unit, "isol = $(isol), m = $(m[isol])")
-        write_to!(fnames, :dcon_unit, "\n  i     re wp        im wp        abs wp\n")
+        write_output(outp, :dcon_out, "isol = $(isol), m = $(m[isol])")
+        write_output(outp, :dcon_out, "\n  i     re wp        im wp        abs wp\n")
         for ipert in 1:intr.mpert
-            write_to!(fnames, :dcon_unit, @sprintf("%3d%13.5e%13.5e%13.5e",
+            write_output(outp, :dcon_out, @sprintf("%3d%13.5e%13.5e%13.5e",
                 ipert, real(wp[ipert, isol]), imag(wp[ipert, isol]), abs(wp[ipert, isol])))
         end
-        write_to!(fnames, :dcon_unit, "\n  i     re wp        im wp        abs wp\n")
+        write_output(outp, :dcon_out, "\n  i     re wp        im wp        abs wp\n")
     end
 
     # Compute separate plasma and vacuum eigenvalues.
