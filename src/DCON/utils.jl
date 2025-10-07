@@ -112,11 +112,11 @@ end
 
 """
     chebyshev_nodes(a::Float64, b::Float64, N::Int)
-Generates `N+1` Chebyshev-Lobatto nodes in the interval `[a, b]`
+Generates `N` Chebyshev-Lobatto nodes in the interval `[a, b]`
 in ascending order.
 """
 function chebyshev_nodes(a::Float64, b::Float64, N::Int)
-    j = 0:N
-    nodes = (a+b)/2 .+ (b-a)/2 .* cos.(pi * j ./ N)
+    j = 0:N-1
+    nodes = (a+b)/2 .+ (b-a)/2 .* cos.(π * j ./ (N - 1))
     return reverse(nodes)
 end

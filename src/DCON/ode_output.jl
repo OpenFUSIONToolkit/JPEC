@@ -48,8 +48,8 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
         write_output(outp, :euler_h5, equil.params.qmax; dsetname="equil/qmax")
         write_output(outp, :euler_h5, equil.params.qa; dsetname="equil/qa")
         write_output(outp, :euler_h5, equil.params.crnt; dsetname="equil/crnt")
-        write_output(outp, :euler_h5, equil.params.psio; dsetname="equil/psio")
-        write_output(outp, :euler_h5, equil.params.psilow; dsetname="equil/psilow")
+        write_output(outp, :euler_h5, equil.psio; dsetname="equil/psio")
+        write_output(outp, :euler_h5, equil.config.control.psilow; dsetname="equil/psilow")
         write_output(outp, :euler_h5, equil.config.control.power_b; dsetname="equil/power_b")
         write_output(outp, :euler_h5, equil.config.control.power_r; dsetname="equil/power_r")
         write_output(outp, :euler_h5, equil.config.control.power_bp; dsetname="equil/power_bp")
@@ -57,16 +57,36 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
         write_output(outp, :euler_h5, 0; dsetname="equil/shottime") # TODO: equil.params.shottime)
 
         # Write spline arrays
-        write_output(outp, :euler_h5, equil.sq.xs; dsetname="splines/sq/xs")
-        write_output(outp, :euler_h5, equil.sq.fs; dsetname="splines/sq/fs")
-        write_output(outp, :euler_h5, equil.sq.fs1; dsetname="splines/sq/fs1")
+        write_output(outp, :euler_h5, Vector(equil.sq.xs); dsetname="splines/sq/xs")
+        # TODO: getting errors when trying to dump just fs, so splitting for now, which adds so many lines
+        #  This should be fixed if we separate these like Nik mentioned
+        write_output(outp, :euler_h5, equil.sq.fs[:,1]; dsetname="splines/sq/fs/2piF")
+        write_output(outp, :euler_h5, equil.sq.fs[:,2]; dsetname="splines/sq/fs/mu0p")
+        write_output(outp, :euler_h5, equil.sq.fs[:,3]; dsetname="splines/sq/fs/dVdpsi")
+        write_output(outp, :euler_h5, equil.sq.fs[:,4]; dsetname="splines/sq/fs/q")
+        write_output(outp, :euler_h5, equil.sq.fs1[:,1]; dsetname="splines/sq/fs1/2piF")
+        write_output(outp, :euler_h5, equil.sq.fs1[:,2]; dsetname="splines/sq/fs1/mu0p")
+        write_output(outp, :euler_h5, equil.sq.fs1[:,3]; dsetname="splines/sq/fs1/dVdpsi")
+        write_output(outp, :euler_h5, equil.sq.fs1[:,4]; dsetname="splines/sq/fs1/q")
         write_output(outp, :euler_h5, 0; dsetname="splines/sq/xpower") # TODO: equil.sq.xpower
-        write_output(outp, :euler_h5, equil.rzphi.xs; dsetname="splines/rzphi/xs")
-        write_output(outp, :euler_h5, equil.rzphi.ys; dsetname="splines/rzphi/ys")
-        write_output(outp, :euler_h5, equil.rzphi.fs; dsetname="splines/rzphi/fs")
-        write_output(outp, :euler_h5, equil.rzphi.fs1; dsetname="splines/rzphi/fsx")
-        write_output(outp, :euler_h5, equil.rzphi.fs2; dsetname="splines/rzphi/fsy")
-        write_output(outp, :euler_h5, equil.rzphi.fs12; dsetname="splines/rzphi/fsxy")
+        write_output(outp, :euler_h5, Vector(equil.rzphi.xs); dsetname="splines/rzphi/xs")
+        write_output(outp, :euler_h5, Vector(equil.rzphi.ys); dsetname="splines/rzphi/ys")
+        write_output(outp, :euler_h5, equil.rzphi.fs[:,1]; dsetname="splines/rzphi/fs/rcoords")
+        write_output(outp, :euler_h5, equil.rzphi.fs[:,2]; dsetname="splines/rzphi/fs/offset")
+        write_output(outp, :euler_h5, equil.rzphi.fs[:,3]; dsetname="splines/rzphi/fs/nu")
+        write_output(outp, :euler_h5, equil.rzphi.fs[:,4]; dsetname="splines/rzphi/fs/jac")
+        write_output(outp, :euler_h5, equil.rzphi.fsx[:,1]; dsetname="splines/rzphi/fsx/rcoords")
+        write_output(outp, :euler_h5, equil.rzphi.fsx[:,2]; dsetname="splines/rzphi/fsx/offset")
+        write_output(outp, :euler_h5, equil.rzphi.fsx[:,3]; dsetname="splines/rzphi/fsx/nu")
+        write_output(outp, :euler_h5, equil.rzphi.fsx[:,4]; dsetname="splines/rzphi/fsx/jac")
+        write_output(outp, :euler_h5, equil.rzphi.fsy[:,1]; dsetname="splines/rzphi/fsy/rcoords")
+        write_output(outp, :euler_h5, equil.rzphi.fsy[:,2]; dsetname="splines/rzphi/fsy/offset")
+        write_output(outp, :euler_h5, equil.rzphi.fsy[:,3]; dsetname="splines/rzphi/fsy/nu")
+        write_output(outp, :euler_h5, equil.rzphi.fsy[:,4]; dsetname="splines/rzphi/fsy/jac")
+        write_output(outp, :euler_h5, equil.rzphi.fsxy[:,1]; dsetname="splines/rzphi/fsxy/rcoords")
+        write_output(outp, :euler_h5, equil.rzphi.fsxy[:,2]; dsetname="splines/rzphi/fsxy/offset")
+        write_output(outp, :euler_h5, equil.rzphi.fsxy[:,3]; dsetname="splines/rzphi/fsxy/nu")
+        write_output(outp, :euler_h5, equil.rzphi.fsxy[:,4]; dsetname="splines/rzphi/fsxy/jac")
         write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/x0") # TODO: equil.rzphi.x0
         write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/y0") # TODO: equil.rzphi.y0
         write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/xpower") # TODO: equil.rzphi.xpower
@@ -91,9 +111,9 @@ This function calls `ode_output_monitor` to track critical eigenvalue behavior
 and handle any diagnostics or logging associated with the current step.
 Additional output (e.g., eigenvalue dumps, binary solution logging) may be added later.
 """
-#TODO: depending on how we restructure our outputs, this function might be uncessary.
-# It currently just calls ode_output_monitor! and does not write any outputs.
-function ode_output_step!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput; force::Bool=false)
+#TODO: depending on how we restructure our outputs, this function might be uncessary
+# (i.e. if we don't need an ode_output_get_evals or ode_output_sol, can just replace calls with ode_output_monitor)
+function ode_output_step!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, outp::DconOutput)
 
     # Compute and print critical data for each time step
     ode_output_monitor!(odet, intr, ctrl, equil, outp)
@@ -101,26 +121,11 @@ function ode_output_step!(odet::OdeState, intr::DconInternal, ctrl::DconControl,
     #     ode_output_get_evals(intr, ctrl, dout, fNames, equil, odet) # this is just outputs
     # end
 
-    # Write solutions to euler.bin
-    # TODO: for now, always writing to euler.bin every step. Can add option to write at all (through outp data struct)
-    # or multiples of steps through eulers_stride. However, we don't have an istep in this version, so might need to do
-    # multiples of psi instead of integer steps?
-    # if bin_euler && (mod(odet.istep, euler_stride) == 0 || force)
-    if outp.write_euler_h5 # TODO: update this logic for set number of psi vals
-        du = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
-        params = (ctrl, equil, intr, odet, ffit, outp)
-        sing_der!(du, odet.u, params, odet.psifac)
-        write_to!(outp, :euler_h5, odet.psifac, odet.q, odet.msol)
-        write_to!(outp, :euler_h5, odet.u)
-        write_to!(outp, :euler_h5, odet.ud)
-    end
+    # All bin_euler logic performed after integration
 
-    # Output solutions components for each time step
-    #if bin_sol
-    #    ode_output_sol(psifac, u, unorm) # again, more outputs
-    #end
-
-    return
+    # if outp.bin_sol
+    #     ode_output_sol()
+    # end
 end
 
 # TODO: I don't think this function is essentially for the minimal working version - can convert later if needed

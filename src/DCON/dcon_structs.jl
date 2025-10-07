@@ -113,6 +113,7 @@ end
     tol_r::Float64 = 1e-5
     crossover::Float64 = 1e-2
     ucrit::Float64 = 1e4
+    max_unorms::Int = 25
     singfac_min::Float64 = 0.0
     singfac_max::Float64 = 0.0
     cyl_flag::Bool = false
@@ -153,7 +154,7 @@ end
     # output switches
     write_crit_out::Bool   = true
     write_dcon_out::Bool   = true
-    write_euler_h5::Bool   = false
+    write_euler_h5::Bool   = true
     write_eqdata_h5::Bool  = false
 
     # filenames

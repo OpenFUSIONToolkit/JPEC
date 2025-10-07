@@ -171,13 +171,12 @@ function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::
 
     # Write to euler.h5
     if outp.write_euler_h5
-        write_output(outp, :euler_h5, 3)
-        write_output(outp, :euler_h5, ep)
-        write_output(outp, :euler_h5, ev)
-        write_output(outp, :euler_h5, et)
-        write_output(outp, :euler_h5, wt)
-        write_output(outp, :euler_h5, wt0)
-        write_output(outp, :euler_h5, ctrl.wv_farwall_flag)
+        write_output(outp, :euler_h5, ep; dsetname="vacuum/ep")
+        write_output(outp, :euler_h5, ev; dsetname="vacuum/ev")
+        write_output(outp, :euler_h5, et; dsetname="vacuum/et")
+        write_output(outp, :euler_h5, wt; dsetname="vacuum/wt")
+        write_output(outp, :euler_h5, wt0; dsetname="vacuum/wt0")
+        write_output(outp, :euler_h5, ctrl.wv_farwall_flag; dsetname="vacuum/wv_farwall_flag")
     end
 
     # Write to screen and copy to output.
