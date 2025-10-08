@@ -15,7 +15,7 @@ end
 
 # TODO: ideally, everything is allocated at construction, but mpert is determined after
 # since these are allocated in sing_find. What's the best way to handle this?
-# For now, leaving as nothings
+# For now, leaving as missing, per Brendan's github comment
 # Something simple could be not creating sing_types within sing_find, but instead saving the data,
 # then creating them all at once after mpert is determined in dcon.jl
 # This wouldn't be as clean, but would allow preallocation. Does this greatly impact performance?
@@ -31,9 +31,9 @@ end
     alpha::ComplexF64 = 0.0 + 0.0im
     n1::Vector{Int} = Int[]
     n2::Vector{Int} = Int[]
-    power::Union{Nothing, Vector{ComplexF64}} = nothing
-    vmat::Union{Nothing, Array{ComplexF64,4}} = nothing
-    mmat::Union{Nothing, Array{ComplexF64,4}} = nothing
+    power::Union{Missing, Vector{ComplexF64}} = missing # we know the size of these, but it depends on mpert
+    vmat::Union{Missing, Array{ComplexF64,4}} = missing
+    mmat::Union{Missing, Array{ComplexF64,4}} = missing
     m0mat::Matrix{ComplexF64} = zeros(ComplexF64, 2, 2)
     restype::ResistType = ResistType()
 end
@@ -72,7 +72,6 @@ end
     xlmda_out::Bool = false
     fkg_kmats_flag::Bool = false
     sol_base::Int = 50
-    locstab::Union{Nothing, Spl.CubicSpline{Float64}} = nothing
     msing::Int = 0
     kmsing::Int = 0
     sing::Union{Nothing, Vector{SingType}} = SingType[]
@@ -80,12 +79,15 @@ end
     psilim::Float64 = 0.0
     qlim::Float64 = 0.0
     q1lim::Float64 = 0.0
+    # TODO: how to initialize a spline? This will be a spline of size mpsi x 5
+    locstab::Union{Missing, Spl.CubicSpline{Float64}} = missing
     size_edge::Int = 0
     pre_edge::Int = 1
     i_edge::Int = 1
-    q_edge::Union{Nothing, Vector{Float64}} = nothing
-    psi_edge::Union{Nothing, Vector{Float64}} = nothing
-    dw_edge::Union{Nothing, Vector{ComplexF64}} = nothing
+    # TODO: what are the lengths of these? can use to initialize
+    q_edge::Union{Missing, Vector{Float64}} = missing
+    psi_edge::Union{Missing, Vector{Float64}} = missing
+    dw_edge::Union{Missing, Vector{ComplexF64}} = missing
 end
 
 @kwdef mutable struct DconControl
@@ -209,18 +211,19 @@ end
     mband::Int
 
     # Spline matrices
-    amats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    bmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    cmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    dmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    emats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    hmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    dbats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    ebats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    fbats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    fmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    kmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    gmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
+    # TODO: how to initialize these splines?
+    amats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    bmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    cmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    dmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    emats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    hmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    dbats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    ebats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    fbats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    fmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    kmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    gmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     # kaats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
     # gaats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
     # f0mats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
@@ -238,7 +241,7 @@ end
     # k0s::JPEC.Spl.SplineType
 
     # ipiva::Union{Nothing,Vector{Int}} = nothing
-    # TODO: these might be deprecated
+    # TODO: these might be deprecated? They're used with a ahb_flag in free
     asmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     bsmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     csmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)

@@ -13,8 +13,8 @@ include("Vacuum/Vacuum.jl")
 import .VacuumMod as VacuumMod
 export VacuumMod
 
-include("DCON/dcon_mod.jl")
-import .DconMod as DconMod
-export DconMod
+include("DCON/DCON.jl")
+import .DCON as DCON
+export DCON
 
 end # module JPEC

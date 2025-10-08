@@ -147,7 +147,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
         qedgestart = trunc(Int, Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
         intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * ctrl.nn * ctrl.nperq_edge)
 
-        intr.dw_edge  = fill(-typemax(Float64) * (1 + im), intr.size_edge)
+        intr.dw_edge  = fill(-Inf * (1 + im), intr.size_edge)
         intr.q_edge   = [qedgestart + i / (ctrl.nperq_edge * ctrl.nn) for i in 0:intr.size_edge-1]
         intr.psi_edge = zeros(intr.size_edge)
 

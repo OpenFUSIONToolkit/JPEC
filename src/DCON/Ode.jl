@@ -646,7 +646,7 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
     # TODO: same as above, this might not be needed
     ode_output_step!(odet, intr, ctrl, equil, outp) # always output final condition
 
-    println("   ψ = $(odet.psifac), max u = $(maximum(abs.(odet.u))), steps = $(odet.step-1)")
+    println("   ψ = $(odet.psifac), max u = $(maximum(abs, odet.u)), steps = $(odet.step-1)")
 end
 
 """
@@ -697,7 +697,7 @@ end
 
 # Compute tolerances based on distance to singular surface during integration
 function compute_tols(intr, odet, ctrl)
-    singfac_local = typemax(Float64)
+    singfac_local = Inf
     # Relative tolerance
     if false  # kin_flag (not implemented)
         # Insert kin_flag branch if needed
@@ -716,7 +716,7 @@ function compute_tols(intr, odet, ctrl)
     atol = similar(odet.u, Float64)
     for ieq in 1:size(odet.u,3), isol in 1:size(odet.u,2)
         atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-        if (atol0 == 0) atol0 = typemax(Float64) end
+        if (atol0 == 0) atol0 = Inf end
         atol[:, isol, ieq] .= atol0
     end
     return rtol, atol
