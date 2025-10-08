@@ -4,6 +4,8 @@
 *.so
 *.o
 *.i
+*.out
+*.h5
 .vscode
 *.DS_Store
 notebooks/spline_examples.ipynb
