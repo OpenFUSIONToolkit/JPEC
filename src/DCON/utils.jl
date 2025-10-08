@@ -102,6 +102,9 @@ end
     close_files(out::DconOutput)
 
 Closes all open files.
+# TODO: is there a way to make the code run this if it errors out anywhere?
+# In existing state, files will remain open if there is an error, so you have
+# to manually exit and reopen Julia.
 """
 function close_files(out::DconOutput)
     for (key, handle) in out.handles
@@ -115,6 +118,7 @@ end
 Generates `N` Chebyshev-Lobatto nodes in the interval `[a, b]`
 in ascending order.
 """
+# TODO: this is no longer used, but might be useful code? Leaving for now, but likely can be removed
 function chebyshev_nodes(a::Float64, b::Float64, N::Int)
     j = 0:N-1
     nodes = (a+b)/2 .+ (b-a)/2 .* cos.(π * j ./ (N - 1))
