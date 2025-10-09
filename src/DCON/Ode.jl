@@ -820,10 +820,12 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
     # TODO: can test be removed if we aren't implementing ode_test_fixup?
 
     # Write to output
-    write_output(outp, :crit_out, "\n   psifac      dpsi        q       singfac     eval1")
-    write_output(outp, :crit_out, @sprintf("\nGaussian Reduction at psi = %10.3e, q = %6.3f\n", odet.psifac, odet.q))
-    if !sing_flag
-        write_output(outp, :crit_out, "   psifac      dpsi        q       singfac     eval1\n")
+    if outp.write_crit_out
+        write_output(outp, :crit_out, "\n   psifac      dpsi        q       singfac     eval1")
+        write_output(outp, :crit_out, @sprintf("\nGaussian Reduction at psi = %10.3e, q = %6.3f\n", odet.psifac, odet.q))
+        if !sing_flag
+            write_output(outp, :crit_out, "   psifac      dpsi        q       singfac     eval1\n")
+        end
     end
     odet.flag_count = 0 # TODO: is this used anywhere?
 
