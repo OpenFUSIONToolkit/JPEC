@@ -118,7 +118,7 @@ function mscvac(
     grrio::Array{Float64,2},
     xzptso::Array{Float64,2},
     op_ahgfile::Union{Nothing,String}=nothing,
-    folder::String=""
+    folder::String="."
 )
 
     ahgfile_ptr = if op_ahgfile === nothing
