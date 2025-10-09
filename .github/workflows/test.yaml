@@ -21,14 +21,18 @@ jobs:
         with:
           version: '1.11'
 
-      - name: Restore Julia cache
+      - name: Restore Julia cache (packages, artifacts, compiled, registries)
         uses: actions/cache@v4
         with:
-          path: ~/.julia
+          path: |
+            ~/.julia/packages
+            ~/.julia/artifacts
+            ~/.julia/compiled
+            ~/.julia/registries
           key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
           restore-keys: |
            ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libopenblas-dev
-      - name: Run tests (instantiate + test)
-        run: julia --project=. -e 'using Pkg; Pkg.activate("."); Pkg.instantiate(); Pkg.test()'
+      - name: Run tests (instantiate without registry update + test)
+        run: julia --project=. -e 'using Pkg; Pkg.activate("."); Pkg.instantiate(update_registry=false); Pkg.test("JPEC")'

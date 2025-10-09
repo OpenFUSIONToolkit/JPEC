@@ -31,10 +31,14 @@ jobs:
         with:
           version: '1.11'
 
-      - name: Restore Julia cache
+      - name: Restore Julia cache (packages, artifacts, compiled, registries)
         uses: actions/cache@v4
         with:
-          path: ~/.julia
+          path: |
+            ~/.julia/packages
+            ~/.julia/artifacts
+            ~/.julia/compiled
+            ~/.julia/registries
           # include Manifest.toml so cache invalidates when resolved versions change
           key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
           restore-keys: |
@@ -42,11 +46,8 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libopenblas-dev
 
-      - name: Setup Project
-        run: julia --project=. -e 'using Pkg; Pkg.activate("."); Pkg.instantiate();'
-
-      - name: Prepare docs environment (instantiate + develop local package)
-        run: julia --project=docs -e 'using Pkg; Pkg.activate("docs"); Pkg.instantiate(); Pkg.develop(PackageSpec(path="."))'
+      - name: Prepare docs environment (develop local package, then instantiate)
+        run: julia --project=docs -e 'using Pkg; Pkg.activate("docs"); Pkg.develop(PackageSpec(path=".")); Pkg.instantiate(update_registry=false)'
 
       - name: Build and deploy documentation
         env:
