@@ -201,7 +201,7 @@ c-----------------------------------------------------------------------
      $              +beta1*fsy(ix,0:my-1,iq)-beta2*fsy(ix,1:my,iq))
             enddo
          enddo
-         
+
 c-----------------------------------------------------------------------
 c     advance to next Fourier component.
 c-----------------------------------------------------------------------
@@ -252,7 +252,7 @@ c-----------------------------------------------------------------------
       subroutine fspline_fit_2(fst,endmode,fit_flag)
 
       type(fspline_type), intent(inout) :: fst
-      integer, intent(in) :: endmode        
+      integer, intent(in) :: endmode
       logical, intent(in) :: fit_flag
 
       character(64) :: message
@@ -323,8 +323,8 @@ c   $     (/my,mx+1,nqty/))
       allocate (temp_out(my, (mx+1)*nqty))
 
       temp_out =  fft_run(temp_in, -1)
-      
-      
+
+
       k = 0
       do iqty = 1, nqty
           do ix = 0, mx
@@ -332,7 +332,7 @@ c   $     (/my,mx+1,nqty/))
               g(:, ix, iqty) = temp_out(:, k)
           end do
       end do
-      
+
       deallocate(temp_in, temp_out)
 c-----------------------------------------------------------------------
 c     copy Fourier coefficients from g to the cspline structure
@@ -519,7 +519,7 @@ c-----------------------------------------------------------------------
 c     evaluate m > 1 for functions
 c-----------------------------------------------------------------------
       expfac0 = EXP(ifac * y)
-      expfac = 2.0_r8 
+      expfac = 2.0_r8
       do m = 1, fst%mband
          expfac = expfac * expfac0
          term = c(m, :) * expfac

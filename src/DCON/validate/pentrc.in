@@ -15,8 +15,8 @@
     jac_in = "hamada"                   ! Jacobian of peq_file harmonic decomposition. 'default' uses jac_type of idconfile.
     jsurf_in=0                          ! True(1) if peq_file is area weighted
     tmag_in=1                           ! True(1) if peq_file has toroidal angle defined by jac_in. False(0) if machine angle.
-/                                       
-&PENT_CONTROL                           
+/
+&PENT_CONTROL
     wefac = 1                           ! Artificial factor applied to omega_EXB
     wdfac = 1                           ! Artificial factor applied to omega_b
     wpfac = 1                           ! Artificial factor applied to omega_phi

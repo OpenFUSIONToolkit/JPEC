@@ -8,7 +8,7 @@ Pkg.instantiate()
 # Build the package
 Pkg.build()
 
-# Activate and instantiate the docs environment  
+# Activate and instantiate the docs environment
 Pkg.activate("docs")
 Pkg.instantiate()
 

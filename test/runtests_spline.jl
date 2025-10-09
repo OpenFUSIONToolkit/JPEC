@@ -58,7 +58,7 @@
         # Test bicubic spline setup and evaluation for a 2D function
         xs = collect(range(0, stop=2π, length=100))
         ys = collect(range(0, stop=2π, length=100))
-        
+
         f1(x, y) = sin(x) * cos(y) + 1
         f2(x, y) = cos(x) * sin(y) + 1
         fvals = Array{Float64}(undef, length(xs), length(ys), 2)

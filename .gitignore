@@ -4,11 +4,12 @@
 *.so
 *.o
 *.i
+*.out
+*.h5
 .vscode
 *.DS_Store
-notebooks/spline_examples.ipynb
-notebooks/*.in
 .gitattributes
 Manifest.toml
 build.log
 docs/build/
+anaconda_projects/

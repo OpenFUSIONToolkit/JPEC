@@ -9,7 +9,7 @@
         # ffit.amats = SplinesMod.CubicSpline("some psi", reshape(amats, mpsi+1, :); bctype="extrap")
         # if using one psi values causes issues, can make a psi array and just fill it all with amat
         # repeat for other matrices, equil data, other relevant constants, etc.
-        
+
         # params = (ctrl, equil, intr, odet, ffit)
         # sing_der!(du, odet.u, params, odet.psifac)
 

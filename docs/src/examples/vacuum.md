@@ -21,7 +21,7 @@ qa1in = 1.23         # Safety factor parameter
 # Create geometry arrays
 n_modes = lmax - lmin + 1
 xin = rand(Float64, n_modes)      # Radial coordinates
-zin = rand(Float64, n_modes)      # Vertical coordinates  
+zin = rand(Float64, n_modes)      # Vertical coordinates
 deltain = rand(Float64, n_modes)  # Displacement data
 
 # Initialize DCON interface
@@ -41,7 +41,7 @@ wv = zeros(ComplexF64, mpert, mpert)
 
 # Calculation flags
 complex_flag = true     # Use complex arithmetic
-kernelsignin = -1.0    # Kernel sign 
+kernelsignin = -1.0    # Kernel sign
 wall_flag = false      # Include wall effects
 farwal_flag = true     # Far wall approximation
 
@@ -67,17 +67,17 @@ println("Result matrix dimensions: ", size(wv))
 using Plots
 
 # Plot magnitude of vacuum matrix elements
-heatmap(abs.(wv), 
+heatmap(abs.(wv),
         title="Vacuum Matrix |W| Elements",
-        xlabel="Mode j", 
+        xlabel="Mode j",
         ylabel="Mode i",
         color=:plasma)
 
 # Plot phase information
-heatmap(angle.(wv), 
+heatmap(angle.(wv),
         title="Vacuum Matrix Phase",
         xlabel="Mode j",
-        ylabel="Mode i", 
+        ylabel="Mode i",
         color=:phase)
 ```
 
@@ -158,7 +158,7 @@ println("Most unstable eigenvalue: ", eigenvals[max_growth_idx])
 ```julia
 # For large problems, consider:
 # - Reducing mtheta/mthvac if possible
-# - Using real arithmetic (complex_flag=false) when appropriate  
+# - Using real arithmetic (complex_flag=false) when appropriate
 # - Parallelization (if available in Fortran backend)
 
 # Monitor memory usage
@@ -166,7 +166,7 @@ using Pkg
 Pkg.add("BenchmarkTools")
 using BenchmarkTools
 
-@time JPEC.VacuumMod.mscvac(wv, mpert, mtheta, mthvac, 
+@time JPEC.VacuumMod.mscvac(wv, mpert, mtheta, mthvac,
                            complex_flag, kernelsignin,
                            wall_flag, farwal_flag,
                            grrio, xzptso)

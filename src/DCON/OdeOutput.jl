@@ -4,7 +4,7 @@
     Write header info to output files at the start of the integration.
 """
 function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, outp::DconOutput, intr::DconInternal, odet::OdeState)
-    
+
     # TODO: mess with this to condense the number of write_output calls? Maybe allow it to pass in dicts
     # Write euler.bin header info
     if outp.write_euler_h5
@@ -258,8 +258,8 @@ end
 """
     ode_output_get_crit(psi, u, mpert, m1, nn, sq) -> (q, singfac, logpsi1, logpsi2, crit)
 
-Compute critical quantities at a given flux surface by constructing and inverting the plasma response matrix from the complex 
-array `u`, symmetrizing it, computing its Hermitian eigenvalues, and using the smallest (in magnitude) 
+Compute critical quantities at a given flux surface by constructing and inverting the plasma response matrix from the complex
+array `u`, symmetrizing it, computing its Hermitian eigenvalues, and using the smallest (in magnitude)
 inverse eigenvalue in combination with the equilibrium profiles to form `crit`.
 
 This uses Julia’s built-in linear algebra:
@@ -293,7 +293,7 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, 
     # Compute and sort inverse eigenvalues
     evalsi = eigen(Hermitian(wp)).values
     indexi = sortperm(abs.(evalsi))  # bubble in Fortran sorts in descending order of -|evalsi|, we just do ascending order of |evalsi|
-    
+
     # Compute critical data for each time step
     profiles = Spl.spline_eval(sq, psi, 0)
     q = profiles[4]

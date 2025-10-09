@@ -100,7 +100,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     begin loop over nodes.
 c-----------------------------------------------------------------------
-      chi1=twopi*psio      
+      chi1=twopi*psio
       DO ipsi=0,mpsi
          psifac=sq%xs(ipsi)
          p1=sq%fs1(ipsi,2)
@@ -116,7 +116,7 @@ c-----------------------------------------------------------------------
             jac1=rzphi%fx(4)
             b2h=eqfun%f(1)**2/2
             b2hp=eqfun%f(1)*eqfun%fx(1)
-            b2ht=eqfun%f(1)*eqfun%fy(1)  
+            b2ht=eqfun%f(1)*eqfun%fy(1)
 c-----------------------------------------------------------------------
 c     compute contravariant basis vectors.
 c-----------------------------------------------------------------------
@@ -236,11 +236,11 @@ c-----------------------------------------------------------------------
       CALL cspline_alloc(cmats,mpsi,mpert**2)
       CALL cspline_alloc(dmats,mpsi,mpert**2)
       CALL cspline_alloc(emats,mpsi,mpert**2)
-      CALL cspline_alloc(hmats,mpsi,mpert**2) 
-      CALL cspline_alloc(dbats,mpsi,mpert**2) 
-      CALL cspline_alloc(ebats,mpsi,mpert**2) 
-      CALL cspline_alloc(fbats,mpsi,mpert**2) 
-  
+      CALL cspline_alloc(hmats,mpsi,mpert**2)
+      CALL cspline_alloc(dbats,mpsi,mpert**2)
+      CALL cspline_alloc(ebats,mpsi,mpert**2)
+      CALL cspline_alloc(fbats,mpsi,mpert**2)
+
       amats%xs=rzphi%xs
       bmats%xs=rzphi%xs
       cmats%xs=rzphi%xs
@@ -480,7 +480,7 @@ c-----------------------------------------------------------------------
 
 c-----------------------------------------------------------------------
 c     write binary output for diagnosis.
-c-----------------------------------------------------------------------  
+c-----------------------------------------------------------------------
       IF(diagnose)THEN
          WRITE(*,*)"Write binary output for graphs."
          mfac =(/(i,i=mlow,mhigh)/)
@@ -587,7 +587,7 @@ c     declaration.
 c-----------------------------------------------------------------------
       INTEGER :: ipsi,istep,ipert,jpert,itheta,dm,m1,m2
       REAL(r8) :: q,singfac2
-      COMPLEX(r8), DIMENSION(-mband:mband) :: 
+      COMPLEX(r8), DIMENSION(-mband:mband) ::
      $     sband,tband,xband,yband1,yband2,zband1,zband2,zband3
       COMPLEX(r8), DIMENSION(mpert,mpert) :: smat,tmat,xmat,ymat,zmat
 
@@ -807,7 +807,7 @@ c-----------------------------------------------------------------------
       SUBROUTINE fourfit_evals(ipsi,psifac,matrix)
       USE global_mod
       IMPLICIT NONE
-      
+
       INTEGER, INTENT(IN) :: ipsi
       REAL(r8), INTENT(IN) :: psifac
       COMPLEX(r8), DIMENSION(mpert,mpert), INTENT(IN) :: matrix
@@ -886,7 +886,7 @@ c-----------------------------------------------------------------------
       ENDDO
       WRITE(unit,10)
       CALL ascii_close(unit)
-      CALL program_stop("Termination by fourfit_diagnose_1") 
+      CALL program_stop("Termination by fourfit_diagnose_1")
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
@@ -902,7 +902,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       SUBROUTINE fourfit_kinetic_matrix(methodin,writein)
       IMPLICIT NONE
-      
+
       LOGICAL, OPTIONAL :: writein
       INTEGER, OPTIONAL :: methodin
 
@@ -1139,7 +1139,7 @@ c-----------------------------------------------------------------------
             CALL cspline_eval_external(dbats,psifac,ix,dbats_f)
             CALL cspline_eval_external(ebats,psifac,ix,ebats_f)
             CALL cspline_eval_external(fbats,psifac,ix,fbats_f)
-            
+
             amat=RESHAPE(amats_f,(/mpert,mpert/))
             bmat=RESHAPE(bmats_f,(/mpert,mpert/))
             cmat=RESHAPE(cmats_f,(/mpert,mpert/))
@@ -1149,7 +1149,7 @@ c-----------------------------------------------------------------------
             dbat=RESHAPE(dbats_f,(/mpert,mpert/))
             ebat=RESHAPE(ebats_f,(/mpert,mpert/))
             fmat=RESHAPE(fbats_f,(/mpert,mpert/))
-               
+
             amat=amat+kwmat(:,:,1)+ktmat(:,:,1)
             bmat=bmat+kwmat(:,:,2)+ktmat(:,:,2)
             cmat=cmat+kwmat(:,:,3)+ktmat(:,:,3)
@@ -1177,8 +1177,8 @@ c-----------------------------------------------------------------------
      $              ", ipert = ",info,", increase delta_mband"
                CALL program_stop(message)
             ENDIF
-            
-            temp1=dbat 
+
+            temp1=dbat
             CALL zgbtrs("N",mpert,mband,mband,mpert,amatlu,
      $           3*mband+1,ipiv,temp1,mpert,info)
             f0mat=fmat-MATMUL(CONJG(TRANSPOSE(dbat)),temp1)
@@ -1189,7 +1189,7 @@ c-----------------------------------------------------------------------
      $           3*mband+1,ipiv,temp2,mpert,info) ! close to unit matrix.
             aamat=CONJG(TRANSPOSE(temp2))
             umat=umat-aamat
-            
+
             bkmat=kwmat(:,:,2)+ktmat(:,:,2)+ifac*chi1/(twopi*nn)*
      $           (kwmat(:,:,1)+ktmat(:,:,1))
             bkaat=kwmat(:,:,2)-ktmat(:,:,2)+ifac*chi1/(twopi*nn)*
@@ -1198,14 +1198,14 @@ c-----------------------------------------------------------------------
             CALL zgbtrs("N",mpert,mband,mband,mpert,amatlu,
      $           3*mband+1,ipiv,temp2,mpert,info)
             pmat=MATMUL(CONJG(TRANSPOSE(b1mat)),temp2)
-               
+
             temp2=b1mat
             CALL zgbtrs("N",mpert,mband,mband,mpert,amatlu,
      $           3*mband+1,ipiv,temp2,mpert,info)
             paat=MATMUL(CONJG(TRANSPOSE(bkaat)),temp2)
      $           -ifac*chi1/(twopi*nn)*MATMUL(umat,b1mat)
             paat=CONJG(TRANSPOSE(paat))
-            
+
             temp1=kwmat(:,:,1)+ktmat(:,:,1)
             temp2=bkmat
             CALL zgbtrs("N",mpert,mband,mband,mpert,amatlu,
@@ -1214,20 +1214,20 @@ c-----------------------------------------------------------------------
      $           (chi1/(twopi*nn))**2*CONJG(TRANSPOSE(temp1))+
      $           ifac*chi1/(twopi*nn)*CONJG(TRANSPOSE(bkaat))-
      $           ifac*chi1/(twopi*nn)*MATMUL(aamat,bkmat)-
-     $           MATMUL(CONJG(TRANSPOSE(bkaat)),temp2) 
-            
+     $           MATMUL(CONJG(TRANSPOSE(bkaat)),temp2)
+
             ! calculate 4 submatrices for kinetic k matrix
             temp1=cmat
             CALL zgbtrs("N",mpert,mband,mband,mpert,amatlu,
      $           3*mband+1,ipiv,temp1,mpert,info)
             kkmat=ebat-MATMUL(CONJG(TRANSPOSE(b1mat)),temp1)
-            
+
             temp1=b1mat
             CALL zgbtrs("N",mpert,mband,mband,mpert,amatlu,
      $           3*mband+1,ipiv,temp1,mpert,info)
             kkaat=CONJG(TRANSPOSE(ebat))-
      $           MATMUL(CONJG(TRANSPOSE(caat)),temp1)
-            
+
             temp1=kwmat(:,:,5)+ktmat(:,:,5)-ifac*chi1/(twopi*nn)*
      $           (kwmat(:,:,3)+ktmat(:,:,3))
             temp2=cmat
@@ -1235,7 +1235,7 @@ c-----------------------------------------------------------------------
      $           3*mband+1,ipiv,temp2,mpert,info)
             r2mat=temp1+ifac*chi1/(twopi*nn)*MATMUL(umat,cmat)-
      $           MATMUL(CONJG(TRANSPOSE(bkaat)),temp2)
-            
+
             temp1=kwmat(:,:,5)-ktmat(:,:,5)-ifac*chi1/(twopi*nn)*
      $           (kwmat(:,:,3)-ktmat(:,:,3))
             temp2=bkmat
@@ -1248,7 +1248,7 @@ c-----------------------------------------------------------------------
             temp2=cmat
             CALL zgbtrs("N",mpert,mband,mband,mpert,amatlu,
      $           3*mband+1,ipiv,temp2,mpert,info)
-            gaat=hmat-MATMUL(CONJG(TRANSPOSE(caat)),temp2) 
+            gaat=hmat-MATMUL(CONJG(TRANSPOSE(caat)),temp2)
 
             ! pass only essential kinetic matrices
             akmats%fs(ipsi,:)=RESHAPE(amat,(/mpert**2/))
@@ -1291,7 +1291,7 @@ c-----------------------------------------------------------------------
          CALL cspline_fit(kkaats,"extrap")
          CALL cspline_fit(r1mats,"extrap")
          CALL cspline_fit(r2mats,"extrap")
-         CALL cspline_fit(r3mats,"extrap")         
+         CALL cspline_fit(r3mats,"extrap")
 c-----------------------------------------------------------------------
 c     Use built in PENTRC spline integration options to form matrixes
 c-----------------------------------------------------------------------
@@ -1301,7 +1301,7 @@ c-----------------------------------------------------------------------
             CALL cspline_alloc(ktmats(i),mpsi,mpert**2)
             kwmats(i)%xs=rzphi%xs
             ktmats(i)%xs=rzphi%xs
-         ENDDO         
+         ENDDO
          DO ipsi=0,mpsi
             iindex = FLOOR(REAL(ipsi+1,r8)/FLOOR((mpsi+1)/10.0))*10
             ileft = REAL(ipsi+1,r8)/FLOOR((mpsi+1)/10.0)*10-iindex
@@ -1534,7 +1534,7 @@ c-----------------------------------------------------------------------
             WRITE(bin_unit)
          ENDDO
          CALL bin_close(bin_unit)
-         
+
          mfac =(/(i,i=mlow,mhigh)/)
          CALL ascii_open(fourfit_out_unit,"kwmats.out","UNKNOWN")
          WRITE(fourfit_out_unit,*)"DCON Kinetic energy matrices"
@@ -1545,7 +1545,7 @@ c-----------------------------------------------------------------------
      $      "real(Ak)","imag(Ak)","real(Bk)","imag(Bk)",
      $      "real(Ck)","imag(Ck)","real(Dk)","imag(Dk)",
      $      "real(Ek)","imag(Ek)","real(Hk)","imag(Hk)"
-         DO ipsi=0,kwmats(1)%mx 
+         DO ipsi=0,kwmats(1)%mx
             DO i=1,mpert
                DO j=1,mpert
                   ipert = (i-1)*mpert + j
@@ -1578,7 +1578,7 @@ c-----------------------------------------------------------------------
      $      "real(Ak)","imag(Ak)","real(Bk)","imag(Bk)",
      $      "real(Ck)","imag(Ck)","real(Dk)","imag(Dk)",
      $      "real(Ek)","imag(Ek)","real(Hk)","imag(Hk)"
-         DO ipsi=0,kwmats(1)%mx 
+         DO ipsi=0,kwmats(1)%mx
             DO i=1,mpert
                DO j=1,mpert
                   ipert = (i-1)*mpert + j

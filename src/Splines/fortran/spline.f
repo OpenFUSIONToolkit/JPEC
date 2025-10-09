@@ -73,7 +73,7 @@ c     safety check.
 c-----------------------------------------------------------------------
       if(spl%allocated)
      $   call program_stop("spline_alloc: spline already allocated")
-      
+
 c-----------------------------------------------------------------------
 c     set scalars.
 c-----------------------------------------------------------------------
@@ -242,7 +242,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boudary conditions.
 c-----------------------------------------------------------------------
-      case(2) ! 2 = Periodic 
+      case(2) ! 2 = Periodic
          spl%periodic=.true.
          spl%fs1(0,:)=3*((spl%fs(1,:)-spl%fs(0,:))*b(1)
      $        +(spl%fs(0,:)-spl%fs(spl%mx-1,:))*b(spl%mx))
@@ -889,7 +889,7 @@ c-----------------------------------------------------------------------
       real(r8) :: xx,d,z,z1,xfac,dx
       real(r8) :: g,g1,g2,g3
 
-      
+
       real(r8), dimension(:), intent(out) :: s_f
       real(r8), dimension(:), optional, intent(out) :: s_f1,s_f2,s_f3
 
@@ -1607,7 +1607,7 @@ c-----------------------------------------------------------------------
       type(spline_type), intent(inout) :: spl
       integer, intent(in):: iqty
       integer, intent(out) :: nroots
-      real(r8), dimension(*), intent(out):: roots 
+      real(r8), dimension(*), intent(out):: roots
       !^^^^ should be dimension(1:spl%mx*3) ^^^^
       logical, intent(in), optional :: op_extrap
       real(r8), intent(in), optional :: op_eps
@@ -1741,7 +1741,7 @@ c-----------------------------------------------------------------------
      $            'I3,a1,I3,a11,es13.4e3,a1,es13.4)',
      $            "  > Found z1",z1,", x1",x1," between knots ",ix,",",
      $            ix+1," where x =",spl%xs(ix),",",spl%xs(ix+1)
-               ! refine solution numerically 
+               ! refine solution numerically
                ! (analytics vs reality of interp)
                call spline_refine_root(spl,iqty,x1)
                ! avoid repeated left/right solutions at a f=0 knot

@@ -38,7 +38,7 @@ c-----------------------------------------------------------------------
       module cspline_mod
       use spline_mod
       implicit none
-      
+
       type :: cspline_type
       integer :: mx,nqty,ix
       real(r8), dimension(:), POinTER :: xs
@@ -51,7 +51,7 @@ c-----------------------------------------------------------------------
       logical :: periodic
       logical :: allocated=.false.
       end type cspline_type
-      
+
       contains
 c-----------------------------------------------------------------------
 c     subprogram 1. cspline_alloc.
@@ -61,7 +61,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine cspline_alloc(spl,mx,nqty)
-      
+
       integer, intent(in) :: mx,nqty
       type(cspline_type), intent(inout) :: spl
 
@@ -108,7 +108,7 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine cspline_dealloc(spl)
-      
+
       type(cspline_type), intent(inout) :: spl
 c-----------------------------------------------------------------------
 c     safety check.
@@ -226,7 +226,7 @@ c-----------------------------------------------------------------------
       enddo
       r(spl%mx,:)=0
 
-      if (endmode==3) then ! 3 = Extrapolated 
+      if (endmode==3) then ! 3 = Extrapolated
          call cspline_get_yp(spl%xs(0:3),spl%fs(0:3,:),
      $                      spl%xs(0),r(0,:),spl%nqty)
          call cspline_get_yp(spl%xs(spl%mx-3:spl%mx),
@@ -274,11 +274,11 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      subroutine cspline_fit_ahg(spl,endmode) 
-      
+      subroutine cspline_fit_ahg(spl,endmode)
+
       type(cspline_type), intent(inout) :: spl
       integer, intent(in) :: endmode
-      
+
       integer :: iqty,iside
       real(r8), dimension(-1:1,0:spl%mx) :: a
       real(r8), dimension(spl%mx) :: b
@@ -328,7 +328,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      case(4) ! 4 = not-a-knot 
+      case(4) ! 4 = not-a-knot
          spl%fs1(1,:)=spl%fs1(1,:)-(2*spl%fs(1,:)
      $        -spl%fs(0,:)-spl%fs(2,:))*2*b(1)
          spl%fs1(spl%mx-1,:)=spl%fs1(spl%mx-1,:)
@@ -374,13 +374,13 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine cspline_fac(spl,a,b,cl,cr,endmode)
-      
+
       type(cspline_type), intent(in) :: spl
       real(r8), dimension(-1:1,0:spl%mx), intent(out) :: a
       real(r8), dimension(spl%mx), intent(out) :: b
       real(r8), dimension(4), intent(out) :: cl,cr
       integer, intent(in) :: endmode
-      
+
       integer :: j
 c-----------------------------------------------------------------------
 c     compute interior matrix.
@@ -477,11 +477,11 @@ c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
       subroutine cspline_eval(spl,x,mode)
-      
+
       type(cspline_type), intent(inout) :: spl
       real(r8), intent(in) :: x
       integer, intent(in) :: mode
-      
+
       integer :: iqty,iside
       real(r8) :: xx,d,z,z1,xfac,dx
       complex(r8) :: g,g1,g2,g3
@@ -798,7 +798,7 @@ c-----------------------------------------------------------------------
             if(mode > 1)g2=(f2(:,iqty)+spl%xpower(iside,iqty)/dx
      $           *(2*f1(:,iqty)+(spl%xpower(iside,iqty)-1)
      $           *f(:,iqty)/dx))*xfac
-     $           
+     $
             if(mode > 2)g3=(f3(:,iqty)+spl%xpower(iside,iqty)/dx
      $           *(3*f2(:,iqty)+(spl%xpower(iside,iqty)-1)/dx
      $           *(3*f1(:,iqty)+(spl%xpower(iside,iqty)-2)/dx
