@@ -1,261 +1,182 @@
-module CubicSpline
+# fortran function names
+call_spline_c_create(::Type{Float64}, mx, nqty, h)    = ccall((:spline_c_create,  libspline), Cvoid, (Int64, Int64, Ref{Ptr{Cvoid}}), mx, nqty, h)
+call_spline_c_create(::Type{ComplexF64}, mx, nqty, h) = ccall((:cspline_c_create, libspline), Cvoid, (Int64, Int64, Ref{Ptr{Cvoid}}), mx, nqty, h)
+call_spline_c_setup(::Type{Float64}, spline, xs, fs)    = ccall((:spline_c_setup,  libspline), Cvoid, (Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}), spline.handle, xs, fs)
+call_spline_c_setup(::Type{ComplexF64}, spline, xs, fs) = ccall((:cspline_c_setup, libspline), Cvoid, (Ptr{Cvoid}, Ptr{Float64}, Ptr{ComplexF64}), spline.handle, xs, fs)
+call_spline_c_fit(::Type{Float64}, spline)    = ccall((:spline_c_fit,  libspline), Cvoid, (Ptr{Cvoid}, Int32, Ptr{Float64}), spline.handle, spline.bctype, spline._fs1)
+call_spline_c_fit(::Type{ComplexF64}, spline) = ccall((:cspline_c_fit, libspline), Cvoid, (Ptr{Cvoid}, Int32, Ptr{ComplexF64}), spline.handle, spline.bctype, spline._fs1)
+call_spline_c_eval(::Type{Float64}, spline, x, f) = ccall((:spline_c_eval, libspline), Cvoid, (Ptr{Cvoid}, Float64, Ptr{Float64}), spline.handle, x, f)
+call_spline_c_eval(::Type{ComplexF64}, spline, x, f) = ccall((:cspline_c_eval, libspline), Cvoid, (Ptr{Cvoid}, Float64, Ptr{ComplexF64}), spline.handle, x, f)
+call_spline_c_eval(::Type{Float64}, spline, x, f, f1) = ccall((:spline_c_eval_deriv, libspline), Cvoid, (Ptr{Cvoid}, Float64, Ptr{Float64}, Ptr{Float64}), spline.handle, x, f, f1)
+call_spline_c_eval(::Type{ComplexF64}, spline, x, f, f1) = ccall((:cspline_c_eval_deriv, libspline), Cvoid, (Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Ptr{ComplexF64}), spline.handle, x, f, f1)
+call_spline_c_eval(::Type{Float64}, spline, x, f, f1, f2) = ccall((:spline_c_eval_deriv2, libspline), Cvoid, (Ptr{Cvoid}, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}), spline.handle, x, f, f1, f2)
+call_spline_c_eval(::Type{ComplexF64}, spline, x, f, f1, f2) = ccall((:cspline_c_eval_deriv2, libspline), Cvoid, (Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Ptr{ComplexF64}, Ptr{ComplexF64}), spline.handle, x, f, f1, f2)
+call_spline_c_eval(::Type{Float64}, spline, x, f, f1, f2, f3) = ccall((:spline_c_eval_deriv3, libspline), Cvoid, (Ptr{Cvoid}, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}), spline.handle, x, f, f1, f2, f3)
+call_spline_c_eval(::Type{ComplexF64}, spline, x, f, f1, f2, f3) = ccall((:cspline_c_eval_deriv3, libspline), Cvoid, (Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Ptr{ComplexF64}, Ptr{ComplexF64}, Ptr{ComplexF64}), spline.handle, x, f, f1, f2, f3)
+call_spline_c_int(::Type{Float64}, spline) = ccall((:spline_c_int, libspline), Cvoid, (Ptr{Cvoid}, Ptr{Float64}), spline.handle, spline._fsi)
+call_spline_c_int(::Type{ComplexF64}, spline) = ccall((:cspline_c_int, libspline), Cvoid, (Ptr{Cvoid}, Ptr{ComplexF64}), spline.handle, spline._fsi)
+call_spline_c_destroy(::Type{Float64}, spline)    = ccall((:spline_c_destroy,  libspline), Cvoid, (Ptr{Cvoid},), spline.handle)
+call_spline_c_destroy(::Type{ComplexF64}, spline) = ccall((:cspline_c_destroy, libspline), Cvoid, (Ptr{Cvoid},), spline.handle)
 
-const libdir = joinpath(@__DIR__, "..", "..", "deps")
-const libspline = joinpath(libdir, "libspline")
-
-export spline_setup, spline_eval
-
-abstract type CubicSplineType end
-
-mutable struct RealSplineType <: CubicSplineType
+mutable struct CubicSpline{T<:Union{Float64, ComplexF64}}
 	handle::Ptr{Cvoid}
-	xs::Vector{Float64}
-	fs::Matrix{Float64}
-	mx::Int64
-	nqty::Int64
-	ix::Int32  # Index of x position in the spline
+	_xs::Vector{Float64}
+	_fs::Matrix{T}
+	mx::Int
+	nqty::Int
     bctype::Int32  # Boundary condition type
+	_fsi::Matrix{T} # To store integrals at gridpoint
+	_fs1::Matrix{T} # To store 1-deriv at gridpoint
 end
 
-mutable struct ComplexSplineType <: CubicSplineType
-	handle::Ptr{Cvoid}
-	xs::Vector{Float64}
-	fs::Matrix{ComplexF64}
-	mx::Int64
-	nqty::Int64
-	ix::Int32  # Index of x position in the spline
-    bctype::Int32  # Boundary condition type
+function CubicSpline(unmanaged_handle::Ptr{Cvoid}, xs::Vector{Float64}, fs::Matrix{T}, mx::Int, nqty::Int) where {T<:Union{Float64, ComplexF64}}
+	fsi = Matrix{T}(undef, 0, 0)
+	fs1 = Matrix{T}(undef, 0, 0)
+	return CubicSpline(unmanaged_handle, xs, fs, mx, nqty, zero(Int32), fsi, fs1)
 end
 
-function _MakeSpline(mx::Int64, nqty::Int64)
-	h = Ref{Ptr{Cvoid}}()
-	ccall((:spline_c_create, libspline), Cvoid,
-		(Int64, Int64, Ref{Ptr{Cvoid}}), mx, nqty, h)
-	return RealSplineType(h[], Vector{Float64}(undef, mx), Matrix{Float64}(undef, mx, nqty), mx, nqty, 0, 0)
+@expose_fields CubicSpline xs fs fsi fs1
+
+function _destroy_spline(spline::CubicSpline{T}) where {T<:Union{Float64, ComplexF64}}
+    if spline.handle != C_NULL
+        call_spline_c_destroy(T, spline)
+		setfield!(spline, :handle, C_NULL)
+    end
 end
 
-function _MakeCSpline(mx::Int64, nqty::Int64)
-	h = Ref{Ptr{Cvoid}}()
-	ccall((:cspline_c_create, libspline), Cvoid,
-		(Int64, Int64, Ref{Ptr{Cvoid}}), mx, nqty, h)
-	return ComplexSplineType(h[], Vector{Float64}(undef, mx), Matrix{ComplexF64}(undef, mx, nqty), mx, nqty, 0, 0)
+function CubicSpline(xs::Vector{Float64}, fs::Vector{<:Union{Float64, ComplexF64}}, bctype::Int32)
+	@assert length(xs) == length(fs) "Length of xs must match length of fs"
+	fs_matrix = reshape(fs, length(xs), 1) # Convert to a column vector
+	return CubicSpline(xs, fs_matrix, bctype)
 end
 
-function _spline_setup(xs::Vector{Float64}, fs::Vector{Float64}, bctype::Int32)
-	# xs -> Float64 (mx)
-	# fs -> Float64 (mx, nqty)
-	if length(xs) != length(fs)
-		error("Length of xs must match length of fs")
-	end
-	mx = length(xs)-1
-	nqty = 1  # Default to 1 quantity if not specified
-	spline = _MakeSpline(mx, nqty)
-	spline.xs = xs
-	# Convert fs to a matrix with one column
-	fs_matrix = reshape(fs, mx, nqty)
-	spline.fs = fs_matrix
-    spline.bctype = Int32(bctype)
-
-	ccall((:spline_c_setup, libspline), Cvoid,
-		(Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}),
-		spline.handle, xs, fs_matrix)
-
-    ccall((:spline_c_fit, libspline), Cvoid, 
-        (Ptr{Cvoid}, Int32), spline.handle, bctype)
-	return spline
-end
-
-function _spline_setup(xs::Vector{Float64}, fs::Matrix{Float64}, bctype::Int32)
-	# xs -> Float64 (mx)
-	# fs -> Float64 (mx, nqty)
-	if length(xs) != size(fs, 1)
-		error("Length of xs must match number of rows in fs")
-	end
-	mx = length(xs)-1
-	nqty = size(fs, 2)
-	spline = _MakeSpline(mx, nqty)
-	spline.xs = xs
-	spline.fs = fs
-	spline.bctype = Int32(bctype)
-
-	ccall((:spline_c_setup, libspline), Cvoid,
-		(Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64}),
-		spline.handle, xs, fs)
-
-    ccall((:spline_c_fit, libspline), Cvoid, 
-        (Ptr{Cvoid}, Int32), spline.handle, bctype)
-	return spline
-end
-
-function _spline_setup(xs::Vector{Float64}, fs::Vector{ComplexF64}, bctype::Int32)
+function CubicSpline(xs::Vector{Float64}, fs::Matrix{T}, bctype::Int32) where {T <: Union{Float64, ComplexF64}}
 	# xs -> Float64 (mx)
 	# fs -> ComplexF64 (mx, nqty)
-	print("hi")
-	if length(xs) != length(fs)
-		error("Length of xs must match length of fs")
-	end
-	mx = length(xs)-1
-	nqty = 1  # Default to 1 quantity if not specified
-	spline = _MakeCSpline(mx, nqty)
-	spline.xs = xs
-	# Convert fs to a matrix with one column
-	fs_matrix = reshape(fs, mx, nqty)
-	spline.fs = fs_matrix
-    spline.bctype = Int32(bctype)
+	@assert length(xs) == size(fs, 1) "Length of xs must match number of rows in fs"
 
-	ccall((:cspline_c_setup, libspline), Cvoid,
-		(Ptr{Cvoid}, Ptr{Float64}, Ptr{ComplexF64}),
-		spline.handle, xs, fs_matrix)
-
-    ccall((:cspline_c_fit, libspline), Cvoid,
-        (Ptr{Cvoid}, Int32), spline.handle, bctype)
-	return spline
-end
-
-function _spline_setup(xs::Vector{Float64}, fs::Matrix{ComplexF64}, bctype::Int32)
-	# xs -> Float64 (mx)
-	# fs -> ComplexF64 (mx, nqty)
-	if length(xs) != size(fs, 1)
-		error("Length of xs must match number of rows in fs")
-	end
 	mx = length(xs)-1
 	nqty = size(fs, 2)
-	spline = _MakeCSpline(mx, nqty)
-	spline.xs = xs
-	spline.fs = fs
-	spline.bctype = Int32(bctype)
+	h = Ref{Ptr{Cvoid}}()
+	call_spline_c_create(T, mx, nqty, h)
 
-	ccall((:cspline_c_setup, libspline), Cvoid,
-		(Ptr{Cvoid}, Ptr{Float64}, Ptr{ComplexF64}),
-		spline.handle, xs, fs)
+	fsi = Matrix{T}(undef, mx+1, nqty)
+	fs1 = Matrix{T}(undef, mx+1, nqty)
 
-    ccall((:cspline_c_fit, libspline), Cvoid,
-        (Ptr{Cvoid}, Int32), spline.handle, bctype)
+	spline = CubicSpline(h[], xs, fs, mx, nqty, bctype, fsi, fs1)
+
+	call_spline_c_setup(T, spline, xs, fs)
+    call_spline_c_fit(T, spline)
 	return spline
 end
 
 """
-    spline_setup(xs, fs, bctype=1)
+    CubicSpline(xs, fs; bctype="not-a-knot")
 
-Set up a cubic spline interpolation.
+    Arguments:
+      - `xs`: A vector of Float64 values representing the x-coordinates.
+      - `fs`: A vector or matrix of Float64/ComplexF64 values representing the function values at the x-coordinates.
+    Keyword Arguments:
+      - `bctype`: Boundary condition type for the cubic spline in `x`.
+        - 1: Natural spline (default)
+        - 2: Periodic spline
+        - 3: Extrapolated spline
+        - 4: "Not-a-knot" spline
 
-# Arguments
-- `xs`: A vector of Float64 values representing the x-coordinates (must be monotonically increasing)
-- `fs`: A vector or matrix of Float64/ComplexF64 values representing the function values at the x-coordinates
-- `bctype`: An integer specifying the boundary condition type (default is 1):
-    - 1: Natural spline (zero second derivative at endpoints)
-    - 2: Periodic spline
-    - 3: Extrapolated spline  
-    - 4: Not-a-knot spline
-
-# Returns
-- A `CubicSplineType` object that can be used for evaluation
-
-# Examples
-```julia
-# 1D spline
-xs = collect(range(0.0, stop=2π, length=21))
-fs = sin.(xs)
-spline = spline_setup(xs, fs, 1)
-
-# Multi-quantity spline
-fs_matrix = hcat(sin.(xs), cos.(xs))
-spline = spline_setup(xs, fs_matrix, 1)
-```
+	Returns:
+      - A `CubicSpline` object containing the spline handle, x-coordinates, function values,
+        number of x-coordinates, number of quantities, and index of x position in the spline.
 """
-function spline_setup(xs, fs, bctype::Int=1)
-	if !isa(xs, Vector{Float64})
-		error("xs must be a vector of Float64")
+function CubicSpline(xs::Vector{Float64}, fs::Union{Vector{T}, Matrix{T}};
+					 bctype::Union{String, Int}="not-a-knot") where {T <: Union{Float64, ComplexF64}}
+
+	bctype_code = parse_bctype(bctype)
+
+	if  T === ComplexF64 && bctype_code == 1
+		error("Complex spline doesn't have natural spline. (bctype = 1/natural)")
 	end
-	if !isa(fs, Vector{Float64}) && !isa(fs, Matrix{Float64}) && !isa(fs, Vector{ComplexF64}) && !isa(fs, Matrix{ComplexF64})
-		error("fs must be a vector or matrix of Float64 or ComplexF64")
-	end
-    spline = _spline_setup(xs, fs, Int32(bctype))
-    return spline
+
+    spline = CubicSpline(xs, fs, Int32(bctype_code))
+
+	finalizer(_destroy_spline, spline)
+
+	return spline
 end
 
-
-function _spline_eval(spline::RealSplineType, x::Float64, derivs::Int=0)
+"""
+spline_eval(spline::CubicSpline{T}, x, derivs::Int=0) where {T<:Union{Float64, ComplexF64}}
+	## Arguments:
+	- `spline`: A `Spline` object created by `CubicSpline`.
+	- `x`: A Float64 value or a vector of Float64 values representing the x-coordinates to evaluate the spline at.
+	## Returns:
+	- If `x` is a single Float64 value, returns a vector of Float64 values representing the function values at that x-coordinate.
+	- If `x` is a vector of Float64 values, returns a matrix of Float64 values where each row corresponds to the function values at
+	  the respective x-coordinate in `x`.
+	- Depending on the derivatives requested, it may return additional vectors for the first, second, or third derivatives.
+"""
+function spline_eval(spline::CubicSpline{T}, x::Float64, derivs::Int=0) where {T<:Union{Float64, ComplexF64}}
 	# x -> Float64
-	# Returns a vector of Float64 (nqty)
-	if derivs == 0
-		f = Vector{Float64}(undef, spline.nqty)
+	# Returns a vector of T (nqty)
+	@assert (derivs in 0:3) "Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3."
 
-		ccall((:spline_c_eval, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{Float64}, Int32),
-			spline.handle, x, f, spline.ix)
+	f = Vector{T}(undef, spline.nqty)
+	if derivs == 0
+		call_spline_c_eval(T, spline, x, f)
 		return f
 	elseif derivs == 1
-		f = Vector{Float64}(undef, spline.nqty)
-		f1 = Vector{Float64}(undef, spline.nqty)
-		ccall((:spline_c_eval_deriv, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{Float64}, Ptr{Float64}, Int32),
-			spline.handle, x, f, f1, spline.ix)
+		f1 = similar(f)
+		call_spline_c_eval(T, spline, x, f, f1)
 		return f, f1
 	elseif derivs == 2
-		f = Vector{Float64}(undef, spline.nqty)
-		f1 = Vector{Float64}(undef, spline.nqty)
-		f2 = Vector{Float64}(undef, spline.nqty)
-		ccall((:spline_c_eval_deriv2, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32),
-			spline.handle, x, f, f1, f2, spline.ix)
+		f1, f2 = similar(f), similar(f)
+		call_spline_c_eval(T, spline, x, f, f1, f2)
 		return f, f1, f2
 	elseif derivs == 3
-		f = Vector{Float64}(undef, spline.nqty)
-		f1 = Vector{Float64}(undef, spline.nqty)
-		f2 = Vector{Float64}(undef, spline.nqty)
-		f3 = Vector{Float64}(undef, spline.nqty)
-		ccall((:spline_c_eval_deriv3, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Int32),
-			spline.handle, x, f, f1, f2, f3, spline.ix)
+		f1, f2, f3 = similar(f), similar(f), similar(f)
+		call_spline_c_eval(T, spline, x, f, f1, f2, f3)
 		return f, f1, f2, f3
-	else
-		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3.")
 	end
 end
 
-function _spline_eval(spline::RealSplineType, xs::Vector{Float64}, derivs::Int=0)
+function spline_eval(spline::CubicSpline{T}, xs::Vector{Float64}, derivs::Int=0) where {T<:Union{Float64, ComplexF64}}
     # xs -> Float64 (any length)
-    # Returns a matrix of Float64 (length(xs), nqty)
+    # Returns a matrix of T (length(xs), nqty)
+	@assert (derivs in 0:3) "Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3."
 
     n = length(xs)
-    fs = Matrix{Float64}(undef, n, spline.nqty)
-	f = Vector{Float64}(undef, spline.nqty)
+    fs = Matrix{T}(undef, n, spline.nqty)
+    f = Vector{T}(undef, spline.nqty)
 	if derivs > 0
-		fs1 = Matrix{Float64}(undef, n, spline.nqty)
-		f1 = Vector{Float64}(undef, spline.nqty)
+		fs1, f1 = similar(fs), similar(f)
 	end
 	if derivs > 1
-		fs2 = Matrix{Float64}(undef, n, spline.nqty)
-		f2 = Vector{Float64}(undef, spline.nqty)
+		fs2, f2 = similar(fs), similar(f)
 	end
 	if derivs > 2
-		fs3 = Matrix{Float64}(undef, n, spline.nqty)
-		f3 = Vector{Float64}(undef, spline.nqty)
+		fs3, f3 = similar(fs), similar(f)
 	end
-	for i in 1:n
+    for (i, x) in enumerate(xs)
 		if derivs == 0
-			f = _spline_eval(spline, xs[i], 0)
-			fs[i, :] = f
+			call_spline_c_eval(T, spline, x, f)
+			fs[i, :] .= f
 		elseif derivs == 1
-			f, f1 = _spline_eval(spline, xs[i], 1)
-			fs[i, :] = f
-			fs1[i, :] = f1
+			call_spline_c_eval(T, spline, x, f, f1)
+			fs[i, :] .= f
+			fs1[i, :] .= f1
 		elseif derivs == 2
-			f, f1, f2 = _spline_eval(spline, xs[i], 2)
-			fs[i, :] = f
-			fs1[i, :] = f1
-			fs2[i, :] = f2
+			call_spline_c_eval(T, spline, x, f, f1, f2)
+			fs[i, :] .= f
+			fs1[i, :] .= f1
+			fs2[i, :] .= f2
 		elseif derivs == 3
-			f, f1, f2, f3 = _spline_eval(spline, xs[i], 3)
-			fs[i, :] = f
-			fs1[i, :] = f1
-			fs2[i, :] = f2
-			fs3[i, :] = f3
-		else
-			error("Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3.")
+			call_spline_c_eval(T, spline, x, f, f1, f2, f3)
+			fs[i, :] .= f
+			fs1[i, :] .= f1
+			fs2[i, :] .= f2
+			fs3[i, :] .= f3
 		end
 	end
+
 	if derivs == 0
 		return fs
 	elseif derivs == 1
@@ -264,140 +185,50 @@ function _spline_eval(spline::RealSplineType, xs::Vector{Float64}, derivs::Int=0
 		return fs, fs1, fs2
 	elseif derivs == 3
 		return fs, fs1, fs2, fs3
-	else
-		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3.")
-	end
-end
-
-function _spline_eval(spline::ComplexSplineType, x::Float64, derivs::Int=0)
-	# x -> Float64
-	# Returns a vector of ComplexF64 (nqty)
-	f1 = Vector{ComplexF64}(undef, spline.nqty)
-	f2 = Vector{ComplexF64}(undef, spline.nqty)
-	f3 = Vector{ComplexF64}(undef, spline.nqty)
-	if derivs == 0
-		f = Vector{ComplexF64}(undef, spline.nqty)
-		ccall((:cspline_c_eval, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Int32),
-			spline.handle, x, f, spline.ix)
-		return f
-	elseif derivs == 1
-		f = Vector{ComplexF64}(undef, spline.nqty)
-		f1 = Vector{ComplexF64}(undef, spline.nqty)
-		ccall((:cspline_c_eval_deriv, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Ptr{ComplexF64}, Int32),
-			spline.handle, x, f, f1, spline.ix)
-		return f, f1
-	elseif derivs == 2
-		f = Vector{ComplexF64}(undef, spline.nqty)
-		f1 = Vector{ComplexF64}(undef, spline.nqty)
-		f2 = Vector{ComplexF64}(undef, spline.nqty)
-		ccall((:cspline_c_eval_deriv2, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Ptr{ComplexF64}, Ptr{ComplexF64}, Int32),
-			spline.handle, x, f, f1, f2, spline.ix)
-		return f, f1, f2
-	elseif derivs == 3
-		f = Vector{ComplexF64}(undef, spline.nqty)
-		f1 = Vector{ComplexF64}(undef, spline.nqty)
-		f2 = Vector{ComplexF64}(undef, spline.nqty)
-		f3 = Vector{ComplexF64}(undef, spline.nqty)
-		ccall((:cspline_c_eval_deriv3, libspline), Cvoid,
-			(Ptr{Cvoid}, Float64, Ptr{ComplexF64}, Ptr{ComplexF64}, Ptr{ComplexF64}, Ptr{ComplexF64}, Int32),
-			spline.handle, x, f, f1, f2, f3, spline.ix)
-		return f, f1, f2, f3
-	else
-		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3.")
-	end
-end
-
-function _spline_eval(spline::ComplexSplineType, xs::Vector{Float64}, derivs::Int=0)
-    # xs -> Float64 (any length)
-    # Returns a matrix of ComplexF64 (length(xs), nqty)
-    n = length(xs)
-    fs = Matrix{ComplexF64}(undef, n, spline.nqty)
-    f = Vector{ComplexF64}(undef, spline.nqty)
-	if derivs > 0
-		fs1 = Matrix{ComplexF64}(undef, n, spline.nqty)
-		f1 = Vector{ComplexF64}(undef, spline.nqty)
-	end
-	if derivs > 1
-		fs2 = Matrix{ComplexF64}(undef, n, spline.nqty)
-		f2 = Vector{ComplexF64}(undef, spline.nqty)
-	end
-	if derivs > 2
-		fs3 = Matrix{ComplexF64}(undef, n, spline.nqty)
-		f3 = Vector{ComplexF64}(undef, spline.nqty)
-	end
-    for i in 1:n
-		if derivs == 0
-			f = _spline_eval(spline, xs[i], 0)
-			fs[i, :] = f
-		elseif derivs == 1
-			f, f1 = _spline_eval(spline, xs[i], 1)
-			fs[i, :] = f
-			fs1[i, :] = f1
-		elseif derivs == 2
-			f, f1, f2 = _spline_eval(spline, xs[i], 2)
-			fs[i, :] = f
-			fs1[i, :] = f1
-			fs2[i, :] = f2
-		elseif derivs == 3
-			f, f1, f2, f3 = _spline_eval(spline, xs[i], 3)
-			fs[i, :] = f
-			fs1[i, :] = f1
-			fs2[i, :] = f2
-			fs3[i, :] = f3
-		else
-			error("Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3.")
-		end
-	end
-	if derivs == 0
-		return fs
-	elseif derivs == 1
-		return fs, fs1
-	elseif derivs == 2
-		return fs, fs1, fs2
-	elseif derivs == 3
-		return fs, fs1, fs2, fs3
-	else
-		error("Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3.")
 	end
 end
 
 """
-    spline_eval(spline, x, derivs=0)
+    spline_eval!(f, spline, x; derivs=0, f1=nothing, f2=nothing, f3=nothing)
 
-Evaluate a cubic spline at given points.
+In-place evaluation of `CubicSpline` at a single point `x`.
 
-# Arguments
-- `spline`: A `CubicSplineType` object created by `spline_setup`
-- `x`: A Float64 value or vector of Float64 values representing the x-coordinates to evaluate
-- `derivs`: Integer specifying derivative level (default is 0):
-    - 0: Function values only
-    - 1: Function values and first derivatives
-    - 2: Function values, first and second derivatives
+Arguments:
+- `f`: preallocated vector for the function values (length = spline.nqty).
+- `spline`: the cubic spline object.
+- `x`: Float64 input point.
+- `derivs`: number of derivatives to evaluate (0–3).
+- `f1`, `f2`, `f3`: optional preallocated vectors for first, second, third derivatives.
 
-# Returns
-- If `derivs=0`: Matrix of function values (length(x) × nqty)
-- If `derivs=1`: Tuple of (values, first_derivatives)  
-- If `derivs=2`: Tuple of (values, first_derivatives, second_derivatives)
-
-# Examples
-```julia
-# Evaluate at single point
-spline = spline_setup(xs, fs, 1)
-f_vals = spline_eval(spline, π/2)
-
-# Evaluate at multiple points
-x_eval = [π/4, π/2, 3π/4]
-f_vals = spline_eval(spline, x_eval)
-
-# Get derivatives
-f_vals, f_derivs = spline_eval(spline, x_eval, 1)
-```
+Results are written into `f` (and optionally `f1`, `f2`, `f3`).
 """
-function spline_eval(spline::CubicSplineType, x, derivs::Int=0)
-	return _spline_eval(spline, x, derivs)
+function spline_eval!(f::Vector{T}, spline::CubicSpline{T}, x::Float64;
+                      derivs::Int=0, f1=nothing, f2=nothing, f3=nothing) where {T<:Union{Float64, ComplexF64}}
+    @assert (derivs in 0:3) "Invalid number of derivatives requested: $derivs"
+
+    if derivs == 0
+        call_spline_c_eval(T, spline, x, f)
+    elseif derivs == 1
+        @assert f1 !== nothing "Need preallocated f1"
+        call_spline_c_eval(T, spline, x, f, f1)
+    elseif derivs == 2
+        @assert f1 !== nothing && f2 !== nothing "Need preallocated f1, f2"
+        call_spline_c_eval(T, spline, x, f, f1, f2)
+    elseif derivs == 3
+        @assert f1 !== nothing && f2 !== nothing && f3 !== nothing "Need preallocated f1, f2, f3"
+        call_spline_c_eval(T, spline, x, f, f1, f2, f3)
+    end
+    return nothing
 end
 
-end
+"""
+    spline_integrate!(spline::CubicSpline{T}) where {T<:Union{Float64, ComplexF64}}
+
+	## Arguments:
+	- `spline`: A mutable `Spline` object".
+
+	## Returns:
+	- Nothing. Updates `spline._fsi` in place so that
+	`spline._fsi[i, :]` equals `∫_{xs[1]}^{xs[i]} f(x) dx` for each component.
+"""
+spline_integrate!(spline::CubicSpline{T}) where {T<:Union{Float64, ComplexF64}} = call_spline_c_int(T, spline)

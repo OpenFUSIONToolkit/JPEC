@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - main
-    tags: 
+      - develop
+    tags:
       - '*'
   pull_request:
 
@@ -31,26 +32,23 @@ jobs:
         with:
           version: '1.11'
 
-      - name: Restore Julia cache
+      - name: Restore Julia cache (packages, artifacts, compiled, registries)
         uses: actions/cache@v4
         with:
-          path: ~/.julia
-          key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}
+          path: |
+            ~/.julia/packages
+            ~/.julia/artifacts
+            ~/.julia/compiled
+            ~/.julia/registries
+          # include Manifest.toml so cache invalidates when resolved versions change
+          key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
           restore-keys: |
-           ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}
-      - name: Download BLAS
-        run: sudo apt install -y libopenblas-dev
-      - name: Instantiate Julia environment
-        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+           ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libopenblas-dev
 
-      - name: Build package
-        run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
-
-      - name: Instantiate docs environment
-        run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
-
-      - name: Add local package to docs environment
-        run: julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path="."))'
+      - name: Prepare docs environment (develop local package, then instantiate)
+        run: julia --project=docs -e 'using Pkg; Pkg.activate("docs"); Pkg.develop(PackageSpec(path=".")); Pkg.instantiate(update_registry=false)'
 
       - name: Build and deploy documentation
         env:

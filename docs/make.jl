@@ -5,7 +5,7 @@ try
     using JPEC
     @info "Successfully loaded JPEC package"
 catch e
-    @error "Failed to load JPEC package" exception=e
+    @error "Failed to load JPEC package" exception = e
     # Try to provide helpful debugging info
     using Pkg
     @info "Current project:" Pkg.project().path
@@ -13,18 +13,19 @@ catch e
     rethrow()
 end
 
-makedocs(
-    sitename = "JPEC.jl",
-    format = Documenter.HTML(
-        prettyurls = get(ENV, "CI", nothing) == "true",
-        canonical = "https://OpenFUSIONToolkit.github.io/JPEC/"
+makedocs(;
+    sitename="JPEC.jl",
+    format=Documenter.HTML(;
+        prettyurls=get(ENV, "CI", nothing) == "true",
+        canonical="https://OpenFUSIONToolkit.github.io/JPEC/"
     ),
-    modules = [JPEC],
-    pages = [
+    modules=[JPEC],
+    pages=[
         "Home" => "index.md",
         "API Reference" => [
             "Splines" => "splines.md",
-            "Vacuum" => "vacuum.md"
+            "Vacuum" => "vacuum.md",
+            "Equilibrium" => "equilibrium.md"
         ],
         "Examples" => [
             "Spline Examples" => "examples/splines.md",
@@ -32,12 +33,12 @@ makedocs(
             "Equilibrium Examples" => "examples/equilibrium.md"
         ]
     ],
-    checkdocs = :exports
+    checkdocs=:exports
 )
 
-deploydocs(
-    repo = "github.com/OpenFUSIONToolkit/JPEC.git",
-    branch = "gh-pages",
-    devbranch = "main",
-    push_preview = true
+deploydocs(;
+    repo="github.com/OpenFUSIONToolkit/JPEC.git",
+    branch="gh-pages",
+    devbranch="main",
+    push_preview=true
 )
