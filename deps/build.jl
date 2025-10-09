@@ -12,6 +12,7 @@ export build_spline_fortran, build_vacuum_fortran
 function build_fortran()
     ENV["FC"] = get(ENV, "FC", "gfortran")
     # Set OS-dependent flags
+    println("Setting up environment for ", Sys.KERNEL)
     if Sys.isapple()
         ENV["LIBS"] = "-framework Accelerate"
         ENV["LIBSUFFIX"] = ".dylib"
@@ -33,7 +34,7 @@ function build_fortran()
     results = [
         # build_jpec_fortran() add here
         build_spline_fortran(),
-        build_vacuum_fortran()
+        build_vacuum_fortran(),
     ]
 
     if all(results)
