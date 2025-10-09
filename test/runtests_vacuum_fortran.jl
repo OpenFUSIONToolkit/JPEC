@@ -29,7 +29,7 @@
             wv, mpert, mtheta, mthvac,
             complex_flag, kernelsignin,
             wall_flag, farwal_flag,
-            grrio, xzptso, op_ahgfile
+            grrio, xzptso, op_ahgfile, joinpath(@__DIR__, ".")
         )
         @info "mscvac OK!"
     catch e
