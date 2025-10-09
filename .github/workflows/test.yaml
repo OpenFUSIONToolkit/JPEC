@@ -29,6 +29,7 @@ jobs:
             ~/.julia/artifacts
             ~/.julia/compiled
             ~/.julia/registries
+          # include Manifest.toml so cache invalidates when resolved versions change
           key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
           restore-keys: |
            ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
