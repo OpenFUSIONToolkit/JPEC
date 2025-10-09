@@ -24,7 +24,7 @@ makedocs(;
         "Home" => "index.md",
         "API Reference" => [
             "Splines" => "splines.md",
-            "Vacuum" => "vacuum.md"
+            "Vacuum" => "vacuum.md",
             "Equilibrium" => "equilibrium.md"
         ],
         "Examples" => [

@@ -25,14 +25,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.julia
-          key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}
+          key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
           restore-keys: |
-           ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}
-      - name: Download BLAS
-        run: sudo apt install -y libopenblas-dev
-      - name: Instantiate Julia environment
-        run: julia --project=. -e 'using Pkg; Pkg.activate("."); Pkg.instantiate()'
-      - name: Build package
-        run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
-      - name: Run tests
-        run: julia --project=. -e 'using Pkg; Pkg.test("JPEC")'
+           ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libopenblas-dev
+      - name: Run tests (instantiate + test)
+        run: julia --project=. -e 'using Pkg; Pkg.activate("."); Pkg.instantiate(); Pkg.test()'
