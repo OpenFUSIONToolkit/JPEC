@@ -31,20 +31,20 @@ MetricData(mpsi::Int, mtheta::Int) = MetricData(; mpsi, mtheta)
 Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equilibrium.
 
 # Arguments
-- `equil::Equilibrium.PlasmaEquilibrium`: 
+- `equil::Equilibrium.PlasmaEquilibrium`:
     An equilibrium object containing spline data (`rzphi`) for flux coordinates and geometry.
-- `mband::Int=10`: 
+- `mband::Int=10`:
     Number of Fourier modes to retain in the metric representation.
-- `fft_flag::Bool=true`: 
-    If `true`, enables use of Fourier fitting for storing metric coefficients. 
+- `fft_flag::Bool=true`:
+    If `true`, enables use of Fourier fitting for storing metric coefficients.
     (Currently reserved for downstream processing.)
 
 # Returns
-- `metric::MetricData`: 
+- `metric::MetricData`:
     A structure containing the metric coefficients, coordinate grids, and Jacobians for the specified equilibrium.
 
 # Details
-- Uses bicubic spline evaluation (`Spl.bicube_eval`) on the equilibrium geometry to compute 
+- Uses bicubic spline evaluation (`Spl.bicube_eval`) on the equilibrium geometry to compute
   contravariant basis vectors ∇ψ, ∇θ, and ∇ζ at each grid point.
 - The metric coefficients stored in `metric.fs` include:
     1. g^ψψ · J
@@ -150,11 +150,11 @@ end
 Constructs Fourier–poloidal coupling matrices for a given toroidal mode number and returns them as a new `FourFitVars` object.
 
 # Arguments
-- `metric::MetricData`: 
+- `metric::MetricData`:
     Metric coefficients on the (ψ, θ) grid, including Fourier representations of g^ij and J.
-- `equil::Equilibrium.PlasmaEquilibrium`: 
+- `equil::Equilibrium.PlasmaEquilibrium`:
     Plasma equilibrium object providing 1D flux-surface profiles (`sq`) and normalization constants.
-- `ctrl::DconControl`: 
+- `ctrl::DconControl`:
     Control parameters for the DCON calculation, including mode numbers and flags.
 - `intr::DconInternal`:
     Internal state for the DCON calculation, including mode number ranges and splines.
@@ -281,7 +281,7 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
         fbat .= fmat
 
         # --- Factorize and build composites ---
-        # TODO: Fortran throws an error if the factorization fails for a/fmat, not sure what this delta_mband comment is referencing. 
+        # TODO: Fortran throws an error if the factorization fails for a/fmat, not sure what this delta_mband comment is referencing.
         # I am keeping this here to most closely match the Fortran behavior, but it may be unnecessary if we only use dense matrices.
         if isposdef(Hermitian(amat, :L))
             amat_fact = cholesky(Hermitian(amat, :L))

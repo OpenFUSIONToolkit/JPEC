@@ -83,7 +83,7 @@ ys_fine = collect(range(0.0, stop=2π, length=100))
 fs_fine = JPEC.SplinesMod.bicube_eval(bcspline, xs_fine, ys_fine)
 
 # Create contour plot
-contourf(xs_fine, ys_fine, fs_fine[:, :, 1]', 
+contourf(xs_fine, ys_fine, fs_fine[:, :, 1]',
          title="Bicubic Spline: sin(x)cos(y) + 1")
 ```
 
@@ -108,7 +108,7 @@ This example shows spline usage with the Solov'ev equilibrium:
 ```julia
 # Create equilibrium parameters
 kappa = 1.8  # elongation
-a = 1.0      # minor radius  
+a = 1.0      # minor radius
 r0 = 3.5     # major radius
 q0 = 1.25    # safety factor
 
@@ -140,8 +140,8 @@ zs_fine = collect(range(zmin, stop=zmax, length=100))
 psi_fine = JPEC.SplinesMod.bicube_eval(psi_spline, rs_fine, zs_fine)
 
 # Create contour plot
-contourf(rs_fine, zs_fine, psi_fine[:, :, 1]', 
-         title="Ψ: Solov'ev Equilibrium", 
+contourf(rs_fine, zs_fine, psi_fine[:, :, 1]',
+         title="Ψ: Solov'ev Equilibrium",
          xlabel="R", ylabel="Z",
          aspect_ratio=:equal)
 ```

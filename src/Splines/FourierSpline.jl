@@ -46,7 +46,7 @@ function _fspline_setup(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Floa
     my = length(ys) - 1
     nqty = size(fs, 3)
 
-    h = Ref{Ptr{Cvoid}}()  
+    h = Ref{Ptr{Cvoid}}()
     ccall((:fspline_c_create, libspline), Cvoid,
           (Int64, Int64, Int64, Int64, Ref{Ptr{Cvoid}}),
           mx, my, mband, nqty, h)

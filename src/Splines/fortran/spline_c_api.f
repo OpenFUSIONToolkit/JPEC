@@ -98,14 +98,14 @@ c     declarations.
 c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       type(spline_type), pointer :: spl
-      
+
       call c_f_pointer(handle%obj, spl)
       if (associated(spl)) then
          call spline_dealloc(spl)
          deallocate(spl)
       else
          print *, "spline_c_destroy: handle is not associated "
-     $       // "with a valid spline object." 
+     $       // "with a valid spline object."
       end if
 c-----------------------------------------------------------------------
 c     terminate.
@@ -164,7 +164,7 @@ c-----------------------------------------------------------------------
 c------------------------------------------------------------------------
 c     terminate.
 c------------------------------------------------------------------------
-      return 
+      return
       end subroutine spline_c_setup
 c-----------------------------------------------------------------------
 c     subprogram 4. spline_c_fit
@@ -194,14 +194,14 @@ c-----------------------------------------------------------------------
 
       call spline_fit(spl, endmode)
 
-      
+
       mx = spl%mx
       nqty = spl%nqty
 
       call c_f_pointer(fs1_out, fs1_out_fort, [mx+1, nqty])
-      
+
       fs1_out_fort = spl%fs1
-      
+
       if (debug) then
             print '(A,*(I0,1X))', "fs1_out_fort dims :",
      $   size(fs1_out_fort,1), size(fs1_out_fort,2)
@@ -330,7 +330,7 @@ c-----------------------------------------------------------------------
       real(c_double), value :: x
       type(c_ptr), value :: f, f1, f2, f3
 
-      
+
       real(c_double), pointer :: fi(:), f1i(:), f2i(:), f3i(:)
       type(spline_type), pointer :: spl
 c-----------------------------------------------------------------------
@@ -436,7 +436,7 @@ c-----------------------------------------------------------------------
          deallocate(cspl)
       else
          print *, "cspline_c_destroy: handle is not associated "
-     $       // "with a valid cspline object." 
+     $       // "with a valid cspline object."
       end if
 c-----------------------------------------------------------------------
 c     terminate.
@@ -491,7 +491,7 @@ c-----------------------------------------------------------------------
 c------------------------------------------------------------------------
 c     terminate.
 c------------------------------------------------------------------------
-      return 
+      return
       end subroutine cspline_c_setup
 c-----------------------------------------------------------------------
 c     subprogram 13. cspline_c_fit
@@ -511,7 +511,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     work.
 c-----------------------------------------------------------------------
-      
+
       call c_f_pointer(handle%obj, cspl)
       if (.not. associated(cspl)) then
             print *, "cspline_c_fit: handle is not associated "
@@ -591,7 +591,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f, fi, [cspl%nqty])
       call c_f_pointer(f1, f1i, [cspl%nqty])
 
-      
+
 
       call cspline_eval_external(cspl, x, fi, f1i)
 c-----------------------------------------------------------------------
@@ -682,7 +682,7 @@ c     declarations.
 c-----------------------------------------------------------------------
       use iso_c_binding, only: c_ptr, c_f_pointer, c_double_complex
       type(spline_handle), value :: handle
-      type(c_ptr), value :: fsi_out 
+      type(c_ptr), value :: fsi_out
 
       type(cspline_type), pointer :: cspl
       complex(c_double_complex), pointer :: fsi_out_fort(:,:)
@@ -899,7 +899,7 @@ c-----------------------------------------------------------------------
          return
       end if
 
-      call c_f_pointer(f, fi, [bicube%nqty])      
+      call c_f_pointer(f, fi, [bicube%nqty])
 
       call bicube_eval_external(bicube, x, y, 0, fi)
 
@@ -980,7 +980,7 @@ c-----------------------------------------------------------------------
       call c_f_pointer(f2xy, f2xyi, [bicube%nqty])
       call c_f_pointer(f2yy, f2yyi, [bicube%nqty])
 
-      
+
       call bicube_eval_external(bicube, x, y, 2, fi, f1xi, f1yi,
      $                                              f2xxi, f2xyi, f2yyi)
 
@@ -1109,7 +1109,7 @@ c-----------------------------------------------------------------------
             print *, "fspline_c_fit_1: handle is not associated."
             return
       end if
-      
+
       fit_flag = fit_flag_c
       call fspline_fit_1(fst, endmode, fit_flag)
 c-----------------------------------------------------------------------
@@ -1140,7 +1140,7 @@ c-----------------------------------------------------------------------
             print *, "fspline_c_fit_2: handle is not associated."
             return
       end if
-      
+
       fit_flag = fit_flag_c
       call fspline_fit_2(fst, endmode, fit_flag)
 c-----------------------------------------------------------------------
@@ -1159,7 +1159,7 @@ c-----------------------------------------------------------------------
       type(spline_handle), value :: handle
       real(c_double), value :: x, y
       type(c_ptr), value :: f_out
-      
+
 
       real(c_double), pointer :: f_f(:)
       type(fspline_type), pointer :: fst
@@ -1173,7 +1173,7 @@ c-----------------------------------------------------------------------
       end if
 
       call c_f_pointer(f_out, f_f, [fst%nqty])
-      
+
 
       call fspline_eval_external(fst, x, y, 0, f_f)
 c-----------------------------------------------------------------------
@@ -1186,7 +1186,7 @@ c-----------------------------------------------------------------------
 c     subprogram 32. fspline_c_eval_deriv
 c     evaluates the fourier spline and its first derivatives.
 c-----------------------------------------------------------------------
-      subroutine fspline_c_eval_deriv(handle, x, y, f_out, 
+      subroutine fspline_c_eval_deriv(handle, x, y, f_out,
      $                                fx_out, fy_out) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.
@@ -1222,7 +1222,7 @@ c-----------------------------------------------------------------------
 c     subprogram 33. fspline_c_eval_deriv2
 c     evaluates the fourier spline and its second derivatives.
 c-----------------------------------------------------------------------
-      subroutine fspline_c_eval_deriv2(handle, x, y, f_out, 
+      subroutine fspline_c_eval_deriv2(handle, x, y, f_out,
      $     fx_out, fy_out, fxx_out, fxy_out, fyy_out) bind(C)
 c-----------------------------------------------------------------------
 c     declarations.

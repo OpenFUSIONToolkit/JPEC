@@ -55,7 +55,7 @@ function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, int
                     psi1 = psifac
                 end
             end
-            
+
             if it == itmax
                 error("Bisection did not converge for m = $m")
             else
@@ -77,14 +77,14 @@ end
     sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, eqCtrl::Equilibrium.EquilibriumControl, eqPrm::Equilibrium.EquilibriumParameters)
 
 Compute and set limiter values for the DCON analysis - handles cases where user
-truncates before the last singular surface. 
+truncates before the last singular surface.
 
 # Arguments
 - `itmax::Int`: The maximum number of iterations allowed for the psilim search (default: 50)
 - `eps::Float64`: The convergence tolerance for the psilim search (default: 1e-10)
 """
-# JMH - this has been checked against the DIID_Ideal example (with psiedge = 0.95 to enter the last if statement). 
-# There are some discrepancies at the 4-5th digit between the two, not sure if this is numerical noise, 
+# JMH - this has been checked against the DIID_Ideal example (with psiedge = 0.95 to enter the last if statement).
+# There are some discrepancies at the 4-5th digit between the two, not sure if this is numerical noise,
 # an issue in the spline evals, or a bug here. However, the differences in the main internal parameters are small
 # so ignoring for now, can address in a unit test later.
 function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=50, eps=1e-10)
@@ -93,10 +93,10 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
     qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
     q1val = psi -> Spl.spline_eval(equil.sq, psi, 1)[2][4]
 
-    #compute and modify the DconInternal struct 
+    #compute and modify the DconInternal struct
     intr.qlim   = min(equil.params.qmax, ctrl.qhigh)
     intr.q1lim  = equil.sq.fs1[equil.config.control.mpsi+1, 4]
-    intr.psilim = equil.config.control.psihigh 
+    intr.psilim = equil.config.control.psihigh
     #normalize dmlim to interval [0,1)
     if ctrl.sas_flag
         while ctrl.dmlim > 1.0
@@ -139,7 +139,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
     else
         intr.qlim = equil.params.qmax
         intr.q1lim = equil.sq.fs1[equil.config.control.mpsi+1,4]
-        intr.psilim = equil.config.control.psihigh 
+        intr.psilim = equil.config.control.psihigh
     end
 
     #set up record for determining the peak in dW near the boundary.
@@ -154,7 +154,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
         # monitor some deeper points for an informative profile
         intr.pre_edge = 1
         for i in 1:intr.size_edge
-            if intr.q_edge[i] < Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4] 
+            if intr.q_edge[i] < Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4]
                 intr.pre_edge += 1
             end
         end
@@ -284,14 +284,14 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
                                     singfac[ipert, 2] * f_interp[ipert, jpert, 1]
             end
             if ctrl.sing_order ≥ 2
-                f[ipert, jpert, 3] = singfac[ipert, 1] * f_interp[ipert, jpert, 3] + 
-                                    2 * singfac[ipert, 2] * f_interp[ipert, jpert, 2] + 
+                f[ipert, jpert, 3] = singfac[ipert, 1] * f_interp[ipert, jpert, 3] +
+                                    2 * singfac[ipert, 2] * f_interp[ipert, jpert, 2] +
                                     singfac[ipert, 3] * f_interp[ipert, jpert, 1]
             end
             if ctrl.sing_order ≥ 3
-                f[ipert, jpert, 4] = singfac[ipert, 1] * f_interp[ipert, jpert, 4] + 
-                                    3 * singfac[ipert, 2] * f_interp[ipert, jpert, 3] + 
-                                    3 * singfac[ipert, 3] * f_interp[ipert, jpert, 2] + 
+                f[ipert, jpert, 4] = singfac[ipert, 1] * f_interp[ipert, jpert, 4] +
+                                    3 * singfac[ipert, 2] * f_interp[ipert, jpert, 3] +
+                                    3 * singfac[ipert, 3] * f_interp[ipert, jpert, 2] +
                                     singfac[ipert, 4] * f_interp[ipert, jpert, 1]
             end
             if ctrl.sing_order ≥ 4
@@ -328,9 +328,9 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
         fac0 *= (n + 1)
     end
 
-    # NOTE: In Fortran, f, g, k are stored as banded Hermitian matrices (lower triangle only), 
+    # NOTE: In Fortran, f, g, k are stored as banded Hermitian matrices (lower triangle only),
     # with f already factored, this is passed into LAPACK which handles all of this under the hood.
-    # However, for now we are using dense matrices in Julia, so ff is stored as a full matrix (both triangles), 
+    # However, for now we are using dense matrices in Julia, so ff is stored as a full matrix (both triangles),
     # and we need to fill in the upper triangle here.
     # Use Hermitian property to fill the upper triangle
     for n in 1:ctrl.sing_order
@@ -374,7 +374,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             end
         end
     end
-    
+
     # Compute Hermitian matrix G
     for jpert in 1:intr.mpert
         for ipert in jpert:min(intr.mpert, jpert + intr.mband)
@@ -594,10 +594,10 @@ This follows the Julia DifferentialEquations package format for in place updatin
 
     ode_function!(du, u, p, t)
 
-# "Defining your ODE function to be in-place updating can have performance benefits. 
-# What this means is that, instead of writing a function which outputs its solution, 
-# you write a function which updates a vector that is designated to hold the solution. 
-# By doing this, DifferentialEquations.jl's solver packages are able to reduce the 
+# "Defining your ODE function to be in-place updating can have performance benefits.
+# What this means is that, instead of writing a function which outputs its solution,
+# you write a function which updates a vector that is designated to hold the solution.
+# By doing this, DifferentialEquations.jl's solver packages are able to reduce the
 # amount of array allocations and achieve better performance."
 
 Wherever possible, in-place operations on pre-allocated arrays are used to minimize memory allocations.
@@ -645,7 +645,7 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
 
         # TODO: banded matrix calculations would go here
     end
-    
+
     # Compute du
     if false #(TODO: kin_flag)
         error("kin_flag not implemented yet")
@@ -664,7 +664,7 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         du[:, :, 2] .= gmat * u[:, :, 1] .+ adjoint(kmat) * du[:, :, 1]
         du[:, :, 1] .*= odet.singfac_vec
     end
-    
+
     # u-derivative used in GPEC
     odet.ud[:,:,1] .= du[:,:,1]
     odet.ud[:,:,2] .= -bmat * du[:,:,1] - cmat * u[:,:,1]

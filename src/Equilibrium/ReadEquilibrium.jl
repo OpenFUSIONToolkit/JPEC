@@ -399,7 +399,7 @@ function read_chease(config::EquilibriumConfig)
                 println("  Last  5 entries: ", flat[n-4:n])
             end
         end
-        
+
 
         println("--> Finished reading CHEASE equilibrium.")
         println("    Magnetic axis at (ro=$ro, zo=$zo), psio=$psio")

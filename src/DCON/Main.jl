@@ -25,7 +25,7 @@ function Main(path::String)
         # equil.config.control.psihigh = intr.psilim
         # equil = set_up_equilibrium(equil.config)
     end
-    
+
     # TODO: add some data dump to dcon.out from equil here or in setup_equilibrium
 
     # Compute Mercier and Ballooning stability (if desired)
@@ -42,10 +42,10 @@ function Main(path::String)
     #   IF(ctrl.verbose) WRITE(*,*)"Evaluating ballooning criterion"
     #   CALL bal_scan
     #ENDIF
-    
+
     # Fit stability data to splines and dump to file
     intr.locstab = Spl.CubicSpline(Vector(equil.sq.xs), locstab_fs; bctype=3)
-    
+
     # Dump equilibrium data to files
     if outp.write_eqdata_h5
         write_output(outp, :eqdata_h5, Vector(equil.sq.xs); dsetname="psi")
@@ -63,14 +63,14 @@ function Main(path::String)
         for ipsi in 1:length(equil.sq.xs)
             write_output(outp, :dcon_out,
                 @sprintf("%4d %12.4e %12.4e %12.4e %12.4e %12.4e %12.4e %12.4e %12.4e",
-                        ipsi, 
-                        equil.sq.xs[ipsi], 
-                        equil.sq.fs[ipsi, 1] / (2π), 
-                        equil.sq.fs[ipsi, 2], 
-                        equil.sq.fs[ipsi, 3], 
-                        equil.sq.fs[ipsi, 4], 
-                        locstab_fs[ipsi, 1] / equil.sq.xs[ipsi], 
-                        locstab_fs[ipsi, 2] / equil.sq.xs[ipsi], 
+                        ipsi,
+                        equil.sq.xs[ipsi],
+                        equil.sq.fs[ipsi, 1] / (2π),
+                        equil.sq.fs[ipsi, 2],
+                        equil.sq.fs[ipsi, 3],
+                        equil.sq.fs[ipsi, 4],
+                        locstab_fs[ipsi, 1] / equil.sq.xs[ipsi],
+                        locstab_fs[ipsi, 2] / equil.sq.xs[ipsi],
                         locstab_fs[ipsi, 4]
                 )
             )
@@ -116,10 +116,10 @@ function Main(path::String)
                 intr.mlow, intr.mhigh, intr.mpert, intr.mband, ctrl.nn,
                 string(ctrl.sas_flag), ctrl.dmlim, intr.qlim, intr.psilim))
         end
-        
+
         # Compute metric tensor
         metric = make_metric(equil, mband=intr.mband, fft_flag=ctrl.fft_flag)
-        
+
         if ctrl.verbose
             println("Computing F, G, and K Matrices")
         end
@@ -181,7 +181,7 @@ function Main(path::String)
             println("Fixed-boundary mode unstable for nn = $(ctrl.nn).")
         end
     end
-  
+
     # Output results of free-boundary stability calculations
     if ctrl.vac_flag && !(ctrl.ksing > 0 && ctrl.ksing <= intr.msing + 1 && outp.bin_sol)
         if real(total1) < 0

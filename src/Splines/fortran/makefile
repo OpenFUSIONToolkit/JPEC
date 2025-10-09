@@ -25,7 +25,7 @@ OBJS = \
 
 # targets
 
-all : $(OUTLIB) 
+all : $(OUTLIB)
 
 $(OUTLIB): $(OBJS)
 	$(FC) $(LDFLAGS) -o $@ $^ $(LIBS)

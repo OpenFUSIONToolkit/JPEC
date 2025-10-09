@@ -9,7 +9,7 @@ c     0. defs_mod.
 c-----------------------------------------------------------------------
       module defs_mod
       implicit none
-      
+
       integer, parameter ::
      $     r4=selected_real_kind(6,37),
      $     r8=selected_real_kind(15,307),
@@ -28,7 +28,7 @@ c-----------------------------------------------------------------------
       real(r8), parameter :: six = 6.0_r8
       integer, parameter :: bin_unit = 10
       integer, parameter :: out_unit = 11
-      
+
       complex(r8), PARAMETER :: ifac=(0,1)
 
       contains
@@ -40,7 +40,7 @@ c-----------------------------------------------------------------------
 c     delcarations.
 c-----------------------------------------------------------------------
       subroutine timer(mode,unit,op_cpuseconds,op_wallseconds)
-      
+
       integer, intent(in) :: mode,unit
       real(r4), intent(out), optional :: op_cpuseconds,op_wallseconds
 

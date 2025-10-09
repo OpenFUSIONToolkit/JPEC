@@ -1,7 +1,7 @@
 """
     mercier_scan!(locstab_fs::Array{Float64,5}, plasma_eq::PlasmaEquilibrium)
 
-Evaluates Mercier criterion for local stability and modifies results in place 
+Evaluates Mercier criterion for local stability and modifies results in place
 within the local stability array.
 
 """
@@ -27,7 +27,7 @@ function mercier_scan!(locstab_fs::Matrix{Float64}, plasma_eq::Equilibrium.Plasm
         # Evaluate coordinates and jacobian
         for itheta in 1:length(rzphi.ys)
             theta = rzphi.ys[itheta]
-            
+
             # Evaluate bicubic spline at grid point
             f, _, fy = Spl.bicube_eval(rzphi, rzphi.xs[ipsi], theta, 1)
 

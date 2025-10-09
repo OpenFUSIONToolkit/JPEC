@@ -36,7 +36,7 @@ using JPEC
 mthin, lmin, lmax, nnin = Int32(4), Int32(1), Int32(4), Int32(2)
 qa1in = 1.23
 xin = rand(Float64, lmax - lmin + 1)
-zin = rand(Float64, lmax - lmin + 1) 
+zin = rand(Float64, lmax - lmin + 1)
 deltain = rand(Float64, lmax - lmin + 1)
 
 # Initialize DCON interface

@@ -53,7 +53,7 @@ including solution vectors, tolerances, and flags for the integration process.
     unorm::Vector{Float64} = zeros(Float64, 2*mpert)                        # norms of solution vectors
     unorm0::Vector{Float64} = zeros(Float64, 2*mpert)                       # initial norms of solution vectors
     ifix::Int = 0                # index for number of unorms performed
-    
+
     # Temporary matrices for sing_der calculations
     amat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
     bmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
@@ -99,7 +99,7 @@ nzero: number of zero crossings of the critical determinant detected during the 
 # and the convention that the modified struct comes first, the struct order is never consistent. Is there a better way?
 # For now - going to try modified structs first, then alphabetical after
 function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ffit::FourFitVars, outp::DconOutput)
-    
+
     # Initialization
     odet = OdeState(intr.mpert, intr.mpert, ctrl.numsteps_init, ctrl.numunorms_init, intr.msing)
 
@@ -440,10 +440,10 @@ end
 # end
 
 """
-    ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
+    ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium,
                      intr::DconInternal, ctrl::DconControl)
 
-Handle the crossing of an ideal MHD singular surface during ODE integration 
+Handle the crossing of an ideal MHD singular surface during ODE integration
 in a plasma equilibrium calculation.
 
 # Arguments
@@ -453,11 +453,11 @@ in a plasma equilibrium calculation.
 - `ctrl::DconControl`: Holds control flags and integration parameters.
 
 # Description
-This function updates the ODE solution as it crosses a (resonant) singular surface in the 
-ideal MHD calculation. It normalizes and reinitializes the solution vector at the singularity, 
-handles singular asymptotics, manages control flags, and updates relevant state variables 
-in `odet` for continued integration. It also determines the location and parameters of 
-the next singular surface, updates tolerance/stepping logic for the ODE solver, and may 
+This function updates the ODE solution as it crosses a (resonant) singular surface in the
+ideal MHD calculation. It normalizes and reinitializes the solution vector at the singularity,
+handles singular asymptotics, manages control flags, and updates relevant state variables
+in `odet` for continued integration. It also determines the location and parameters of
+the next singular surface, updates tolerance/stepping logic for the ODE solver, and may
 write auxiliary diagnostic output or coefficients as configured.
 
 # Notes
@@ -515,7 +515,7 @@ function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
             break
         end
     end
-    
+
     # Compute conditions at next singular surface
     if odet.ising > intr.msing || intr.psilim < intr.sing[min(odet.ising, intr.msing)].psifac
         odet.psimax = intr.psilim * (1 - eps)
@@ -554,7 +554,7 @@ function ode_resist_cross()
 end
 
 """
-    ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
+    ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium,
              intr::DconInternal, ctrl::DconControl, ffit::FourFitVars)
 
 Integrate the Euler-Lagrange equations to the next rational surface or edge.
@@ -568,8 +568,8 @@ Integrate the Euler-Lagrange equations to the next rational surface or edge.
 
 # Description
 This function computes and sets appropriate relative and absolute tolerances
-for the ODE integration depending on proximity to singular surfaces, 
-chooses the next integration endpoint, and advances the solution using 
+for the ODE integration depending on proximity to singular surfaces,
+chooses the next integration endpoint, and advances the solution using
 an adaptive ODE solver. The state in `odet` is updated in-place with
 the solution at the new point.
 
@@ -587,7 +587,7 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
     #     # du = similar(u)
     #     # sing_der!(du, u, params, integrator.t)
     #     fmt(x) = @sprintf("%.5e", x)
-    #     println("       ψ=", fmt(integrator.t), 
+    #     println("       ψ=", fmt(integrator.t),
     #         ", max|u|=", fmt(maximum(abs.(u))))
     #         # ", max|du|=", fmt(maximum(abs.(du))))
     #     last_psi[] = integrator.t
@@ -610,10 +610,10 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
     # Print out every tenth of the inter-rational interval
     # Δψ = (odet.psimax - odet.psifac) / 10
     # last_psi = Ref(0.0)
-    
+
     # TODO: need input here! Fortran emphasized that it was important to record data at the first and last step
     # However, the recording for u, ud, psi is now done after integration. Is there anything still within
-    # ode_output_step that needs to be recorded with this precision, or can it just be called within the 
+    # ode_output_step that needs to be recorded with this precision, or can it just be called within the
     # callback? Currently, ode_output_step does: ode_output_monitor (crit values), and in Fortran also does
     # ode_output_get_evals, and ode_output_sol
     # We don't use the `first` variable, and instead call the functions directly here before/after integration
@@ -662,7 +662,7 @@ function integrator_callback!(integrator)
     ctrl, equil, intr, odet, ffit, outp = integrator.p
     odet.u .= integrator.u
     odet.psifac = integrator.t
-    
+
     # Update integration tolerances
     rtol, atol = compute_tols(intr, odet, ctrl)
     integrator.opts.reltol = rtol
@@ -673,7 +673,7 @@ function integrator_callback!(integrator)
     #     print!(integrator)
     # end
 
-    # Note: no need for istep > 0 condition, since this is called after the first integration step always        
+    # Note: no need for istep > 0 condition, since this is called after the first integration step always
     ode_unorm!(odet, intr, ctrl, outp, false)
     integrator.u .= odet.u # Update integrator.u with normalized odet.u
 
