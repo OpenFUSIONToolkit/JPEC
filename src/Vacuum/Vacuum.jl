@@ -117,7 +117,8 @@ function mscvac(
     farwal_flag::Bool,
     grrio::Array{Float64,2},
     xzptso::Array{Float64,2},
-    op_ahgfile::Union{Nothing,String}=nothing
+    op_ahgfile::Union{Nothing,String}=nothing,
+    folder::String="."
 )
 
     ahgfile_ptr = if op_ahgfile === nothing
@@ -126,9 +127,12 @@ function mscvac(
         Base.cconvert(Ptr{UInt8}, op_ahgfile)
     end
 
-    ccall((:__vacuum_mod_MOD_mscvac, libvac),
-        Nothing,
-        (Ptr{ComplexF64},       # wv(mpert,mpert)
+    # TODO: this allows VACUUM to be called from a specified folder, like the rest of the Julia DCON
+    # vac.in is hardcoded in the fortran, so this just changes the working directory temporarily for VACUUM
+    cd(folder) do
+        ccall((:__vacuum_mod_MOD_mscvac, libvac),
+            Nothing,
+            (Ptr{ComplexF64},       # wv(mpert,mpert)
             Ref{Cint},            # mpert
             Ref{Cint},            # mtheta
             Ref{Cint},            # mthvac
@@ -139,18 +143,19 @@ function mscvac(
             Ptr{Cdouble},         # grrio(:,:)
             Ptr{Cdouble},         # xzptso(:,:)
             Ptr{UInt8}),          # op_ahgfile (optional)
-        pointer(wv),
-        Ref(Int32(mpert)),
-        Ref(Int32(mtheta)),
-        Ref(Int32(mthvac)),
-        Ref(Int32(complex_flag)),
-        Ref(kernelsignin),
-        Ref(Int32(wall_flag)),
-        Ref(Int32(farwal_flag)),
-        pointer(grrio),
-        pointer(xzptso),
-        ahgfile_ptr
-    )
+            pointer(wv),
+            Ref(Int32(mpert)),
+            Ref(Int32(mtheta)),
+            Ref(Int32(mthvac)),
+            Ref(Int32(complex_flag)),
+            Ref(kernelsignin),
+            Ref(Int32(wall_flag)),
+            Ref(Int32(farwal_flag)),
+            pointer(grrio),
+            pointer(xzptso),
+            ahgfile_ptr
+        )
+    end
 
     return wv
 end

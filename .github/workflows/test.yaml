@@ -2,9 +2,13 @@ name: Build and Test Julia Package
 
 on:
   pull_request:
+    branches:
+      - main
+      - develop
   push:
     branches:
       - main
+      - develop
 
 jobs:
   build:
@@ -19,19 +23,19 @@ jobs:
         with:
           version: '1.11'
 
-      - name: Restore Julia cache
+      - name: Restore Julia cache (packages, artifacts, compiled, registries)
         uses: actions/cache@v4
         with:
-          path: ~/.julia
-          key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}
+          path: |
+            ~/.julia/packages
+            ~/.julia/artifacts
+            ~/.julia/compiled
+            ~/.julia/registries
+          # include Manifest.toml so cache invalidates when resolved versions change
+          key: ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
           restore-keys: |
-           ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml') }}
-      - name: Download BLAS
-        run: sudo apt install -y libopenblas-dev
-      - name: Instantiate Julia environment
-        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
-
-      - name: Build package
-        run: julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile()'
-      - name: Run tests
-        run: julia --project=. -e 'using Pkg; Pkg.test("JPEC")'
+           ${{ runner.os }}-julia-${{ hashFiles('**/Project.toml','**/Manifest.toml') }}
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libopenblas-dev
+      - name: Run tests (instantiate without registry update + test)
+        run: julia --project=. -e 'using Pkg; Pkg.activate("."); Pkg.instantiate(update_registry=false); include("test/runtests.jl")'
