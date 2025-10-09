@@ -685,7 +685,7 @@ function integrator_callback!(integrator)
     ode_record_edge!(intr, ctrl, equil, odet)
 
     # Grow arrays if needed
-    if odet.step > size(odet.u_store, 4)
+    if odet.step >= size(odet.u_store, 4)
         resize_storage!(odet)
     end
     # Save values
@@ -789,13 +789,14 @@ function ode_unorm!(odet::OdeState, intr::DconInternal, ctrl::DconControl, outp:
         uratio = maximum(odet.unorm[1:odet.msol]) / minimum(odet.unorm[1:odet.msol])
         if uratio > ctrl.ucrit || sing_flag
             # TODO: add resizing logic here as well
-            if odet.ifix <= ctrl.numunorms_init
+            if odet.ifix < ctrl.numunorms_init
                 odet.ifix += 1
-                ode_fixup!(odet, intr, outp, sing_flag, false)
-                odet.new = true
             else
-                @warn "Maximum number of unorms reached, continuing without further unorms. Increase `numunorms_init` in dcon.toml if needed."
+                @warn "unorm storage reached, no longer saving fixfac data. Stability outputs and unorming will be correct, but cannot reconstruct `u`. \n
+                Increase `numunorms_init` in dcon.toml if needed. Automatic resizing will be added in a future version."
             end
+            ode_fixup!(odet, intr, outp, sing_flag, false)
+            odet.new = true
         end
     end
 end
