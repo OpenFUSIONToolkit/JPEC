@@ -40,22 +40,22 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      MODULE spline_mod
-      USE defs_mod
-      IMPLICIT NONE
+      module spline_mod
+      use defs_mod
+      implicit none
 
-      LOGICAL :: use_classic_splines = .FALSE.
-      TYPE :: spline_type
-      INTEGER :: mx,nqty,ix
-      REAL(r8), DIMENSION(:), ALLOCATABLE :: xs,f,f1,f2,f3
-      REAL(r8), DIMENSION(:,:), ALLOCATABLE :: fs,fs1,fsi,xpower
-      REAL(r8), DIMENSION(2) :: x0
-      CHARACTER(6), DIMENSION(:), ALLOCATABLE :: title
-      CHARACTER(6) :: name
-      LOGICAL :: periodic=.FALSE., allocated=.FALSE.
-      END TYPE spline_type
+      logical :: use_classic_splines = .false.
+      type :: spline_type
+      integer :: mx,nqty,ix
+      real(r8), dimension(:), allocatable :: xs,f,f1,f2,f3
+      real(r8), dimension(:,:), allocatable :: fs,fs1,fsi,xpower
+      real(r8), dimension(2) :: x0
+      character(6), dimension(:), allocatable :: title
+      character(6) :: name
+      logical :: periodic=.false., allocated=.false.
+      end type spline_type
 
-      CONTAINS
+      contains
 c-----------------------------------------------------------------------
 c     subprogram 1. spline_alloc.
 c     allocates space for spline_type.
@@ -63,44 +63,44 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_alloc(spl,mx,nqty)
+      subroutine spline_alloc(spl,mx,nqty)
 
-      INTEGER, INTENT(IN) :: mx,nqty
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      ! IF(spl%allocated) CALL spline_dealloc(spl)
+      integer, intent(in) :: mx,nqty
+      type(spline_type), intent(inout) :: spl
+      ! if(spl%allocated) call spline_dealloc(spl)
 c-----------------------------------------------------------------------
 c     safety check.
 c-----------------------------------------------------------------------
-      IF(spl%allocated)
-     $   CALL program_stop("spline_alloc: spline already allocated")
-      
+      if(spl%allocated)
+     $   call program_stop("spline_alloc: spline already allocated")
+
 c-----------------------------------------------------------------------
 c     set scalars.
 c-----------------------------------------------------------------------
       spl%mx=mx
       spl%nqty=nqty
       spl%ix=0
-      spl%periodic=.FALSE.
+      spl%periodic=.false.
 c-----------------------------------------------------------------------
 c     allocate space.
 c-----------------------------------------------------------------------
-      ALLOCATE(spl%xs(0:mx))
-      ALLOCATE(spl%f(nqty))
-      ALLOCATE(spl%f1(nqty))
-      ALLOCATE(spl%f2(nqty))
-      ALLOCATE(spl%f3(nqty))
-      ALLOCATE(spl%title(0:nqty))
-      ALLOCATE(spl%fs(0:mx,nqty))
-      ALLOCATE(spl%fs1(0:mx,nqty))
-      ALLOCATE(spl%xpower(2,nqty))
+      allocate(spl%xs(0:mx))
+      allocate(spl%f(nqty))
+      allocate(spl%f1(nqty))
+      allocate(spl%f2(nqty))
+      allocate(spl%f3(nqty))
+      allocate(spl%title(0:nqty))
+      allocate(spl%fs(0:mx,nqty))
+      allocate(spl%fs1(0:mx,nqty))
+      allocate(spl%xpower(2,nqty))
       spl%xpower=0
       spl%x0=0
-      spl%allocated=.TRUE.
+      spl%allocated=.true.
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_alloc
+      return
+      end subroutine spline_alloc
 c-----------------------------------------------------------------------
 c     subprogram 2. spline_dealloc.
 c     deallocates space for spline_type.
@@ -108,33 +108,33 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_dealloc(spl)
+      subroutine spline_dealloc(spl)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
+      type(spline_type), intent(inout) :: spl
 c-----------------------------------------------------------------------
 c     safety check.
 c-----------------------------------------------------------------------
-      IF(.NOT.spl%allocated)
-     $   CALL program_stop("spline_dealloc: spline not allocated")
+      if(.not.spl%allocated)
+     $   call program_stop("spline_dealloc: spline not allocated")
 c-----------------------------------------------------------------------
 c     deallocate space.
 c-----------------------------------------------------------------------
-      DEALLOCATE(spl%xs)
-      DEALLOCATE(spl%f)
-      DEALLOCATE(spl%f1)
-      DEALLOCATE(spl%f2)
-      DEALLOCATE(spl%f3)
-      DEALLOCATE(spl%title)
-      DEALLOCATE(spl%fs)
-      DEALLOCATE(spl%fs1)
-      DEALLOCATE(spl%xpower)
-      IF(ALLOCATED(spl%fsi))DEALLOCATE(spl%fsi)
-      spl%allocated=.FALSE.
+      deallocate(spl%xs)
+      deallocate(spl%f)
+      deallocate(spl%f1)
+      deallocate(spl%f2)
+      deallocate(spl%f3)
+      deallocate(spl%title)
+      deallocate(spl%fs)
+      deallocate(spl%fs1)
+      deallocate(spl%xpower)
+      if(allocated(spl%fsi))deallocate(spl%fsi)
+      spl%allocated=.false.
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_dealloc
+      return
+      end subroutine spline_dealloc
 c-----------------------------------------------------------------------
 c     subprogram 3. spline_fit.
 c     switch between cubic splines.
@@ -142,24 +142,24 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_fit(spl,endmode)
+      subroutine spline_fit(spl,endmode)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      type(spline_type), intent(inout) :: spl
+      integer, intent(in) :: endmode
 c-----------------------------------------------------------------------
 c     switch between two spline_fit.
 c-----------------------------------------------------------------------
-      IF (use_classic_splines .AND.
-     $    (endmode.EQ."extrap".OR.endmode.EQ."natural"))THEN
-         CALL spline_fit_classic(spl,endmode)
-      ELSE
-         CALL spline_fit_ahg(spl,endmode)
-      ENDIF
+      if (use_classic_splines .and.
+     $    (endmode  == 3 .OR. endmode == 1))then ! 3 = Extrapolate, 1 = Natural
+         call spline_fit_classic(spl,endmode)
+      else
+         call spline_fit_ahg(spl,endmode)
+      endif
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_fit
+      return
+      end subroutine spline_fit
 c-----------------------------------------------------------------------
 c     subprogram 4. spline_fit_ahg.
 c     fits real functions to cubic splines.
@@ -167,47 +167,47 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_fit_ahg(spl,endmode)
+      subroutine spline_fit_ahg(spl,endmode)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      type(spline_type), intent(inout) :: spl
+      integer, intent(in) :: endmode
 
-      INTEGER :: iqty,iside
-      REAL(r8), DIMENSION(-1:1,0:spl%mx) :: a
-      REAL(r8), DIMENSION(spl%mx) :: b
-      REAL(r8), DIMENSION(4) :: cl,cr
-      REAL(r8), DIMENSION(0:spl%mx) :: xfac
+      integer :: iqty,iside
+      real(r8), dimension(-1:1,0:spl%mx) :: a
+      real(r8), dimension(spl%mx) :: b
+      real(r8), dimension(4) :: cl,cr
+      real(r8), dimension(0:spl%mx) :: xfac
 c-----------------------------------------------------------------------
 c     extract powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
-         DO iqty=1,spl%nqty
-            IF(spl%xpower(iside,iqty) /= 0)THEN
+      do iside=1,2
+         do iqty=1,spl%nqty
+            if(spl%xpower(iside,iqty) /= 0)then
                xfac=1/ABS(spl%xs-spl%x0(iside))**spl%xpower(iside,iqty)
                spl%fs(:,iqty)=spl%fs(:,iqty)*xfac
-            ENDIF
-         ENDDO
-      ENDDO
+            endif
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     set up grid matrix.
 c-----------------------------------------------------------------------
-      CALL spline_fac(spl,a,b,cl,cr,endmode)
+      call spline_fac(spl,a,b,cl,cr,endmode)
 c-----------------------------------------------------------------------
 c     compute first derivatives, interior.
 c-----------------------------------------------------------------------
-      DO iqty=1,spl%nqty
+      do iqty=1,spl%nqty
          spl%fs1(1:spl%mx-1,iqty)=
      $        3*((spl%fs(2:spl%mx,iqty)-spl%fs(1:spl%mx-1,iqty))
      $        *b(2:spl%mx)
      $        +(spl%fs(1:spl%mx-1,iqty)-spl%fs(0:spl%mx-2,iqty))
      $        *b(1:spl%mx-1))
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     extrapolation boundary conditions.
 c-----------------------------------------------------------------------
-      SELECT CASE(endmode)
-      CASE("extrap")
-         DO iqty=1,spl%nqty
+      select case(endmode)
+      case(3) ! 3 = Extrapolate
+         do iqty=1,spl%nqty
             spl%fs1(0,iqty)=SUM(cl(1:4)*spl%fs(0:3,iqty))
             spl%fs1(spl%mx,iqty)=SUM(cr(1:4)
      $           *spl%fs(spl%mx:spl%mx-3:-1,iqty))
@@ -216,18 +216,18 @@ c-----------------------------------------------------------------------
             spl%fs1(spl%mx-1,iqty)=
      $           spl%fs1(spl%mx-1,iqty)-spl%fs1(spl%mx,iqty)
      $           /(spl%xs(spl%mx)-spl%xs(spl%mx-1))
-         ENDDO
-         CALL spline_trilus(a(:,1:spl%mx-1),spl%fs1(1:spl%mx-1,:))
+         enddo
+         call spline_trilus(a(:,1:spl%mx-1),spl%fs1(1:spl%mx-1,:))
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("not-a-knot")
+      case(4) ! 4 = not-a-knot
          spl%fs1(1,:)=spl%fs1(1,:)-(2*spl%fs(1,:)
      $        -spl%fs(0,:)-spl%fs(2,:))*2*b(1)
          spl%fs1(spl%mx-1,:)=spl%fs1(spl%mx-1,:)
      $        +(2*spl%fs(spl%mx-1,:)-spl%fs(spl%mx,:)
      $        -spl%fs(spl%mx-2,:))*2*b(spl%mx)
-         CALL spline_trilus(a(:,1:spl%mx-1),spl%fs1(1:spl%mx-1,:))
+         call spline_trilus(a(:,1:spl%mx-1),spl%fs1(1:spl%mx-1,:))
          spl%fs1(0,:)=(2*(2*spl%fs(1,:)-spl%fs(0,:)-spl%fs(2,:))
      $        +(spl%fs1(1,:)+spl%fs1(2,:))*(spl%xs(2)-spl%xs(1))
      $        -spl%fs1(1,:)*(spl%xs(1)-spl%xs(0)))/(spl%xs(1)-spl%xs(0))
@@ -242,23 +242,23 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boudary conditions.
 c-----------------------------------------------------------------------
-      CASE("periodic")
-         spl%periodic=.TRUE.
+      case(2) ! 2 = Periodic
+         spl%periodic=.true.
          spl%fs1(0,:)=3*((spl%fs(1,:)-spl%fs(0,:))*b(1)
      $        +(spl%fs(0,:)-spl%fs(spl%mx-1,:))*b(spl%mx))
-         CALL spline_morrison(a(:,0:spl%mx-1),spl%fs1(0:spl%mx-1,:))
+         call spline_morrison(a(:,0:spl%mx-1),spl%fs1(0:spl%mx-1,:))
          spl%fs1(spl%mx,:)=spl%fs1(0,:)
 c-----------------------------------------------------------------------
 c     unrecognized boundary condition.
 c-----------------------------------------------------------------------
-      CASE DEFAULT
-         CALL program_stop("Cannot recognize endmode = "//TRIM(endmode))
-      END SELECT
+      case default
+         call program_stop("Cannot recognize endmode")
+      end select
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_fit_ahg
+      return
+      end subroutine spline_fit_ahg
 c-----------------------------------------------------------------------
 c     subprogram 5. spline_fit_classic.
 c     classical way to solve spline coefficients
@@ -268,62 +268,62 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_fit_classic(spl,endmode)
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
-      REAL(r8), DIMENSION(:),ALLOCATABLE :: d,l,u,h
-      REAL(r8), DIMENSION(:,:),ALLOCATABLE :: r
-      REAL(r8), DIMENSION(0:spl%mx) :: xfac
+      subroutine spline_fit_classic(spl,endmode)
+      type(spline_type), intent(inout) :: spl
+      integer, intent(in) :: endmode
+      real(r8), dimension(:),allocatable :: d,l,u,h
+      real(r8), dimension(:,:),allocatable :: r
+      real(r8), dimension(0:spl%mx) :: xfac
 
-      INTEGER :: iside,iqty,i
-      REAL(r8),DIMENSION(spl%nqty) :: bs,cs,ds
+      integer :: iside,iqty,i
+      real(r8),dimension(spl%nqty) :: bs,cs,ds
 c-----------------------------------------------------------------------
 c     extract powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
-         DO iqty=1,spl%nqty
-            IF(spl%xpower(iside,iqty) /= 0)THEN
+      do iside=1,2
+         do iqty=1,spl%nqty
+            if(spl%xpower(iside,iqty) /= 0)then
                xfac=1/ABS(spl%xs-spl%x0(iside))**spl%xpower(iside,iqty)
                spl%fs(:,iqty)=spl%fs(:,iqty)*xfac
-            ENDIF
-         ENDDO
-      ENDDO
-      ALLOCATE (d(0:spl%mx),l(spl%mx),u(spl%mx),r(0:spl%mx,spl%nqty))
-      ALLOCATE (h(0:spl%mx-1))
+            endif
+         enddo
+      enddo
+      allocate (d(0:spl%mx),l(spl%mx),u(spl%mx),r(0:spl%mx,spl%nqty))
+      allocate (h(0:spl%mx-1))
 c-----------------------------------------------------------------------
 c     compute tridiagnol matrix for natural B.C.
 c-----------------------------------------------------------------------
-      DO i=0,spl%mx-1
+      do i=0,spl%mx-1
          h(i)=spl%xs(i+1)-spl%xs(i)
-      ENDDO
+      enddo
 
       d(0)=1
-      DO i=1,spl%mx-1
+      do i=1,spl%mx-1
          d(i)=2*(h(i-1)+h(i))
-      ENDDO
+      enddo
       d(spl%mx)=1
 
-      DO i=1,spl%mx-1
+      do i=1,spl%mx-1
          l(i)=h(i-1)
-      ENDDO
+      enddo
       l(spl%mx)=0
 
       u(1)=0
-      DO i=2,spl%mx
+      do i=2,spl%mx
          u(i)=h(i-1)
-      ENDDO
+      enddo
 
       r(0,:)=0
-      DO i=1,spl%mx-1
+      do i=1,spl%mx-1
          r(i,:)=( (spl%fs(i+1,:)-spl%fs(i,:))/h(i)
      $           -(spl%fs(i,:)-spl%fs(i-1,:))/h(i-1) )*6
-      ENDDO
+      enddo
       r(spl%mx,:)=0
 
-      IF (endmode=="extrap") THEN
-         CALL spline_get_yp(spl%xs(0:3),spl%fs(0:3,:),
+      if (endmode==3) then ! 3 = Extrapolate
+         call spline_get_yp(spl%xs(0:3),spl%fs(0:3,:),
      $                      spl%xs(0),r(0,:),spl%nqty)
-         CALL spline_get_yp(spl%xs(spl%mx-3:spl%mx),
+         call spline_get_yp(spl%xs(spl%mx-3:spl%mx),
      $        spl%fs(spl%mx-3:spl%mx,:),spl%xs(spl%mx),
      $        r(spl%mx,:),spl%nqty)
          d(0)=2*h(0)
@@ -334,19 +334,19 @@ c-----------------------------------------------------------------------
          r(spl%mx,:)=( r(spl%mx,:)
      $  -(spl%fs(spl%mx,:)-spl%fs(spl%mx-1,:))/h(spl%mx-1) )*6
 
-      ENDIF
+      endif
 c-----------------------------------------------------------------------
 c     solve and contrruct spline.
 c-----------------------------------------------------------------------
 
-      CALL spline_thomas(l,d,u,r,spl%mx+1,spl%nqty)
+      call spline_thomas(l,d,u,r,spl%mx+1,spl%nqty)
 
-      DO i=0, spl%mx-1
+      do i=0, spl%mx-1
          bs=(spl%fs(i+1,:)-spl%fs(i,:))/h(i)
      $    - 0.5*h(i)*r(i,:)
      $    - h(i)*(r(i+1,:)-r(i,:))/6
          spl%fs1(i,:)=bs
-      ENDDO
+      enddo
       ds=(r(spl%mx,:)-r(spl%mx-1,:))/(h(spl%mx-1)*6)
       cs=r(spl%mx-1,:)*0.5
       i=spl%mx-1
@@ -355,12 +355,12 @@ c-----------------------------------------------------------------------
      $    - h(i)*(r(i+1,:)-r(i,:))/6
       i=spl%mx
       spl%fs1(i,:)=bs+h(i-1)*(cs*2+h(i-1)*ds*3)
-      DEALLOCATE (d,l,u,r,h)
+      deallocate (d,l,u,r,h)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_fit_classic
+      return
+      end subroutine spline_fit_classic
 c-----------------------------------------------------------------------
 c     subprogram 6. spline_fit_ha.
 c     fits real functions to highly accurate cubic splines
@@ -370,31 +370,31 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_fit_ha(spl,endmode)
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      CHARACTER(*), INTENT(IN) :: endmode
+      subroutine spline_fit_ha(spl,endmode)
+      type(spline_type), intent(inout) :: spl
+      integer, intent(in) :: endmode
 
-      INTEGER ::icount,icoef,imx,iqty,istart,jstart,info,iside
-      INTEGER :: ndim,nqty,kl,ku,ldab,nvar
-      INTEGER, DIMENSION(:), ALLOCATABLE :: ipiv
-      INTEGER,  DIMENSION(:,:), ALLOCATABLE :: imap
-      REAL(r8) :: x0,x1,x2,dx
-      REAL(r8), DIMENSION(0:spl%mx) :: xfac
-      REAL(r8), DIMENSION(:,:), ALLOCATABLE :: rhs,locrhs,fs,locrhs0,
+      integer ::icount,icoef,imx,iqty,istart,jstart,info,iside
+      integer :: ndim,nqty,kl,ku,ldab,nvar
+      integer, dimension(:), allocatable :: ipiv
+      integer,  dimension(:,:), allocatable :: imap
+      real(r8) :: x0,x1,x2,dx
+      real(r8), dimension(0:spl%mx) :: xfac
+      real(r8), dimension(:,:), allocatable :: rhs,locrhs,fs,locrhs0,
      $                                         locrhs1,tmpmat
-      REAL(r8), DIMENSION(:,:),ALLOCATABLE :: mat,locmat,locmat0,locmat1
-      REAL(r8), DIMENSION(:,:,:),ALLOCATABLE :: coef
+      real(r8), dimension(:,:),allocatable :: mat,locmat,locmat0,locmat1
+      real(r8), dimension(:,:,:),allocatable :: coef
 c-----------------------------------------------------------------------
 c     extract powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
-         DO iqty=1,spl%nqty
-            IF(spl%xpower(iside,iqty) /= 0)THEN
+      do iside=1,2
+         do iqty=1,spl%nqty
+            if(spl%xpower(iside,iqty) /= 0)then
                xfac=1/ABS(spl%xs-spl%x0(iside))**spl%xpower(iside,iqty)
                spl%fs(:,iqty)=spl%fs(:,iqty)*xfac
-            ENDIF
-         ENDDO
-      ENDDO
+            endif
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     contruct grid and related matrix block.
 c     five unknow variables at each interval a,b,c,e,f
@@ -403,30 +403,30 @@ c     e and f are used for passing periodic conditions
 c-----------------------------------------------------------------------
       nqty=spl%nqty
       nvar=5
-      ALLOCATE (coef(nvar,0:spl%mx-1,nqty),imap(nvar,0:spl%mx-1))
-      ALLOCATE (fs(0:spl%mx,nqty))
+      allocate (coef(nvar,0:spl%mx-1,nqty),imap(nvar,0:spl%mx-1))
+      allocate (fs(0:spl%mx,nqty))
       icount=1
-      DO imx=0, spl%mx-1
-         DO icoef=1,nvar
+      do imx=0, spl%mx-1
+         do icoef=1,nvar
             imap(icoef,imx)=icount
             icount=icount+1
-         ENDDO
-      ENDDO
+         enddo
+      enddo
       ndim=icount-1
       kl=nvar*3
       ku=kl
       ldab=2*kl+ku+1
-      ALLOCATE(mat(ldab,ndim),rhs(ndim,nqty),ipiv(ndim))
+      allocate(mat(ldab,ndim),rhs(ndim,nqty),ipiv(ndim))
       mat=0
       rhs=0
       fs=spl%fs(:,:)
 c-----------------------------------------------------------------------
 c     contruct local matrix in each interval.
 c-----------------------------------------------------------------------
-      ALLOCATE(locmat(nvar,nvar*3),locmat0(nvar,nvar*3),
+      allocate(locmat(nvar,nvar*3),locmat0(nvar,nvar*3),
      &         locmat1(nvar,nvar*2),tmpmat(nvar,nvar*2))
-      ALLOCATE(locrhs(nvar,nqty),locrhs0(nvar,nqty),locrhs1(nvar,nqty))
-      DO imx=1,spl%mx-2
+      allocate(locrhs(nvar,nqty),locrhs0(nvar,nqty),locrhs1(nvar,nqty))
+      do imx=1,spl%mx-2
          x0=spl%xs(imx-1)
          x1=spl%xs(imx)
          x2=spl%xs(imx+1)
@@ -469,9 +469,9 @@ c     fill global matrix
 c-----------------------------------------------------------------------
          istart=imap(1,imx)
          jstart=imap(1,imx-1)
-         CALL spline_fill_matrix(mat,locmat,istart,jstart,kl,ku)
+         call spline_fill_matrix(mat,locmat,istart,jstart,kl,ku)
          rhs(istart:istart+nvar-1,:)=locrhs
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     boundary condition
 c-----------------------------------------------------------------------
@@ -509,11 +509,11 @@ c-----------------------------------------------------------------------
       locmat1(5,5)=1
       locmat1(5,nvar+5)=-1
 
-      SELECT CASE(endmode)
+      select case(endmode)
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("not-a-knot")
+      case(4) ! 4 = not-a-knot
          locmat0(1,nvar+1)=6
          locmat0(1,2*nvar+1)=-6
          locmat0(5,nvar+5)=1
@@ -528,9 +528,9 @@ c-----------------------------------------------------------------------
 c     extrap boudary conditions, use first and last four points to
 c     calculate y'(0) and y'(1).
 c-----------------------------------------------------------------------
-      CASE("extrap")
+      case(3) ! 3 = Extrapolate
          locmat0(1,nvar+3)=1
-         CALL spline_get_yp(spl%xs(0:3),spl%fs(0:3,:),
+         call spline_get_yp(spl%xs(0:3),spl%fs(0:3,:),
      $                      spl%xs(0),locrhs0(1,:),nqty)
 
          locmat0(5,nvar+5)=1
@@ -540,7 +540,7 @@ c-----------------------------------------------------------------------
          locmat1(3,nvar+1)=3*dx*dx
          locmat1(3,nvar+2)=2*dx
          locmat1(3,nvar+3)=1
-         CALL spline_get_yp(spl%xs(spl%mx-3:spl%mx),
+         call spline_get_yp(spl%xs(spl%mx-3:spl%mx),
      $   spl%fs(spl%mx-3:spl%mx,:),spl%xs(spl%mx),locrhs1(3,:),nqty)
 
          locmat1(4,nvar+4)=1
@@ -548,7 +548,7 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     natural boudary conditions.
 c-----------------------------------------------------------------------
-      CASE("natural")
+      case(1) ! 1 = Natural
          locmat0(1,nvar+2)=2
 
          locmat0(5,nvar+5)=1
@@ -563,20 +563,20 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     periodic boudary conditions.
 c-----------------------------------------------------------------------
-      CASE("periodic")
+      case(2) ! 2 = Periodic
 c-----------------------------------------------------------------------
 c     s'0(x0)=s'm-1(xm).
 c-----------------------------------------------------------------------
-         DO iqty=1,nqty
-            IF (ABS(spl%fs(0,iqty)-spl%fs(spl%mx,iqty)) > 1E-15) THEN
-               WRITE(*,*)
+         do iqty=1,nqty
+            if (ABS(spl%fs(0,iqty)-spl%fs(spl%mx,iqty)) > 1E-15) then
+               write(*,*)
      $             "Warning: first and last points are different.
-     $              IQTY= ",IQTY,",  averaged value is used."//
-     $              TRIM(endmode)
+     $              IQTY= ",IQTY,",  averaged value is used."
+c                    ,endmode
               spl%fs(0,iqty)=(spl%fs(0,iqty)+spl%fs(spl%mx,iqty))*0.5
               spl%fs(spl%mx,iqty)=spl%fs(0,iqty)
-            ENDIF
-         ENDDO
+            endif
+         enddo
          locmat0(1,nvar+3)=1
          locmat0(1,nvar+4)=-1
 
@@ -594,21 +594,21 @@ c-----------------------------------------------------------------------
 
          locmat0(5,nvar+2)=2
          locmat0(5,nvar+5)=-1
-         spl%periodic=.TRUE.
+         spl%periodic=.true.
 c-----------------------------------------------------------------------
 c     unrecognized boundary condition.
 c-----------------------------------------------------------------------
-      CASE DEFAULT
-         CALL program_stop
-     $       ("Cannot recognize endmode = "//TRIM(endmode))
-      END SELECT
+      case default
+         call program_stop
+     $       ("Cannot recognize endmode")
+      end select
 c-----------------------------------------------------------------------
 c     fill global matrix at x0
 c-----------------------------------------------------------------------
       istart=imap(1,0)
       jstart=imap(1,0)
       tmpmat=locmat0(:,nvar+1:3*nvar)
-      CALL spline_fill_matrix(mat,tmpmat,istart,jstart,kl,ku)
+      call spline_fill_matrix(mat,tmpmat,istart,jstart,kl,ku)
       rhs(istart:istart+nvar-1,:)=locrhs0
 c-----------------------------------------------------------------------
 c     fill global matrix at xm
@@ -616,44 +616,44 @@ c-----------------------------------------------------------------------
       istart=imap(1,spl%mx-1)
       jstart=imap(1,spl%mx-2)
       tmpmat=locmat1(:,1:2*nvar)
-      CALL spline_fill_matrix(mat,tmpmat,istart,jstart,kl,ku)
+      call spline_fill_matrix(mat,tmpmat,istart,jstart,kl,ku)
       rhs(istart:istart+nvar-1,:)=locrhs1
 c-----------------------------------------------------------------------
 c     solve global matrix
 c-----------------------------------------------------------------------
-      CALL dgbtrf(ndim,ndim,kl,ku,mat,ldab,ipiv,info)
-      IF (info .NE. 0) THEN
-         CALL program_stop
+      call dgbtrf(ndim,ndim,kl,ku,mat,ldab,ipiv,info)
+      if (info .NE. 0) then
+         call program_stop
      $           ("Error: LU factorization of spline matrix info ne 0")
-      ENDIF
-      CALL dgbtrs("N",ndim,kl,ku,nqty,mat,ldab,ipiv,rhs,ndim,info )
-      IF (info .NE. 0) THEN
-         CALL program_stop
+      endif
+      call dgbtrs("N",ndim,kl,ku,nqty,mat,ldab,ipiv,rhs,ndim,info )
+      if (info .NE. 0) then
+         call program_stop
      $        ("Error: solve spline matrix info ne 0")
-      ENDIF
+      endif
 c-----------------------------------------------------------------------
 c     get spl%fs1.
 c-----------------------------------------------------------------------
-      DO imx=0, spl%mx-1
-         DO icoef=1,nvar
+      do imx=0, spl%mx-1
+         do icoef=1,nvar
             coef(icoef,imx,:)=rhs(imap(icoef,imx),:)
-         ENDDO
+         enddo
          spl%fs1(imx,:)=coef(3,imx,:)
-      ENDDO
+      enddo
       dx=spl%xs(imx)-spl%xs(imx-1)
       spl%fs1(imx,:)=coef(3,imx-1,:)
      $                   +dx*(coef(2,imx-1,:)*2+dx*coef(1,imx-1,:)*3)
 
-      DEALLOCATE (coef,imap)
-      DEALLOCATE (fs)
-      DEALLOCATE(mat,rhs,ipiv)
-      DEALLOCATE(locmat,locmat0,locmat1,tmpmat)
-      DEALLOCATE(locrhs,locrhs0,locrhs1)
+      deallocate (coef,imap)
+      deallocate (fs)
+      deallocate(mat,rhs,ipiv)
+      deallocate(locmat,locmat0,locmat1,tmpmat)
+      deallocate(locrhs,locrhs0,locrhs1)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_fit_ha
+      return
+      end subroutine spline_fit_ha
 c-----------------------------------------------------------------------
 c     subprogram 7. spline_fac.
 c     sets up matrix for cubic spline fitting.
@@ -661,29 +661,29 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_fac(spl,a,b,cl,cr,endmode)
+      subroutine spline_fac(spl,a,b,cl,cr,endmode)
 
-      TYPE(spline_type), INTENT(IN) :: spl
-      REAL(r8), DIMENSION(-1:1,0:spl%mx), INTENT(OUT) :: a
-      REAL(r8), DIMENSION(spl%mx), INTENT(OUT) :: b
-      REAL(r8), DIMENSION(4), INTENT(OUT) :: cl,cr
-      CHARACTER(*), INTENT(IN) :: endmode
+      type(spline_type), intent(in) :: spl
+      real(r8), dimension(-1:1,0:spl%mx), intent(out) :: a
+      real(r8), dimension(spl%mx), intent(out) :: b
+      real(r8), dimension(4), intent(out) :: cl,cr
+      integer, intent(in) :: endmode
 
-      INTEGER :: j
+      integer :: j
 c-----------------------------------------------------------------------
 c     compute interior matrix.
 c-----------------------------------------------------------------------
       b=1/(spl%xs(1:spl%mx)-spl%xs(0:spl%mx-1))
-      DO j=1,spl%mx-1
+      do j=1,spl%mx-1
          a(-1,j)=b(j)
          a(0,j)=2*(b(j)+b(j+1))
          a(1,j)=b(j+1)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     extrapolation boundary conditions.
 c-----------------------------------------------------------------------
-      SELECT CASE(endmode)
-      CASE("extrap")
+      select case(endmode)
+      case(3) ! 3 = Extrapolate
          b=b*b
          cl(1)=(spl%xs(0)*(3*spl%xs(0)
      $        -2*(spl%xs(1)+spl%xs(2)+spl%xs(3)))
@@ -723,11 +723,11 @@ c-----------------------------------------------------------------------
      $        /((spl%xs(spl%mx-3)-spl%xs(spl%mx))
      $        *(spl%xs(spl%mx-3)-spl%xs(spl%mx-1))
      $        *(spl%xs(spl%mx-3)-spl%xs(spl%mx-2)))
-         CALL spline_triluf(a(:,1:spl%mx-1))
+         call spline_triluf(a(:,1:spl%mx-1))
 c-----------------------------------------------------------------------
 c     not-a-knot boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("not-a-knot")
+      case(4) ! 4 = not-a-knot
          b=b*b
          a(0,1)=a(0,1)+(spl%xs(2)+spl%xs(0)-2*spl%xs(1))*b(1)
          a(1,1)=a(1,1)+(spl%xs(2)-spl%xs(1))*b(1)
@@ -736,27 +736,27 @@ c-----------------------------------------------------------------------
      $        -spl%xs(spl%mx))*b(spl%mx)
          a(-1,spl%mx-1)=a(-1,spl%mx-1)
      $        +(spl%xs(spl%mx-1)-spl%xs(spl%mx-2))*b(spl%mx)
-         CALL spline_triluf(a(:,1:spl%mx-1))
+         call spline_triluf(a(:,1:spl%mx-1))
 c-----------------------------------------------------------------------
 c     periodic boundary conditions.
 c-----------------------------------------------------------------------
-      CASE("periodic")
+      case(2) ! 2 = Periodic
          a(0,0:spl%mx:spl%mx)=2*(b(spl%mx)+b(1))
          a(1,0)=b(1)
          a(-1,0)=b(spl%mx)
          b=b*b
-         CALL spline_sherman(a(:,0:spl%mx-1))
+         call spline_sherman(a(:,0:spl%mx-1))
 c-----------------------------------------------------------------------
 c     unrecognized boundary condition.
 c-----------------------------------------------------------------------
-      CASE DEFAULT
-         CALL program_stop("Cannot recognize endmode = "//TRIM(endmode))
-      END SELECT
+      case default
+         call program_stop("Cannot recognize endmode")
+      end select
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_fac
+      return
+      end subroutine spline_fac
 c-----------------------------------------------------------------------
 c     subprogram 8. spline_eval.
 c     evaluates real cubic spline function.
@@ -764,45 +764,45 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_eval(spl,x,mode)
+      subroutine spline_eval(spl,x,mode)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      REAL(r8), INTENT(IN) :: x
-      INTEGER, INTENT(IN) :: mode
+      type(spline_type), intent(inout) :: spl
+      real(r8), intent(in) :: x
+      integer, intent(in) :: mode
 
-      INTEGER :: iqty,iside
-      REAL(r8) :: xx,d,z,z1,xfac,dx
-      REAL(r8) :: g,g1,g2,g3
+      integer :: iqty,iside
+      real(r8) :: xx,d,z,z1,xfac,dx
+      real(r8) :: g,g1,g2,g3
 c-----------------------------------------------------------------------
 c     preliminary computations.
 c-----------------------------------------------------------------------
       xx=x
       spl%ix=MAX(spl%ix,0)
-      spl%ix=MIN(spl%ix,spl%mx-1)
+      spl%ix=Min(spl%ix,spl%mx-1)
 c-----------------------------------------------------------------------
 c     normalize interval for periodic splines.
 c-----------------------------------------------------------------------
-      IF(spl%periodic)THEN
-         DO
-            IF(xx < spl%xs(spl%mx))EXIT
+      if(spl%periodic)then
+         do
+            if(xx < spl%xs(spl%mx))EXIT
             xx=xx-spl%xs(spl%mx)
-         ENDDO
-         DO
-            IF(xx >= spl%xs(0))EXIT
+         enddo
+         do
+            if(xx >= spl%xs(0))EXIT
             xx=xx+spl%xs(spl%mx)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     find cubic spline interval.
 c-----------------------------------------------------------------------
-      DO
-         IF(xx >= spl%xs(spl%ix).OR.spl%ix <= 0)EXIT
+      do
+         if(xx >= spl%xs(spl%ix).OR.spl%ix <= 0)EXIT
          spl%ix=spl%ix-1
-      ENDDO
-      DO
-         IF(xx < spl%xs(spl%ix+1).OR.spl%ix >= spl%mx-1)EXIT
+      enddo
+      do
+         if(xx < spl%xs(spl%ix+1).OR.spl%ix >= spl%mx-1)EXIT
          spl%ix=spl%ix+1
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     evaluate offset and related quantities.
 c-----------------------------------------------------------------------
@@ -819,59 +819,59 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     evaluate first derivatives.
 c-----------------------------------------------------------------------
-      IF(mode > 0)THEN
+      if(mode > 0)then
          spl%f1=6*(spl%fs(spl%ix+1,1:spl%nqty)
      $        -spl%fs(spl%ix,1:spl%nqty))*z*z1/d
      $        +spl%fs1(spl%ix,1:spl%nqty)*z1*(3*z1-2)
      $        +spl%fs1(spl%ix+1,1:spl%nqty)*z*(3*z-2)
-      ENDIF
+      endif
 c-----------------------------------------------------------------------
 c     evaluate second derivatives.
 c-----------------------------------------------------------------------
-      IF(mode > 1)THEN
+      if(mode > 1)then
          spl%f2=(6*(spl%fs(spl%ix+1,1:spl%nqty)
      $        -spl%fs(spl%ix,1:spl%nqty))*(z1-z)/d
      $        -spl%fs1(spl%ix,1:spl%nqty)*(6*z1-2)
      $        +spl%fs1(spl%ix+1,1:spl%nqty)*(6*z-2))/d
-      ENDIF
+      endif
 c-----------------------------------------------------------------------
 c     evaluate third derivatives.
 c-----------------------------------------------------------------------
-      IF(mode > 2)THEN
+      if(mode > 2)then
          spl%f3=(12*(spl%fs(spl%ix,1:spl%nqty)
      $        -spl%fs(spl%ix+1,1:spl%nqty))/d
      $        +6*(spl%fs1(spl%ix,1:spl%nqty)
      $        +spl%fs1(spl%ix+1,1:spl%nqty)))/(d*d)
-      ENDIF
+      endif
 c-----------------------------------------------------------------------
 c     restore powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
+      do iside=1,2
          dx=x-spl%x0(iside)
-         DO iqty=1,spl%nqty
-            IF(spl%xpower(iside,iqty) == 0)CYCLE
+         do iqty=1,spl%nqty
+            if(spl%xpower(iside,iqty) == 0)cycle
             xfac=ABS(dx)**spl%xpower(iside,iqty)
             g=spl%f(iqty)*xfac
-            IF(mode > 0)g1=(spl%f1(iqty)+spl%f(iqty)
+            if(mode > 0)g1=(spl%f1(iqty)+spl%f(iqty)
      $           *spl%xpower(iside,iqty)/dx)*xfac
-            IF(mode > 1)g2=(spl%f2(iqty)+spl%xpower(iside,iqty)/dx
+            if(mode > 1)g2=(spl%f2(iqty)+spl%xpower(iside,iqty)/dx
      $           *(2*spl%f1(iqty)+(spl%xpower(iside,iqty)-1)
      $           *spl%f(iqty)/dx))*xfac
-            IF(mode > 2)g3=(spl%f3(iqty)+spl%xpower(iside,iqty)/dx
+            if(mode > 2)g3=(spl%f3(iqty)+spl%xpower(iside,iqty)/dx
      $           *(3*spl%f2(iqty)+(spl%xpower(iside,iqty)-1)/dx
      $           *(3*spl%f1(iqty)+(spl%xpower(iside,iqty)-2)/dx
      $           *spl%f(iqty))))*xfac
             spl%f(iqty)=g
-            IF(mode > 0)spl%f1(iqty)=g1
-            IF(mode > 1)spl%f2(iqty)=g2
-            IF(mode > 2)spl%f3(iqty)=g3
-         ENDDO
-      ENDDO
+            if(mode > 0)spl%f1(iqty)=g1
+            if(mode > 1)spl%f2(iqty)=g2
+            if(mode > 2)spl%f3(iqty)=g3
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_eval
+      return
+      end subroutine spline_eval
 c-----------------------------------------------------------------------
 c     subprogram 9. spline_eval_external
 c     evaluates real cubic spline with external arrays (parallel).
@@ -879,117 +879,130 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_eval_external(spl,x,s_ix,s_f,s_f1,s_f2,s_f3)
+      subroutine spline_eval_external(spl,x,s_f,s_f1,s_f2,s_f3)
 
-      TYPE(spline_type), INTENT(IN) :: spl
-      REAL(r8), INTENT(IN) :: x
+      type(spline_type), intent(in) :: spl
+      real(r8), intent(in) :: x
 
-      INTEGER :: iqty,iside
-      REAL(r8) :: xx,d,z,z1,xfac,dx
-      REAL(r8) :: g,g1,g2,g3
+      integer :: iqty,iside
+      integer :: ix, i_low, i_high, i_mid
+      real(r8) :: xx,d,z,z1,xfac,dx
+      real(r8) :: g,g1,g2,g3
 
-      INTEGER, INTENT(INOUT) :: s_ix
-      REAL(r8), DIMENSION(:), INTENT(OUT) :: s_f
-      REAL(r8), DIMENSION(:), OPTIONAL, INTENT(OUT) :: s_f1,s_f2,s_f3
+
+      real(r8), dimension(:), intent(out) :: s_f
+      real(r8), dimension(:), optional, intent(out) :: s_f1,s_f2,s_f3
+
 c-----------------------------------------------------------------------
 c     preliminary computations.
 c-----------------------------------------------------------------------
       xx=x
-      s_ix=MAX(s_ix,0)
-      s_ix=MIN(s_ix,spl%mx-1)
 c-----------------------------------------------------------------------
 c     normalize interval for periodic splines.
 c-----------------------------------------------------------------------
-      IF(spl%periodic)THEN
-         DO
-            IF(xx < spl%xs(spl%mx))EXIT
+      if(spl%periodic)then
+         do
+            if(xx < spl%xs(spl%mx))EXIT
             xx=xx-spl%xs(spl%mx)
-         ENDDO
-         DO
-            IF(xx >= spl%xs(0))EXIT
+         enddo
+         do
+            if(xx >= spl%xs(0))EXIT
             xx=xx+spl%xs(spl%mx)
-         ENDDO
-      ENDIF
+         enddo
+      endif
+
 c-----------------------------------------------------------------------
-c     find cubic spline interval.
+c     find cubic spline interval using Binary Search
 c-----------------------------------------------------------------------
-      DO
-         IF(xx >= spl%xs(s_ix).OR.s_ix <= 0)EXIT
-         s_ix=s_ix-1
-      ENDDO
-      DO
-         IF(xx < spl%xs(s_ix+1).OR.s_ix >= spl%mx-1)EXIT
-         s_ix=s_ix+1
-      ENDDO
+      i_low = 0
+      i_high = spl%mx - 1
+
+      do while (i_low <= i_high)
+            i_mid = i_low + (i_high - i_low) / 2
+            if (xx < spl%xs(i_mid)) then
+                  i_high = i_mid - 1
+            else if (xx >= spl%xs(i_mid + 1)) then
+                  i_low = i_mid + 1
+            else
+                  ! We found the interval: xs(i_mid) <= xx < xs(i_mid+1)
+                  ix = i_mid
+                  exit
+            endif
+      enddo
+
+      ! If the search fails, treat it as a boundary value.
+      if (i_low > i_high) then
+        ix = min(max(i_low - 1, 0), spl%mx - 1)
+      endif
 c-----------------------------------------------------------------------
 c     evaluate offset and related quantities.
 c-----------------------------------------------------------------------
-      d=spl%xs(s_ix+1)-spl%xs(s_ix)
-      z=(xx-spl%xs(s_ix))/d
+      d=spl%xs(ix+1)-spl%xs(ix)
+      z=(xx-spl%xs(ix))/d
       z1=1-z
 c-----------------------------------------------------------------------
 c     evaluate functions.
 c-----------------------------------------------------------------------
-      s_f=spl%fs(s_ix,1:spl%nqty)*z1*z1*(3-2*z1)
-     $     +spl%fs(s_ix+1,1:spl%nqty)*z*z*(3-2*z)
-     $     +d*z*z1*(spl%fs1(s_ix,1:spl%nqty)*z1
-     $     -spl%fs1(s_ix+1,1:spl%nqty)*z)
+      s_f=spl%fs(ix,1:spl%nqty)*z1*z1*(3-2*z1)
+     $     +spl%fs(ix+1,1:spl%nqty)*z*z*(3-2*z)
+     $     +d*z*z1*(spl%fs1(ix,1:spl%nqty)*z1
+     $     -spl%fs1(ix+1,1:spl%nqty)*z)
 c-----------------------------------------------------------------------
 c     evaluate first derivatives.
 c-----------------------------------------------------------------------
-      IF(PRESENT(s_f1))THEN
-         s_f1=6*(spl%fs(s_ix+1,1:spl%nqty)
-     $        -spl%fs(s_ix,1:spl%nqty))*z*z1/d
-     $        +spl%fs1(s_ix,1:spl%nqty)*z1*(3*z1-2)
-     $        +spl%fs1(s_ix+1,1:spl%nqty)*z*(3*z-2)
-      ENDIF
+      if(present(s_f1))then
+         s_f1=6*(spl%fs(ix+1,1:spl%nqty)
+     $        -spl%fs(ix,1:spl%nqty))*z*z1/d
+     $        +spl%fs1(ix,1:spl%nqty)*z1*(3*z1-2)
+     $        +spl%fs1(ix+1,1:spl%nqty)*z*(3*z-2)
+      endif
 c-----------------------------------------------------------------------
 c     evaluate second derivatives.
 c-----------------------------------------------------------------------
-      IF(PRESENT(s_f2))THEN
-         s_f2=(6*(spl%fs(s_ix+1,1:spl%nqty)
-     $        -spl%fs(s_ix,1:spl%nqty))*(z1-z)/d
-     $        -spl%fs1(s_ix,1:spl%nqty)*(6*z1-2)
-     $        +spl%fs1(s_ix+1,1:spl%nqty)*(6*z-2))/d
-      ENDIF
+      if(present(s_f2))then
+         s_f2=(6*(spl%fs(ix+1,1:spl%nqty)
+     $        -spl%fs(ix,1:spl%nqty))*(z1-z)/d
+     $        -spl%fs1(ix,1:spl%nqty)*(6*z1-2)
+     $        +spl%fs1(ix+1,1:spl%nqty)*(6*z-2))/d
+      endif
 c-----------------------------------------------------------------------
 c     evaluate third derivatives.
 c-----------------------------------------------------------------------
-      IF(PRESENT(s_f3))THEN
-         s_f3=(12*(spl%fs(s_ix,1:spl%nqty)
-     $        -spl%fs(s_ix+1,1:spl%nqty))/d
-     $        +6*(spl%fs1(s_ix,1:spl%nqty)
-     $        +spl%fs1(s_ix+1,1:spl%nqty)))/(d*d)
-      ENDIF
+      if(present(s_f3))then
+         s_f3=(12*(spl%fs(ix,1:spl%nqty)
+     $        -spl%fs(ix+1,1:spl%nqty))/d
+     $        +6*(spl%fs1(ix,1:spl%nqty)
+     $        +spl%fs1(ix+1,1:spl%nqty)))/(d*d)
+      endif
 c-----------------------------------------------------------------------
 c     restore powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
+      do iside=1,2
          dx=x-spl%x0(iside)
-         DO iqty=1,spl%nqty
-            IF(spl%xpower(iside,iqty) == 0)CYCLE
+         do iqty=1,spl%nqty
+            if(spl%xpower(iside,iqty) == 0)cycle
             xfac=ABS(dx)**spl%xpower(iside,iqty)
             g=s_f(iqty)*xfac
-            IF(PRESENT(s_f1))g1=(s_f1(iqty)+s_f(iqty)
+            if(present(s_f1))g1=(s_f1(iqty)+s_f(iqty)
      $           *spl%xpower(iside,iqty)/dx)*xfac
-            IF(PRESENT(s_f2))g2=(s_f2(iqty)+spl%xpower(iside,iqty)/dx
+            if(present(s_f2))g2=(s_f2(iqty)+spl%xpower(iside,iqty)/dx
      $           *(2*s_f1(iqty)+(spl%xpower(iside,iqty)-1)
      $           *s_f(iqty)/dx))*xfac
-            IF(PRESENT(s_f3))g3=(s_f3(iqty)+spl%xpower(iside,iqty)/dx
+            if(present(s_f3))g3=(s_f3(iqty)+spl%xpower(iside,iqty)/dx
      $           *(3*s_f2(iqty)+(spl%xpower(iside,iqty)-1)/dx
      $           *(3*s_f1(iqty)+(spl%xpower(iside,iqty)-2)/dx
      $           *s_f(iqty))))*xfac
             s_f(iqty)=g
-            IF(PRESENT(s_f1))s_f1(iqty)=g1
-            IF(PRESENT(s_f2))s_f2(iqty)=g2
-            IF(PRESENT(s_f3))s_f3(iqty)=g3
-         ENDDO
-      ENDDO
+            if(present(s_f1))s_f1(iqty)=g1
+            if(present(s_f2))s_f2(iqty)=g2
+            if(present(s_f3))s_f3(iqty)=g3
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_eval_external
+      return
+      end subroutine spline_eval_external
 c-----------------------------------------------------------------------
 c     subprogram 10. spline_all_eval.
 c     evaluates cubic spline function.
@@ -997,17 +1010,17 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_all_eval(spl,z,f,f1,f2,f3,mode)
+      subroutine spline_all_eval(spl,z,f,f1,f2,f3,mode)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      REAL(r8), INTENT(IN) :: z
-      REAL(r8), DIMENSION(spl%mx,spl%nqty), INTENT(OUT) :: f,f1,f2,f3
-      INTEGER, INTENT(IN) :: mode
+      type(spline_type), intent(inout) :: spl
+      real(r8), intent(in) :: z
+      real(r8), dimension(spl%mx,spl%nqty), intent(out) :: f,f1,f2,f3
+      integer, intent(in) :: mode
 
-      INTEGER :: iqty,nqty,n,iside
-      REAL(r8) :: z1
-      REAL(r8), DIMENSION(spl%mx) :: d,xfac,dx
-      REAL(r8), DIMENSION(spl%mx) :: g,g1,g2,g3
+      integer :: iqty,nqty,n,iside
+      real(r8) :: z1
+      real(r8), dimension(spl%mx) :: d,xfac,dx
+      real(r8), dimension(spl%mx) :: g,g1,g2,g3
 c-----------------------------------------------------------------------
 c     evaluate offset and related quantities.
 c-----------------------------------------------------------------------
@@ -1018,70 +1031,70 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     evaluate functions.
 c-----------------------------------------------------------------------
-      DO iqty=1,nqty
+      do iqty=1,nqty
          f(:,iqty)=spl%fs(0:n-1,iqty)*z1*z1*(3-2*z1)
      $        +spl%fs(1:n,iqty)*z*z*(3-2*z)
      $        +d*z*z1*(spl%fs1(0:n-1,iqty)*z1-spl%fs1(1:n,iqty)*z)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     evaluate first derivatives.
 c-----------------------------------------------------------------------
-      IF(mode > 0)THEN
-         DO iqty=1,nqty
+      if(mode > 0)then
+         do iqty=1,nqty
             f1(:,iqty)=6*(spl%fs(1:n,iqty)-spl%fs(0:n-1,iqty))*z*z1/d
      $           +spl%fs1(0:n-1,iqty)*z1*(3*z1-2)
      $           +spl%fs1(1:n,iqty)*z*(3*z-2)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     evaluate second derivatives.
 c-----------------------------------------------------------------------
-      IF(mode > 1)THEN
-         DO iqty=1,nqty
+      if(mode > 1)then
+         do iqty=1,nqty
             f2(:,iqty)=(6*(spl%fs(1:n,iqty)-spl%fs(0:n-1,iqty))*(z1-z)/d
      $           -spl%fs1(0:n-1,iqty)*(6*z1-2)
      $           +spl%fs1(1:n,iqty)*(6*z-2))/d
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     evaluate third derivatives.
 c-----------------------------------------------------------------------
-      IF(mode > 2)THEN
-         DO iqty=1,nqty
+      if(mode > 2)then
+         do iqty=1,nqty
             f3(:,iqty)=(12*(spl%fs(0:n-1,iqty)-spl%fs(1:n,iqty))/d
      $           +6*(spl%fs1(0:n-1,iqty)+spl%fs1(1:n,iqty)))/(d*d)
-         ENDDO
-      ENDIF
+         enddo
+      endif
 c-----------------------------------------------------------------------
 c     restore powers.
 c-----------------------------------------------------------------------
-      DO iside=1,2
+      do iside=1,2
          dx=(spl%xs(0:spl%mx-1)+z*d(1:spl%mx))-spl%x0(iside)
-         DO iqty=1,spl%nqty
-            IF(spl%xpower(iside,iqty) == 0)CYCLE
+         do iqty=1,spl%nqty
+            if(spl%xpower(iside,iqty) == 0)cycle
             xfac=ABS(dx)**spl%xpower(iside,iqty)
             g=f(:,iqty)*xfac
-            IF(mode > 0)g1=(f1(:,iqty)
+            if(mode > 0)g1=(f1(:,iqty)
      $           +f(:,iqty)*spl%xpower(iside,iqty)/dx)*xfac
-            IF(mode > 1)g2=(f2(:,iqty)+spl%xpower(iside,iqty)/dx
+            if(mode > 1)g2=(f2(:,iqty)+spl%xpower(iside,iqty)/dx
      $           *(2*f1(:,iqty)+(spl%xpower(iside,iqty)-1)
      $           *f(:,iqty)/dx))*xfac
      $
-            IF(mode > 2)g3=(f3(:,iqty)+spl%xpower(iside,iqty)/dx
+            if(mode > 2)g3=(f3(:,iqty)+spl%xpower(iside,iqty)/dx
      $           *(3*f2(:,iqty)+(spl%xpower(iside,iqty)-1)/dx
      $           *(3*f1(:,iqty)+(spl%xpower(iside,iqty)-2)/dx
      $           *f(:,iqty))))*xfac
             f(:,iqty)=g
-            IF(mode > 0)f1(:,iqty)=g1
-            IF(mode > 1)f2(:,iqty)=g2
-            IF(mode > 2)f3(:,iqty)=g3
-         ENDDO
-      ENDDO
+            if(mode > 0)f1(:,iqty)=g1
+            if(mode > 1)f2(:,iqty)=g2
+            if(mode > 2)f3(:,iqty)=g3
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_all_eval
+      return
+      end subroutine spline_all_eval
 c-----------------------------------------------------------------------
 c     subprogram 11. spline_write1.
 c     produces ascii and binary output for real cubic spline fits.
@@ -1089,81 +1102,81 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_write1(spl,out,bin,iua,iub,interp)
+      subroutine spline_write1(spl,out,bin,iua,iub,interp)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      LOGICAL, INTENT(IN) :: out,bin
-      INTEGER, INTENT(IN) :: iua,iub
-      LOGICAL, INTENT(IN) :: interp
+      type(spline_type), intent(inout) :: spl
+      logical, intent(in) :: out,bin
+      integer, intent(in) :: iua,iub
+      logical, intent(in) :: interp
 
-      CHARACTER(30) :: format1,format2
-      INTEGER :: i,j
-      REAL(r8) :: x,dx
+      character(30) :: format1,format2
+      integer :: i,j
+      real(r8) :: x,dx
 c-----------------------------------------------------------------------
 c     formats.
 c-----------------------------------------------------------------------
- 10   FORMAT('(/3x,"ix",',i2.2,'(4x,a6,1x)/)')
- 20   FORMAT('(i5,1p,',i2.2,'e11.3)')
-!  30   FORMAT('(/3x,"ix",2x,"j",',i2.2,'(4x,a6,1x)/)')
+ 10   format('(/3x,"ix",',i2.2,'(4x,a6,1x)/)')
+ 20   format('(i5,1p,',i2.2,'e11.3)')
+!  30   format('(/3x,"ix",2x,"j",',i2.2,'(4x,a6,1x)/)')
 c-----------------------------------------------------------------------
 c     abort.
 c-----------------------------------------------------------------------
-      IF(.NOT.out.AND..NOT.bin)RETURN
+      if(.not.out.and..not.bin)return
 c-----------------------------------------------------------------------
 c     print node values.
 c-----------------------------------------------------------------------
-      IF(out)THEN
-         WRITE(format1,10)spl%nqty+1
-         WRITE(format2,20)spl%nqty+1
-         WRITE(iua,'(/1x,a)')'node values:'
-         WRITE(iua,format1)spl%title(0:spl%nqty)
-      ENDIF
-      DO i=0,spl%mx
-         CALL spline_eval(spl,spl%xs(i),0)
-         IF(out)WRITE(iua,format2)i,spl%xs(i),spl%f
-         IF(bin)WRITE(iub)REAL(spl%xs(i),4),REAL(spl%f,4)
-      ENDDO
-      IF(out)WRITE(iua,format1)spl%title(0:spl%nqty)
-      IF(bin)WRITE(iub)
-      IF(.NOT. interp)RETURN
+      if(out)then
+         write(format1,10)spl%nqty+1
+         write(format2,20)spl%nqty+1
+         write(iua,'(/1x,a)')'node values:'
+         write(iua,format1)spl%title(0:spl%nqty)
+      endif
+      do i=0,spl%mx
+         call spline_eval(spl,spl%xs(i),0)
+         if(out)write(iua,format2)i,spl%xs(i),spl%f
+         if(bin)write(iub)real(spl%xs(i),4),real(spl%f,4)
+      enddo
+      if(out)write(iua,format1)spl%title(0:spl%nqty)
+      if(bin)write(iub)
+      if(.not. interp)return
 c-----------------------------------------------------------------------
 c     print header for interpolated values.
 c-----------------------------------------------------------------------
-      IF(out)THEN
-         WRITE(iua,'(/1x,a)')'interpolated values:'
-         WRITE(iua,format1)spl%title(0:spl%nqty)
-      ENDIF
+      if(out)then
+         write(iua,'(/1x,a)')'interpolated values:'
+         write(iua,format1)spl%title(0:spl%nqty)
+      endif
 c-----------------------------------------------------------------------
 c     print interpolated values.
 c-----------------------------------------------------------------------
-      DO i=0,spl%mx-1
+      do i=0,spl%mx-1
          dx=(spl%xs(i+1)-spl%xs(i))/4
-         DO j=0,4
+         do j=0,4
             x=spl%xs(i)+j*dx
-            CALL spline_eval(spl,x,0)
-            IF(out)WRITE(iua,format2)i,x,spl%f
-            IF(bin)WRITE(iub)REAL(x,4),REAL(spl%f,4)
-         ENDDO
-      ENDDO
+            call spline_eval(spl,x,0)
+            if(out)write(iua,format2)i,x,spl%f
+            if(bin)write(iub)real(x,4),real(spl%f,4)
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     print final interpolated values.
 c-----------------------------------------------------------------------
       x=spl%xs(spl%mx)
-      CALL spline_eval(spl,x,0)
-      IF(out)THEN
-         WRITE(iua,format2)i,x,spl%f
-         WRITE(iua,format1)spl%title
-      ENDIF
-      IF(bin)THEN
-         WRITE(iub)REAL(x,4),REAL(spl%f,4)
-         WRITE(iub)
-         CALL bin_close(bin_unit)
-      ENDIF
+      call spline_eval(spl,x,0)
+      if(out)then
+         write(iua,format2)i,x,spl%f
+         write(iua,format1)spl%title
+      endif
+      if(bin)then
+         write(iub)real(x,4),real(spl%f,4)
+         write(iub)
+         call bin_close(bin_unit)
+      endif
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_write1
+      return
+      end subroutine spline_write1
 c-----------------------------------------------------------------------
 c     subprogram 12. spline_write2.
 c     produces ascii and binary output for real cubic spline fits.
@@ -1171,87 +1184,87 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_write2(spl,out,bin,iua,iub,interp)
+      subroutine spline_write2(spl,out,bin,iua,iub,interp)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      LOGICAL, INTENT(IN) :: out,bin
-      INTEGER, INTENT(IN) :: iua,iub
-      LOGICAL, INTENT(IN) :: interp
+      type(spline_type), intent(inout) :: spl
+      logical, intent(in) :: out,bin
+      integer, intent(in) :: iua,iub
+      logical, intent(in) :: interp
 
-      CHARACTER(30) :: format1,format2
-      INTEGER :: i,j,iz
-      REAL(r8) :: x,dx,z
-      REAL(r8), DIMENSION(spl%mx,spl%nqty) :: f, f1,f2,f3
-      REAL(r8), DIMENSION(0:4*spl%mx,spl%nqty) :: g
+      character(30) :: format1,format2
+      integer :: i,j,iz
+      real(r8) :: x,dx,z
+      real(r8), dimension(spl%mx,spl%nqty) :: f, f1,f2,f3
+      real(r8), dimension(0:4*spl%mx,spl%nqty) :: g
 c-----------------------------------------------------------------------
 c     formats.
 c-----------------------------------------------------------------------
- 10   FORMAT('(/4x,"i",',i2.2,'(4x,a6,1x)/)')
- 20   FORMAT('(i5,1p,',i2.2,'e11.3)')
-!  30   FORMAT('(/4x,"i",2x,"j",',i2.2,'(4x,a6,1x)/)')
+ 10   format('(/4x,"i",',i2.2,'(4x,a6,1x)/)')
+ 20   format('(i5,1p,',i2.2,'e11.3)')
+!  30   format('(/4x,"i",2x,"j",',i2.2,'(4x,a6,1x)/)')
 c-----------------------------------------------------------------------
 c     compute values.
 c-----------------------------------------------------------------------
       z=0
-      DO iz=0,3
-         CALL spline_all_eval(spl,z,f,f1,f2,f3,0)
+      do iz=0,3
+         call spline_all_eval(spl,z,f,f1,f2,f3,0)
          g(iz:4*spl%mx-1:4,:)=f
          z=z+.25_r8
-      ENDDO
-      CALL spline_eval(spl,spl%xs(spl%mx),0)
+      enddo
+      call spline_eval(spl,spl%xs(spl%mx),0)
       g(4*spl%mx,:)=spl%f
 c-----------------------------------------------------------------------
 c     print node values.
 c-----------------------------------------------------------------------
-      IF(.NOT.out.AND..NOT.bin)RETURN
-      IF(out)THEN
-         WRITE(format1,10)spl%nqty+1
-         WRITE(format2,20)spl%nqty+1
-         WRITE(iua,'(/1x,a)')'node values:'
-         WRITE(iua,format1)spl%title(0:spl%nqty)
-      ENDIF
-      DO i=0,spl%mx
-         IF(out)WRITE(iua,format2)i,spl%xs(i),g(4*i,:)
-         IF(bin)WRITE(iub)REAL(spl%xs(i),4),REAL(g(4*i,:),4)
-      ENDDO
-      IF(out)WRITE(iua,format1)spl%title(0:spl%nqty)
-      IF(bin)WRITE(iub)
+      if(.not.out.and..not.bin)return
+      if(out)then
+         write(format1,10)spl%nqty+1
+         write(format2,20)spl%nqty+1
+         write(iua,'(/1x,a)')'node values:'
+         write(iua,format1)spl%title(0:spl%nqty)
+      endif
+      do i=0,spl%mx
+         if(out)write(iua,format2)i,spl%xs(i),g(4*i,:)
+         if(bin)write(iub)real(spl%xs(i),4),real(g(4*i,:),4)
+      enddo
+      if(out)write(iua,format1)spl%title(0:spl%nqty)
+      if(bin)write(iub)
 c-----------------------------------------------------------------------
 c     print header for interpolated values.
 c-----------------------------------------------------------------------
-      IF(.NOT. interp)RETURN
-      IF(out)THEN
-         WRITE(iua,'(/1x,a)')'interpolated values:'
-         WRITE(iua,format1)spl%title(0:spl%nqty)
-      ENDIF
+      if(.not. interp)return
+      if(out)then
+         write(iua,'(/1x,a)')'interpolated values:'
+         write(iua,format1)spl%title(0:spl%nqty)
+      endif
 c-----------------------------------------------------------------------
 c     print interpolated values.
 c-----------------------------------------------------------------------
-      DO i=0,spl%mx-1
+      do i=0,spl%mx-1
          dx=(spl%xs(i+1)-spl%xs(i))/4
-         DO j=0,4
+         do j=0,4
             x=spl%xs(i)+j*dx
-            IF(out)WRITE(iua,format2)i,x,g(4*i+j,:)
-            IF(bin)WRITE(iub)REAL(x,4),REAL(g(4*i+j,:),4)
-         ENDDO
-         IF(out)WRITE(iua,'(1x)')
-      ENDDO
+            if(out)write(iua,format2)i,x,g(4*i+j,:)
+            if(bin)write(iub)real(x,4),real(g(4*i+j,:),4)
+         enddo
+         if(out)write(iua,'(1x)')
+      enddo
 c-----------------------------------------------------------------------
 c     print final interpolated values.
 c-----------------------------------------------------------------------
-      IF(out)THEN
-         WRITE(iua,format2)i,x,g(spl%mx*4,:)
-         WRITE(iua,format1)spl%title(0:spl%nqty)
-      ENDIF
-      IF(bin)THEN
-         WRITE(iub)REAL(x,4),REAL(g(spl%mx*4,:),4)
-         WRITE(iub)
-      ENDIF
+      if(out)then
+         write(iua,format2)i,x,g(spl%mx*4,:)
+         write(iua,format1)spl%title(0:spl%nqty)
+      endif
+      if(bin)then
+         write(iub)real(x,4),real(g(spl%mx*4,:),4)
+         write(iub)
+      endif
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_write2
+      return
+      end subroutine spline_write2
 c-----------------------------------------------------------------------
 c     subprogram 13. spline_int.
 c     integrates real cubic splines.
@@ -1259,54 +1272,54 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_int(spl)
+      subroutine spline_int(spl)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
+      type(spline_type), intent(inout) :: spl
 
-      INTEGER :: ix,iqty,ig
-      REAL(r8), DIMENSION(spl%mx) :: dx
-      REAL(r8), DIMENSION(spl%mx,spl%nqty) :: term,f,f1,f2,f3
+      integer :: ix,iqty,ig
+      real(r8), dimension(spl%mx) :: dx
+      real(r8), dimension(spl%mx,spl%nqty) :: term,f,f1,f2,f3
 
-      INTEGER, PARAMETER :: mg=4
-      REAL(r8), DIMENSION(mg) :: xg=(1+(/-0.861136311594053_r8,
+      integer, PARAMETER :: mg=4
+      real(r8), dimension(mg) :: xg=(1+(/-0.861136311594053_r8,
      $     -0.339981043584856_r8,0.339981043584856_r8,
      $     0.861136311594053_r8/))/2
-      REAL(r8), DIMENSION(mg) :: wg=(/0.347854845137454_r8,
+      real(r8), dimension(mg) :: wg=(/0.347854845137454_r8,
      $     0.652145154862546_r8,0.652145154862546_r8,
      $     0.347854845137454_r8/)/2
 c-----------------------------------------------------------------------
 c     preliminary computations.
 c-----------------------------------------------------------------------
-      IF(.NOT.ALLOCATED(spl%fsi))ALLOCATE(spl%fsi(0:spl%mx,spl%nqty))
+      if(.not.allocated(spl%fsi))allocate(spl%fsi(0:spl%mx,spl%nqty))
       dx=spl%xs(1:spl%mx)-spl%xs(0:spl%mx-1)
       term=0
 c-----------------------------------------------------------------------
 c     compute integrals over intervals.
 c-----------------------------------------------------------------------
-      DO iqty=1,spl%nqty
-         IF(spl%xpower(1,iqty) == 0 .AND. spl%xpower(2,iqty) == 0)THEN
+      do iqty=1,spl%nqty
+         if(spl%xpower(1,iqty) == 0 .and. spl%xpower(2,iqty) == 0)then
             term(:,iqty)=dx/12
      $           *(6*(spl%fs(0:spl%mx-1,iqty)+spl%fs(1:spl%mx,iqty))
      $           +dx*(spl%fs1(0:spl%mx-1,iqty)-spl%fs1(1:spl%mx,iqty)))
-         ELSE
-            DO ig=1,mg
-               CALL spline_all_eval(spl,xg(ig),f,f1,f2,f3,0)
+         else
+            do ig=1,mg
+               call spline_all_eval(spl,xg(ig),f,f1,f2,f3,0)
                term(:,iqty)=term(:,iqty)+dx*wg(ig)*f(:,iqty)
-            ENDDO
-         ENDIF
-      ENDDO
+            enddo
+         endif
+      enddo
 c-----------------------------------------------------------------------
 c     accumulate over intervals.
 c-----------------------------------------------------------------------
       spl%fsi(0,:)=0
-      DO ix=1,spl%mx
+      do ix=1,spl%mx
          spl%fsi(ix,:)=spl%fsi(ix-1,:)+term(ix,:)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_int
+      return
+      end subroutine spline_int
 c-----------------------------------------------------------------------
 c     subprogram 14. spline_triluf.
 c     performs tridiagonal LU factorization.
@@ -1314,40 +1327,40 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_triluf(a)
+      subroutine spline_triluf(a)
 
-      REAL(r8), DIMENSION(-1:,:), INTENT(INOUT) :: a
+      real(r8), dimension(-1:,:), intent(inout) :: a
 
-      INTEGER :: i,j,k,jmin,jmax,n
+      integer :: i,j,k,jmin,jmax,n
 c-----------------------------------------------------------------------
 c     begin loop over rows and define limits.
 c-----------------------------------------------------------------------
       n=SIZE(a,2)
-      DO i=1,n
+      do i=1,n
          jmin=MAX(1-i,-1)
-         jmax=MIN(n-i,1)
+         jmax=Min(n-i,1)
 c-----------------------------------------------------------------------
 c     compute lower elements.
 c-----------------------------------------------------------------------
-         DO j=jmin,-1
-            DO k=MAX(jmin,j-1),j-1
+         do j=jmin,-1
+            do k=MAX(jmin,j-1),j-1
                a(j,i)=a(j,i)-a(k,i)*a(j-k,i+k)
-            ENDDO
+            enddo
             a(j,i)=a(j,i)*a(0,i+j)
-         ENDDO
+         enddo
 c-----------------------------------------------------------------------
 c     compute diagonal element
 c-----------------------------------------------------------------------
-         DO k=MAX(jmin,-1),-1
+         do k=MAX(jmin,-1),-1
             a(0,i)=a(0,i)-a(k,i)*a(-k,i+k)
-         ENDDO
+         enddo
          a(0,i)=1/a(0,i)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_triluf
+      return
+      end subroutine spline_triluf
 c-----------------------------------------------------------------------
 c     subprogram 15. spline_trilus.
 c     performs tridiagonal LU solution.
@@ -1355,35 +1368,35 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_trilus(a,x)
+      subroutine spline_trilus(a,x)
 
-      REAL(r8), DIMENSION(-1:,:), INTENT(IN) :: a
-      REAL(r8), DIMENSION(:,:), INTENT(INOUT) :: x
+      real(r8), dimension(-1:,:), intent(in) :: a
+      real(r8), dimension(:,:), intent(inout) :: x
 
-      INTEGER :: i,j,n
+      integer :: i,j,n
 c-----------------------------------------------------------------------
 c     down sweep.
 c-----------------------------------------------------------------------
       n=SIZE(a,2)
-      DO i=1,n
-         DO j=MAX(1-i,-1),-1
+      do i=1,n
+         do j=MAX(1-i,-1),-1
             x(i,:)=x(i,:)-a(j,i)*x(i+j,:)
-         ENDDO
-      ENDDO
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     up sweep.
 c-----------------------------------------------------------------------
-      DO i=n,1,-1
-         DO j=1,MIN(n-i,1)
+      do i=n,1,-1
+         do j=1,Min(n-i,1)
             x(i,:)=x(i,:)-a(j,i)*x(i+j,:)
-         ENDDO
+         enddo
          x(i,:)=x(i,:)*a(0,i)
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_trilus
+      return
+      end subroutine spline_trilus
 c-----------------------------------------------------------------------
 c     subprogram 16. spline_sherman.
 c     uses Sherman-Morrison formula to factor periodic matrix.
@@ -1391,12 +1404,12 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_sherman(a)
+      subroutine spline_sherman(a)
 
-      REAL(r8), DIMENSION(-1:,:), INTENT(INOUT) :: a
+      real(r8), dimension(-1:,:), intent(inout) :: a
 
-      INTEGER :: j,n
-      REAL(r8), DIMENSION(SIZE(a,2),1) :: u
+      integer :: j,n
+      real(r8), dimension(SIZE(a,2),1) :: u
 c-----------------------------------------------------------------------
 c     prepare matrices.
 c-----------------------------------------------------------------------
@@ -1404,14 +1417,14 @@ c-----------------------------------------------------------------------
       a(0,1)=a(0,1)-a(-1,1)
       a(0,n)=a(0,n)-a(-1,1)
       u=RESHAPE((/one,(zero,j=2,n-1),one/),SHAPE(u))
-      CALL spline_triluf(a)
-      CALL spline_trilus(a,u)
+      call spline_triluf(a)
+      call spline_trilus(a,u)
       a(-1,1)=a(-1,1)/(1+a(-1,1)*(u(1,1)+u(n,1)))
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_sherman
+      return
+      end subroutine spline_sherman
 c-----------------------------------------------------------------------
 c     subprogram 17. spline_morrison.
 c     uses Sherman-Morrison formula to solve periodic matrix.
@@ -1419,27 +1432,27 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_morrison(a,x)
+      subroutine spline_morrison(a,x)
 
-      REAL(r8), DIMENSION(-1:,:), INTENT(IN) :: a
-      REAL(r8), DIMENSION(:,:), INTENT(INOUT) :: x
+      real(r8), dimension(-1:,:), intent(in) :: a
+      real(r8), dimension(:,:), intent(inout) :: x
 
-      INTEGER :: n
-      REAL(r8), DIMENSION(SIZE(x,1),SIZE(x,2)) :: y
+      integer :: n
+      real(r8), dimension(SIZE(x,1),SIZE(x,2)) :: y
 c-----------------------------------------------------------------------
 c     solve for x.
 c-----------------------------------------------------------------------
       n=SIZE(a,2)
       y=x
-      CALL spline_trilus(a,y)
+      call spline_trilus(a,y)
       x(1,:)=x(1,:)-a(-1,1)*(y(1,:)+y(n,:))
       x(n,:)=x(n,:)-a(-1,1)*(y(1,:)+y(n,:))
-      CALL spline_trilus(a,x)
+      call spline_trilus(a,x)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_morrison
+      return
+      end subroutine spline_morrison
 c-----------------------------------------------------------------------
 c     subprogram 18. spline_copy.
 c     copies one spline_type to another.
@@ -1447,15 +1460,15 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_copy(spl1,spl2)
+      subroutine spline_copy(spl1,spl2)
 
-      TYPE(spline_type), INTENT(IN) :: spl1
-      TYPE(spline_type), INTENT(INOUT) :: spl2
+      type(spline_type), intent(in) :: spl1
+      type(spline_type), intent(inout) :: spl2
 c-----------------------------------------------------------------------
 c     computations.
 c-----------------------------------------------------------------------
-      IF(ALLOCATED(spl2%xs))CALL spline_dealloc(spl2)
-      CALL spline_alloc(spl2,spl1%mx,spl1%nqty)
+      if(allocated(spl2%xs))call spline_dealloc(spl2)
+      call spline_alloc(spl2,spl1%mx,spl1%nqty)
       spl2%xs=spl1%xs
       spl2%fs=spl1%fs
       spl2%fs1=spl1%fs1
@@ -1467,8 +1480,8 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_copy
+      return
+      end subroutine spline_copy
 c-----------------------------------------------------------------------
 c     subprogram 19. spline_fill_matrix.
 c     fill local matrix into global matrix.
@@ -1476,28 +1489,28 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_fill_matrix(mat,locmat,istart,jstart,kl,ku)
-      INTEGER :: istart,jstart,itot,jtot,i,j,kl,ku,m,n,offset
-      REAL(r8), DIMENSION(:,:), ALLOCATABLE,INTENT(INOUT) :: mat
-      REAL(r8), DIMENSION(:,:), ALLOCATABLE,INTENT(IN) :: locmat
+      subroutine spline_fill_matrix(mat,locmat,istart,jstart,kl,ku)
+      integer :: istart,jstart,itot,jtot,i,j,kl,ku,m,n,offset
+      real(r8), dimension(:,:), allocatable,intent(inout) :: mat
+      real(r8), dimension(:,:), allocatable,intent(in) :: locmat
 c-----------------------------------------------------------------------
 c     fill matrix.
 c-----------------------------------------------------------------------
       itot=SIZE(locmat,1)
       jtot=SIZE(locmat,2)
       offset=kl+ku+1
-      DO m=1, itot
+      do m=1, itot
          i=m+istart-1
-         DO n=1, jtot
+         do n=1, jtot
             j=n+jstart-1
             mat(offset+i-j,j)=mat(offset+i-j,j)+locmat(m,n)
-         ENDDO
-      ENDDO
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_fill_matrix
+      return
+      end subroutine spline_fill_matrix
 c-----------------------------------------------------------------------
 c     subprogram 20. spline_get_yp.
 c     get yi' with four points for spline boundary condtion .
@@ -1505,17 +1518,17 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_get_yp(x,y,xi,yip,nqty)
-      INTEGER, INTENT(IN) :: nqty
-      INTEGER :: n,nrhs,lda,info,ldb,i
-      INTEGER, DIMENSION(4) :: ipiv
-      REAL(r8) :: dx
-      REAL(r8), INTENT(IN) :: xi
-      REAL(r8), DIMENSION(nqty),INTENT(OUT) :: yip
-      REAL(r8), DIMENSION(4), INTENT(IN) :: x
-      REAL(r8), DIMENSION(4,nqty), INTENT(IN) :: y
-      REAL(r8), DIMENSION(4,nqty) :: b
-      REAL(r8), DIMENSION(4,4) :: a
+      subroutine spline_get_yp(x,y,xi,yip,nqty)
+      integer, intent(in) :: nqty
+      integer :: n,nrhs,lda,info,ldb,i
+      integer, dimension(4) :: ipiv
+      real(r8) :: dx
+      real(r8), intent(in) :: xi
+      real(r8), dimension(nqty),intent(out) :: yip
+      real(r8), dimension(4), intent(in) :: x
+      real(r8), dimension(4,nqty), intent(in) :: y
+      real(r8), dimension(4,nqty) :: b
+      real(r8), dimension(4,4) :: a
       n=4
       nrhs=nqty
       lda=N
@@ -1525,22 +1538,22 @@ c-----------------------------------------------------------------------
 
       a(1,4)=1
       b(1,:)=y(1,:)
-      DO i=2,n
+      do i=2,n
          dx=x(i)-x(1)
          a(i,1)=dx*dx*dx
          a(i,2)=dx*dx
          a(i,3)=dx
          a(i,4)=1
          b(i,:)=y(i,:)
-      ENDDO
-      CALL dgesv(n,nrhs,a,lda,ipiv,b,ldb,info)
+      enddo
+      call dgesv(n,nrhs,a,lda,ipiv,b,ldb,info)
       dx=xi-x(1)
       yip=(3*b(1,:)*dx+2*b(2,:))*dx+b(3,:)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_get_yp
+      return
+      end subroutine spline_get_yp
 c-----------------------------------------------------------------------
 c     subprogram 21. spline_thomas.
 c     thomas method to solve tri-diagnol matrix.
@@ -1548,13 +1561,13 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_thomas(l,d,u,b,n,m)
+      subroutine spline_thomas(l,d,u,b,n,m)
 
-      INTEGER, INTENT(IN):: n,m
-      REAL(r8), DIMENSION(n), INTENT(INOUT):: d
-      REAL(r8), DIMENSION(n-1), INTENT(INOUT):: l,u
-      REAL(r8), DIMENSION(n,m), INTENT(INOUT):: b
-      INTEGER:: i
+      integer, intent(in):: n,m
+      real(r8), dimension(n), intent(inout):: d
+      real(r8), dimension(n-1), intent(inout):: l,u
+      real(r8), dimension(n,m), intent(inout):: b
+      integer:: i
 c-----------------------------------------------------------------------
 c     calculate tri-diagno matrix
 c     l=[A(1,2),A(2,3),...,A(n-1,n)];
@@ -1562,21 +1575,21 @@ c     d=[A(1,1),A(2,2),...,A(n,n)];
 c     u=[A(2,1),A(3,2),...,A(n,n-1)];
 c     b is n row m column matrix
 c-----------------------------------------------------------------------
-      DO i = 2, n
+      do i = 2, n
          l(i-1) = l(i-1)/d(i-1)
          d(i) = d(i) - u(i-1) * l(i-1)
          b(i,:) = b(i,:) - b(i-1,:) * l(i-1)
-      ENDDO
+      enddo
 
       b(n,:) = b(n,:) / d(n);
-      DO i = n-1, 1, -1
+      do i = n-1, 1, -1
          b(i,:) = (b(i,:) - u(i) * b(i+1,:)) / d(i);
-      ENDDO
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_thomas
+      return
+      end subroutine spline_thomas
 c-----------------------------------------------------------------------
 c     subprogram 22. spline_roots.
 c     Calculate all the roots of a cubic spline.
@@ -1589,41 +1602,41 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_roots(spl, iqty, nroots, roots,op_extrap,op_eps)
+      subroutine spline_roots(spl, iqty, nroots, roots,op_extrap,op_eps)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      INTEGER, INTENT(IN):: iqty
-      INTEGER, INTENT(OUT) :: nroots
-      REAL(r8), DIMENSION(*), INTENT(OUT):: roots 
-      !^^^^ should be DIMENSION(1:spl%mx*3) ^^^^
-      LOGICAL, INTENT(IN), OPTIONAL :: op_extrap
-      REAL(r8), INTENT(IN), OPTIONAL :: op_eps
+      type(spline_type), intent(inout) :: spl
+      integer, intent(in):: iqty
+      integer, intent(out) :: nroots
+      real(r8), dimension(*), intent(out):: roots
+      !^^^^ should be dimension(1:spl%mx*3) ^^^^
+      logical, intent(in), optional :: op_extrap
+      real(r8), intent(in), optional :: op_eps
 
-      LOGICAL, PARAMETER :: debug = .FALSE.
+      logical, PARAMETER :: debug = .false.
 
-      LOGICAL :: extrap
-      INTEGER:: ix, jroot, lx, nzvalid
-      REAL(r8)::  f_0, f1_0, f_1, f1_1,
+      logical :: extrap
+      integer:: ix, jroot, lx, nzvalid
+      real(r8)::  f_0, f1_0, f_1, f1_1,
      $  c3, c2, c1, c0, a, b, c, q, r, m, s, t, theta,
      $  z1, z2, z3, x1, x2, x3, last1, last2, last3,
      $  dx, eps, tol
-      INTEGER, DIMENSION(:), ALLOCATABLE :: index
-      REAL(r8), DIMENSION(:), ALLOCATABLE :: tmproots
+      integer, dimension(:), allocatable :: index
+      real(r8), dimension(:), allocatable :: tmproots
 
       ! allow optional accuracy manipulation repeated solutions
       ! within eps*stepsize are rejected
-      IF(PRESENT(op_eps))THEN
+      if(present(op_eps))then
          eps = op_eps
-      ELSE
+      else
          eps = 1e-6
-      ENDIF
+      endif
 
       ! allow optional extrapolation beyond ends of the spline
-      IF(PRESENT(op_extrap))THEN
+      if(present(op_extrap))then
          extrap = op_extrap
-      ELSE
-         extrap = .FALSE.
-      ENDIF
+      else
+         extrap = .false.
+      endif
 
       roots(1:spl%mx*3) = spl%xs(0) - HUGE(last1)
       last1 = spl%xs(0) - HUGE(last1)
@@ -1632,7 +1645,7 @@ c-----------------------------------------------------------------------
       lx = spl%mx-1
       jroot = 0
       ! find the analytic roots of a cubic polynomial between each knot
-      DO ix=0, lx
+      do ix=0, lx
          nzvalid = 0
          ! step size and associated tolerance for repeated roots
          dx=spl%xs(ix+1)-spl%xs(ix)
@@ -1657,31 +1670,31 @@ c-----------------------------------------------------------------------
          c1 = dx*f1_0
          c0 = f_0
          ! we have to watch out for secret reductions!
-         IF(c3==0)THEN
-            IF(debug) PRINT *, "  >> Spline quadratic @",spl%xs(ix)
+         if(c3==0)then
+            if(debug) PRinT *, "  >> Spline quadratic @",spl%xs(ix)
             a = c2
             b = c1
             c = c0
-            IF(b**2 - 4.0*a*c >= 0)THEN
+            if(b**2 - 4.0*a*c >= 0)then
                z1 = (-b + sqrt(b**2 - 4.0*a*c)) / (2.0 * a)
                z2 = (-b - sqrt(b**2 - 4.0*a*c)) / (2.0 * a)
                nzvalid = 2
-            ELSEIF(a==0)THEN
-               IF(debug) PRINT *, "  >> Spline linear @",spl%xs(ix)
+            elseif(a==0)then
+               if(debug) PRinT *, "  >> Spline linear @",spl%xs(ix)
                z1 = -c / b
                z2 = -huge(z2)
                nzvalid = 1
-            ELSEIF(a==0 .and. b==0 .and. c==0)THEN
-               IF(debug) PRINT *, "  >> Spline all 0 @",spl%xs(ix)
+            elseif(a==0 .and. b==0 .and. c==0)then
+               if(debug) PRinT *, "  >> Spline all 0 @",spl%xs(ix)
                z1 = 0
                nzvalid = 1
-            ELSE
+            else
                z1 = -huge(z1)
                z2 = -huge(z2)
                nzvalid = 0
-            ENDIF
+            endif
            z3 = -huge(z3)
-         ELSE
+         else
             ! truely a cubic case
             ! since we want f = 0 we can normalize out the c3
             ! so 0 = z^3 + a z^2 + b z + c
@@ -1692,22 +1705,22 @@ c-----------------------------------------------------------------------
             q = (a * a - 3.0 * b) / 9.0
             r = (2.0 * a * a * a - 9.0 * a * b + 27.0 * c) / 54.0
             m = r**2 - q**3  ! discrimenent
-            IF(m > 0)THEN ! one real root
+            if(m > 0)then ! one real root
                s = -sign(1.0_r8, r) * (abs(r) + sqrt(m))**(1.0/3.0)
                t = q / s
                z1 = s + t - (a / 3.0)
                z2 = -huge(z2)
                z3 = -huge(z3)
                nzvalid = 1
-            ELSE  ! three real roots (watch out for repeates)
+            else  ! three real roots (watch out for repeates)
                theta = acos(r / sqrt(q**3))
                z1 = -2*sqrt(q)*cos(theta/3.0) - a/3.0
                z2 = -2*sqrt(q)*cos((theta+twopi)/3.0) - a/3.0
                z3 = -2*sqrt(q)*cos((theta-twopi)/3.0) - a/3.0
                nzvalid = 3
-               IF(abs(z2-z3)<tol) nzvalid = 2  ! double root
-            ENDIF
-         ENDIF
+               if(abs(z2-z3)<tol) nzvalid = 2  ! double root
+            endif
+         endif
          ! note spline_eval uses step-size normalized coordinate z,
          ! but we want real x values
          x1 = spl%xs(ix) + z1 * dx
@@ -1715,87 +1728,87 @@ c-----------------------------------------------------------------------
          x3 = spl%xs(ix) + z3 * dx
          ! check if they are in the knot interval
          ! (exclude repeats if periodic)
-         IF(debug .AND. (f_0*f_1 <= 0))THEN
-            PRINT *," > f zero crossing between",spl%xs(ix),spl%xs(ix+1)
-            PRINT *,"  >> f_0, f_1 =",f_0,f_1
-            PRINT *,"  >> nzvalid =",nzvalid
-            PRINT *,"  >> z1, z2, z3 = ",z1,z2,z3
-            PRINT *,"  >> c3,c2,c1,c0 =",c3,c2,c1,c0
-         ENDIF
-         IF(nzvalid>0 .AND. (z1>-eps .OR. (ix==0 .AND. extrap)))THEN
-            IF(z1<=1+eps .OR. (ix==lx .AND. extrap)) THEN
-               IF(debug) PRINT '(a12,es17.8e3,a4,es17.8e3,a15,'//
+         if(debug .and. (f_0*f_1 <= 0))then
+            PRinT *," > f zero crossing between",spl%xs(ix),spl%xs(ix+1)
+            PRinT *,"  >> f_0, f_1 =",f_0,f_1
+            PRinT *,"  >> nzvalid =",nzvalid
+            PRinT *,"  >> z1, z2, z3 = ",z1,z2,z3
+            PRinT *,"  >> c3,c2,c1,c0 =",c3,c2,c1,c0
+         endif
+         if(nzvalid>0 .and. (z1>-eps .OR. (ix==0 .and. extrap)))then
+            if(z1<=1+eps .OR. (ix==lx .and. extrap)) then
+               if(debug) PRinT '(a12,es17.8e3,a4,es17.8e3,a15,'//
      $            'I3,a1,I3,a11,es13.4e3,a1,es13.4)',
      $            "  > Found z1",z1,", x1",x1," between knots ",ix,",",
      $            ix+1," where x =",spl%xs(ix),",",spl%xs(ix+1)
-               ! refine solution numerically 
+               ! refine solution numerically
                ! (analytics vs reality of interp)
-               CALL spline_refine_root(spl,iqty,x1)
+               call spline_refine_root(spl,iqty,x1)
                ! avoid repeated left/right solutions at a f=0 knot
-               IF(abs(last1-x1)>tol .AND. abs(last2-x1)>tol .AND.
-     $            abs(last3-x1)>tol) THEN
+               if(abs(last1-x1)>tol .and. abs(last2-x1)>tol .and.
+     $            abs(last3-x1)>tol) then
                   jroot = jroot + 1
                   roots(jroot) = x1
-               ENDIF
-            ENDIF
-         ENDIF
-         IF(nzvalid>1 .AND. (z2>-eps .OR. (ix==0 .AND. extrap)))THEN
-            IF(z2<=1+eps .OR. (ix==lx .AND. extrap)) THEN
-               IF(debug) PRINT '(a12,es17.8e3,a4,es17.8e3,a15,'//
+               endif
+            endif
+         endif
+         if(nzvalid>1 .and. (z2>-eps .OR. (ix==0 .and. extrap)))then
+            if(z2<=1+eps .OR. (ix==lx .and. extrap)) then
+               if(debug) PRinT '(a12,es17.8e3,a4,es17.8e3,a15,'//
      $            'I3,a1,I3,a11,es13.4e3,a1,es13.4)',
      $            "  > Found z2",z2,", x2",x2," between knots ",ix,
      $            ",",ix+1," where x =",spl%xs(ix),",",spl%xs(ix+1)
                ! refine solution numerically
                ! (analytics vs reality of interp)
-               CALL spline_refine_root(spl,iqty,x2)
+               call spline_refine_root(spl,iqty,x2)
                ! avoid double roots or repeats right at a knot location
-               IF(abs(last1-x2)>tol .AND. abs(last2-x2)>tol .AND.
-     $            abs(last3-x2)>tol .AND. abs(x1-x2)>tol) THEN
+               if(abs(last1-x2)>tol .and. abs(last2-x2)>tol .and.
+     $            abs(last3-x2)>tol .and. abs(x1-x2)>tol) then
                   jroot = jroot + 1
                   roots(jroot) = x2
-               ENDIF
-            ENDIF
-         ENDIF
-         IF(nzvalid>2 .AND. (z3>-eps .OR. (ix==0 .AND. extrap)))THEN
-            IF(z3<=1+eps .OR. (ix==lx .AND. extrap)) THEN
-               IF(debug) PRINT '(a12,es17.8e3,a4,es17.8e3,a15,'//
+               endif
+            endif
+         endif
+         if(nzvalid>2 .and. (z3>-eps .OR. (ix==0 .and. extrap)))then
+            if(z3<=1+eps .OR. (ix==lx .and. extrap)) then
+               if(debug) PRinT '(a12,es17.8e3,a4,es17.8e3,a15,'//
      $            'I3,a1,I3,a11,es13.4e3,a1,es13.4)',
      $            "  > Found z3",z3,", x3",x3," between knots ",ix,
      $            ",",ix+1," where x =",spl%xs(ix),",",spl%xs(ix+1)
                ! refine solution numerically
                ! (analytics vs reality of interp)
-               CALL spline_refine_root(spl,iqty,x3)
+               call spline_refine_root(spl,iqty,x3)
                ! avoid double roots or repeats right at a knot location
-               IF(abs(last1-x3)>tol .AND. abs(last2-x3)>tol .AND.
-     $            abs(last3-x3)>tol .AND. abs(x1-x3)>tol .AND.
-     $            abs(x2-x3)>tol) THEN
+               if(abs(last1-x3)>tol .and. abs(last2-x3)>tol .and.
+     $            abs(last3-x3)>tol .and. abs(x1-x3)>tol .and.
+     $            abs(x2-x3)>tol) then
                   jroot = jroot + 1
                   roots(jroot) = x3
-               ENDIF
-            ENDIF
-         ENDIF
+               endif
+            endif
+         endif
          last1 = roots(max(1,jroot))
          last2 = roots(max(1,jroot-1))
          last3 = roots(max(1,jroot-2))
-      ENDDO
+      enddo
       nroots = jroot
       ! sort the roots lowest to highest
-      ALLOCATE(index(nroots), tmproots(nroots))
+      allocate(index(nroots), tmproots(nroots))
       index=(/(ix,ix=1,nroots)/)
       tmproots(1:nroots) = roots(1:nroots)
-      CALL bubble_sort(tmproots,index,1,nroots)
-      DO ix=1,nroots
+      call bubble_sort(tmproots,index,1,nroots)
+      do ix=1,nroots
          tmproots(ix) = roots(index(nroots + 1 - ix))
-      ENDDO
+      enddo
       roots(1:nroots) = tmproots(1:nroots)
-      IF(nroots>0 .AND. debug)
-     $   PRINT *,"  > Sorted roots are",roots(1:nroots)
-      DEALLOCATE(index, tmproots)
+      if(nroots>0 .and. debug)
+     $   PRinT *,"  > Sorted roots are",roots(1:nroots)
+      deallocate(index, tmproots)
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_roots
+      return
+      end subroutine spline_roots
 
 c-----------------------------------------------------------------------
 c     subprogram 23. spline_refine_root.
@@ -1806,54 +1819,54 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE spline_refine_root(spl, iqty, x, op_tol)
+      subroutine spline_refine_root(spl, iqty, x, op_tol)
 
-      TYPE(spline_type), INTENT(INOUT) :: spl
-      INTEGER, INTENT(IN):: iqty
-      REAL(r8), INTENT(INOUT) :: x
-      REAL(r8), INTENT(IN), OPTIONAL :: op_tol
+      type(spline_type), intent(inout) :: spl
+      integer, intent(in):: iqty
+      real(r8), intent(inout) :: x
+      real(r8), intent(in), optional :: op_tol
       ! declare variables
-      INTEGER :: it
-      INTEGER, PARAMETER :: itmax=500
-      REAL(r8) :: tol=1e-12
-      REAL(r8) :: dx,lx,lf,f,df
+      integer :: it
+      integer, PARAMETER :: itmax=500
+      real(r8) :: tol=1e-12
+      real(r8) :: dx,lx,lf,f,df
 
       ! set optional tolerance
       tol = 1e-12
-      IF(PRESENT(op_tol)) tol = op_tol
+      if(present(op_tol)) tol = op_tol
 
       ! if its exact, we don't need to do anything
-      CALL spline_eval(spl,x,1)
-      IF(spl%f(iqty) == 0) RETURN
+      call spline_eval(spl,x,1)
+      if(spl%f(iqty) == 0) return
       ! otherwise, we'll iterate
       lx=spl%xs(spl%ix+1)-spl%xs(spl%ix)  ! note ix set in above eval
       lf = maxval(spl%fs(:,iqty))-minval(spl%fs(:,iqty))
       dx=lx
       f=huge(f)
       it=0
-      DO
-         CALL spline_eval(spl,x,1)
+      do
+         call spline_eval(spl,x,1)
          df=spl%f(iqty)-f
-        !IF(abs(dx) < tol*lx .OR. abs(df) < tol*lf .OR. it >= itmax)EXIT
-         IF(abs(dx) <= abs(tol*lx) .OR. it >= itmax)EXIT
+        !if(abs(dx) < tol*lx .OR. abs(df) < tol*lf .OR. it >= itmax)EXIT
+         if(abs(dx) <= abs(tol*lx) .OR. it >= itmax)EXIT
          it=it+1
          f=spl%f(iqty)
          dx=-spl%f(iqty)/spl%f1(iqty)
          x=x+dx
-      ENDDO
+      enddo
       ! abort on failure.
-      IF(it >= itmax)THEN
-         WRITE(*,*)
-         WRITE(*,*) "!! WARNING: root refining convergence failure"
-         WRITE(*,*) " -> estimated root ",x,
+      if(it >= itmax)then
+         write(*,*)
+         write(*,*) "!! WARNinG: root refining convergence failure"
+         write(*,*) " -> estimated root ",x,
      $              " has error/tol ",abs(dx)/(tol*lx),abs(df)/(tol*lf)
-         WRITE(*,*)
-      ENDIF
+         write(*,*)
+      endif
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE spline_refine_root
+      return
+      end subroutine spline_refine_root
 c-----------------------------------------------------------------------
 c     subprogram 24. bubble_sort.
 c     performs a bubble sort in decreasing order of value.
@@ -1861,33 +1874,33 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c     declarations.
 c-----------------------------------------------------------------------
-      SUBROUTINE bubble_sort(key,index,mmin,mmax)
+      subroutine bubble_sort(key,index,mmin,mmax)
 
-      REAL(r8), DIMENSION(:), INTENT(IN) :: key
-      INTEGER, DIMENSION(:), INTENT(INOUT) :: index
-      INTEGER :: mmin,mmax
+      real(r8), dimension(:), intent(in) :: key
+      integer, dimension(:), intent(inout) :: index
+      integer :: mmin,mmax
 
-      LOGICAL :: switch
-      INTEGER :: i,temp
+      logical :: switch
+      integer :: i,temp
 c-----------------------------------------------------------------------
 c     computations.
 c-----------------------------------------------------------------------
-      switch= .TRUE.
-      DO while(switch)
-         switch= .FALSE.
-         DO i=mmin,mmax-1
-            IF(key(index(i)) < key(index(i+1)))THEN
+      switch= .true.
+      do while(switch)
+         switch= .false.
+         do i=mmin,mmax-1
+            if(key(index(i)) < key(index(i+1)))then
                temp=index(i)
                index(i)=index(i+1)
                index(i+1)=temp
-               switch= .TRUE.
-            ENDIF
-         ENDDO
-      ENDDO
+               switch= .true.
+            endif
+         enddo
+      enddo
 c-----------------------------------------------------------------------
 c     terminate.
 c-----------------------------------------------------------------------
-      RETURN
-      END SUBROUTINE bubble_sort
+      return
+      end subroutine bubble_sort
 c-----------------------------------------------------------------------
-      END MODULE spline_mod
+      end module spline_mod
