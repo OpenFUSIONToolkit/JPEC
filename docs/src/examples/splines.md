@@ -18,7 +18,7 @@ fc = cos.(xs)
 fs_matrix = hcat(fs, fc)
 
 # Set up spline for 2 quantities
-spline = JPEC.SplinesMod.spline_setup(xs, fs_matrix, 2)
+spline = JPEC.SplinesMod.CubicSpline(xs, fs_matrix, 2)
 
 # Evaluate on fine grid
 xs_fine = collect(range(0.0, stop=2π, length=100))
@@ -43,7 +43,7 @@ fp = exp.(im .* xs)   # e^(ix)
 fs_matrix = hcat(fm, fp)
 
 # Set up complex spline
-spline = JPEC.SplinesMod.spline_setup(xs, fs_matrix, 2)
+spline = JPEC.SplinesMod.CubicSpline(xs, fs_matrix, 2)
 
 # Evaluate
 xs_fine = collect(range(0.0, stop=2π, length=100))

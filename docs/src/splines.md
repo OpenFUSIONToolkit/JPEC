@@ -71,7 +71,7 @@ xs = collect(range(0.0, stop=2π, length=21))
 fs = sin.(xs)
 
 # Set up spline (1 quantity)
-spline = JPEC.SplinesMod.spline_setup(xs, hcat(fs), 1)
+spline = JPEC.SplinesMod.CubicSpline(xs, hcat(fs), 1)
 
 # Evaluate at new points
 xs_fine = collect(range(0.0, stop=2π, length=100))
