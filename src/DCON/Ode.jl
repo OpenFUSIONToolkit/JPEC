@@ -532,6 +532,7 @@ function ode_ideal_cross!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, 
     # Restart ode solver
     odet.new = true
     odet.psi_store[odet.step] = odet.psifac # Store current psi
+    odet.u_store[:,:,:,odet.step] = odet.u   # Store current u
     odet.step += 1 # Advance step to account for crossing step
     odet.u_prev .= odet.u
     odet.psi_prev = odet.psifac

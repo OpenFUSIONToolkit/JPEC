@@ -115,8 +115,8 @@ end
     tol_r::Float64 = 1e-5
     crossover::Float64 = 1e-2
     ucrit::Float64 = 1e4
-    numsteps_init::Int = 1000 # used to set initial size of data store in OdeState
-    numunorms_init::Int = 15 # used to set initial size of saved unorm data in OdeState
+    numsteps_init::Int = 4000 # used to set initial size of data store in OdeState
+    numunorms_init::Int = 100 # used to set initial size of saved unorm data in OdeState
     singfac_min::Float64 = 0.0
     singfac_max::Float64 = 0.0
     cyl_flag::Bool = false

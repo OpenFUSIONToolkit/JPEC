@@ -34,7 +34,6 @@ where CODE is EQUIL, DCON, VAC, etc. and TAGs are short descriptors of the type 
 
 Again, this is currently used for the by-hand compilation of release notes. The tags thus need to be human readable but are not strictly inforced to be within some limited set. The objective is to allow a lead developer to skim through commits and pick out only the key new features / bug fixes / improvements to note in the release while not having to read all the work-in-progress or minor changes.
 
-
 ### Julia Tips
 
 #### Revise 
