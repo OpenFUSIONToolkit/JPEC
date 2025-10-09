@@ -212,7 +212,6 @@ A mutable struct holding parameters for the Solev'ev (SOL) plasma equilibrium mo
 - `b0fac`: scale toroidal field at constant beta (s*Phi,s*f,s^2*P. bt changes. Shape,beta constant)
 - `f0fac`: scale toroidal field at constant pressure (s*f. beta,q changes. Phi,p,bp constant)
 """
-
 @kwdef mutable struct SolevevConfig
     mr::Int = 128      # number of radial grid zones
     mz::Int = 128      # number of axial grid zones

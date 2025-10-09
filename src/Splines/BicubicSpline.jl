@@ -74,7 +74,6 @@ BicubicSpline(xs, ys, fs;
 	function values, number of x-coordinates, number of y-coordinates, number of quantities,
 	and boundary condition types.
 """
-
 function BicubicSpline(xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64, 3};
 	bctypex::Union{String, Int}="not-a-knot", bctypey::Union{String, Int}="not-a-knot")
 

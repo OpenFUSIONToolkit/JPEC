@@ -28,7 +28,7 @@ using JPEC
 ## Modules
 
 ```@contents
-Pages = ["splines.md", "vacuum.md"]
+Pages = ["splines.md", "vacuum.md", "equilibrium.md"]
 Depth = 1
 ```
 

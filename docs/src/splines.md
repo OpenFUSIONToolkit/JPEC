@@ -30,9 +30,9 @@ Represents a Fourier spline interpolation object for decomposed data.
 
 ## Functions
 
-### spline_setup
+### CubicSpline
 ```@docs
-JPEC.SplinesMod.spline_setup
+JPEC.SplinesMod.CubicSpline
 ```
 
 ### spline_eval
@@ -40,14 +40,24 @@ JPEC.SplinesMod.spline_setup
 JPEC.SplinesMod.spline_eval
 ```
 
-### bicube_setup
+### BicubicSpline
 ```@docs
-JPEC.SplinesMod.bicube_setup
+JPEC.SplinesMod.BicubicSpline
 ```
 
 ### bicube_eval
 ```@docs
 JPEC.SplinesMod.bicube_eval
+```
+
+### FourierSpline
+```@docs
+JPEC.SplinesMod.FourierSpline
+```
+
+### fspline_eval
+```@docs
+JPEC.SplinesMod.fspline_eval
 ```
 
 ## Example Usage
@@ -81,7 +91,7 @@ for i in 1:20, j in 1:20
 end
 
 # Set up bicubic spline
-bcspline = JPEC.SplinesMod.bicube_setup(xs, ys, fs, 1, 1)
+bcspline = JPEC.SplinesMod.BicubicSpline(xs, ys, fs, 1, 1)
 
 # Evaluate with derivatives
 x_eval, y_eval = π/2, π/4
