@@ -15,12 +15,12 @@ using Printf
 # Include all necessary files
 include("DconStructs.jl")
 include("Main.jl")
-include("Mercier.jl")
+include("mercier.jl")
 include("Ode.jl")
-include("Sing.jl")
-include("FourFit.jl")
+include("sing.jl")
+include("fourfit.jl")
 include("OdeOutput.jl")
-include("Utils.jl")
-include("Free.jl")
+include("utils.jl")
+include("free.jl")
 
 end

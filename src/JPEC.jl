@@ -13,7 +13,7 @@ include("Vacuum/Vacuum.jl")
 import .VacuumMod as VacuumMod
 export VacuumMod
 
-include("DCON/DCON.jl")
+include("DCON/dcon.jl")
 import .DCON as DCON
 export DCON
 
