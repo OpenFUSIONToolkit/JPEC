@@ -100,8 +100,6 @@ end
     res_flag::Bool = false
     fft_flag::Bool = false
     node_flag::Bool = false
-    # saves_per_region::Int = 2 # number of u to save per interrational region, must be >> 0 to run GPEC
-    # save_spacing::String = "Chebyshev" # method for determining spacing of saved u points
     mthvac::Int = 480
     sing_start::Int = 0
     nn::Int = 0
@@ -157,7 +155,7 @@ end
     # output switches
     write_crit_out::Bool   = true
     write_dcon_out::Bool   = true
-    write_euler_h5::Bool   = true
+    write_euler_h5::Bool   = false
     write_eqdata_h5::Bool  = false
 
     # filenames

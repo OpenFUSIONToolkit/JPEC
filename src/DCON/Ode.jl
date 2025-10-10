@@ -27,7 +27,7 @@ including solution vectors, tolerances, and flags for the integration process.
     ca_r::Array{ComplexF64, 4} = Array{ComplexF64}(undef, mpert, 2*mpert, 2, msing) # asymptotic coefficients just right of singular surface
     ca_l::Array{ComplexF64, 4} = Array{ComplexF64}(undef, mpert, 2*mpert, 2, msing) # asymptotic coefficients just left of singular surface
     index::Array{Int,2} = zeros(Int, mpert, numunorms_init)                                   # indices for sorting solutions
-    sing_flags::Vector{Bool} = falses(numunorms_init)                     # flags for singular solutions
+    sing_flag::Vector{Bool} = falses(numunorms_init)                     # flags for singular solutions
     fixfac::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, numunorms_init)             # fixup factors for Gaussian reduction
     fixstep::Vector{Float64} = zeros(Float64, numunorms_init)               # psi values at which unorms were performed
 
@@ -139,10 +139,15 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
         ode_step!(odet, equil, intr, ctrl, ffit, outp)
     end
 
-    # Deallocate unused storage of integration data
     odet.step -= 1 # step was incremented one extra time in ode_step!
-    odet.fixstep[odet.ifix+1] = odet.step
+    # Fixstep segments regions for the transforms - last step
+    odet.fixstep = [odet.fixstep[1:odet.ifix]; odet.step]
+    # Deallocate unused storage of integration data
     trim_storage!(odet)
+
+    # Compute transformation matrices for each region between fixups
+    transforms = compute_transforms(intr, odet)
+    println(size(transforms))
 
     if outp.write_euler_h5
         if ctrl.verbose
@@ -155,9 +160,13 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
         write_output(outp, :euler_h5, odet.u_store; dsetname="integration/u")
         write_output(outp, :euler_h5, odet.ud_store; dsetname="integration/ud")
         write_output(outp, :euler_h5, odet.ifix; dsetname="normalizations/mfix")
-        write_output(outp, :euler_h5, odet.fixstep[1:odet.ifix]; dsetname="normalizations/fixstep")
+        write_output(outp, :euler_h5, odet.fixstep[1:odet.ifix+1]; dsetname="normalizations/fixstep")
+        write_output(outp, :euler_h5, transforms; dsetname="normalizations/transforms")
+        # Note: in Julia, we write transforms directly to output, whereas this was done
+        # in idcon.f in GPEC during preprocessing. This will make fixfac, sing_flag, and index outputs
+        # unnecessary. Keeping now for testing, but eventually can delete.  
         write_output(outp, :euler_h5, odet.fixfac[:,:,1:odet.ifix]; dsetname="normalizations/fixfac")
-        write_output(outp, :euler_h5, odet.sing_flags[1:odet.ifix]; dsetname="normalizations/sing_flag")
+        write_output(outp, :euler_h5, odet.sing_flag[1:odet.ifix]; dsetname="normalizations/sing_flag")
         write_output(outp, :euler_h5, odet.index[:, 1:odet.ifix]; dsetname="normalizations/index")
         write_output(outp, :euler_h5, intr.msing; dsetname="singular/msing")
         write_output(outp, :euler_h5, [intr.sing[ising].psifac for ising in 1:intr.msing]; dsetname="singular/psi")
@@ -832,8 +841,10 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
 
     # Store data for the current fixup
     ifix = odet.ifix
-    odet.sing_flags[ifix] = sing_flag
-    odet.fixstep[ifix] = odet.step
+    odet.sing_flag[ifix] = sing_flag
+    # Since the current step has been fixed-up, we denote the end of the previous
+    # fixup region as the previous step (this just avoids a -1 index later)
+    odet.fixstep[ifix] = odet.step - 1
 
     # Initialize fixfac
     if !test
@@ -1014,21 +1025,21 @@ function get_psi_saves!(odet::OdeState, ctrl::DconControl, intr::DconInternal)
     end
 end
 
-function create_transforms(intr::DconInternal, odet::OdeState)
+function compute_transforms(intr::DconInternal, odet::OdeState)
 
     # Gaussian reduction matrices for each fixup
-    gauss = Array{Float64,3}(undef, intr.mpert, intr.mpert, odet.ifix)
+    gauss = Array{ComplexF64,3}(undef, intr.mpert, intr.mpert, odet.ifix)
     # Transformation matrices for each region between fixups (ifix + 1 regions)
-    transforms = Array{Float64,3}(undef, intr.mpert, intr.mpert, odet.ifix + 1)
+    transforms = Array{ComplexF64,3}(undef, intr.mpert, intr.mpert, odet.ifix + 1)
     
-    identity = Matrix{Float64}(I, intr.mpert, intr.mpert)
+    identity = Matrix{ComplexF64}(I, intr.mpert, intr.mpert)
     mask = trues(intr.mpert)
 
     # Construct gaussian reduction matrices for each fixup
     for ifix in 1:odet.ifix
         gauss[:, :, ifix] = copy(identity)
         mask .= true
-        for isol in 1:msol
+        for isol in 1:odet.msol
             ksol = odet.index[isol, ifix]
             mask[ksol] = false
             temp = copy(identity)
@@ -1040,18 +1051,18 @@ function create_transforms(intr::DconInternal, odet::OdeState)
             # Matrix multiplication gauss = gauss * temp
             gauss[:, :, ifix] .= gauss[:, :, ifix] * temp
         end
-        if sing_flag[ifix]
+        if odet.sing_flag[ifix]
             gauss[:, odet.index[1, ifix], ifix] .= 0.0
         end
     end
 
     # Concatenate gaussian reduction matrix to form transform matrix for each region
     # Here, the i'th region is between the (i-1)'th and i'th fixup e.g. transforms[:, :, 1]
-    # is the transform matrix for the region between the initialization and first fixup
+    # is the transform matrix for the region between init and first fixup
     # and mfix + 1 is the for the region after the last fixup and before the edge
-    transforms[:, :, mfix + 1] = copy(identity)
-    for ifix in mfix:-1:1
-        transforms[:, :, ifix] = transforms[:, :, ifix + 1] * transforms[:, :, ifix + 1]
+    transforms[:, :, end] = copy(identity)
+    for ifix in odet.ifix:-1:1
+        transforms[:, :, ifix] = gauss[:, :, ifix] * transforms[:, :, ifix + 1]
     end
 
     return transforms
