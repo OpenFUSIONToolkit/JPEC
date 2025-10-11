@@ -29,7 +29,7 @@ including solution vectors, tolerances, and flags for the integration process.
     index::Array{Int,2} = zeros(Int, mpert, numunorms_init)                                   # indices for sorting solutions
     sing_flag::Vector{Bool} = falses(numunorms_init)                     # flags for singular solutions
     fixfac::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, numunorms_init)             # fixup factors for Gaussian reduction
-    fixstep::Vector{Float64} = zeros(Float64, numunorms_init)               # psi values at which unorms were performed
+    fixstep::Vector{Int64} = zeros(Float64, numunorms_init)               # psi values at which unorms were performed
 
     # Data for integrator
     singfac::Float64 = 0.0      # separation from singular surface in terms of m - nq
@@ -140,14 +140,13 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
     end
 
     odet.step -= 1 # step was incremented one extra time in ode_step!
-    # Fixstep segments regions for the transforms - last step
+    # Fixstep segments regions for the transforms - add last step
     odet.fixstep = [odet.fixstep[1:odet.ifix]; odet.step]
     # Deallocate unused storage of integration data
     trim_storage!(odet)
 
     # Compute transformation matrices for each region between fixups
-    transforms = compute_transforms(intr, odet)
-    println(size(transforms))
+    ureal = build_ureal(intr, odet)
 
     if outp.write_euler_h5
         if ctrl.verbose
@@ -159,12 +158,17 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
         write_output(outp, :euler_h5, Spl.spline_eval(equil.sq, odet.psi_store, 0)[4]; dsetname="integration/q")
         write_output(outp, :euler_h5, odet.u_store; dsetname="integration/u")
         write_output(outp, :euler_h5, odet.ud_store; dsetname="integration/ud")
+        # TODO: for GPEC, should add u1, u2, u3, u4? I think this would just be a
+        # matter of adding u[:, :, 2] and ud to the build ureal function, yes?
+        write_output(outp, :euler_h5, ureal; dsetname="integration/ureal")
+        # Note: in Julia, we write ureal directly to output, whereas this was done
+        # in idcon.f in GPEC during preprocessing. This will make all outputs relating
+        # to the normalizations unnecessary (since ureal is already the unnormalized solution, 
+        # and the user does not need to see any of this). This includes mfix, fixstep, fixfac, 
+        # sing_flag, and index. Keeping now for testing/backwards compatability with Fortran, 
+        # but eventually can delete.
         write_output(outp, :euler_h5, odet.ifix; dsetname="normalizations/mfix")
         write_output(outp, :euler_h5, odet.fixstep[1:odet.ifix+1]; dsetname="normalizations/fixstep")
-        write_output(outp, :euler_h5, transforms; dsetname="normalizations/transforms")
-        # Note: in Julia, we write transforms directly to output, whereas this was done
-        # in idcon.f in GPEC during preprocessing. This will make fixfac, sing_flag, and index outputs
-        # unnecessary. Keeping now for testing, but eventually can delete.  
         write_output(outp, :euler_h5, odet.fixfac[:,:,1:odet.ifix]; dsetname="normalizations/fixfac")
         write_output(outp, :euler_h5, odet.sing_flag[1:odet.ifix]; dsetname="normalizations/sing_flag")
         write_output(outp, :euler_h5, odet.index[:, 1:odet.ifix]; dsetname="normalizations/index")
@@ -1025,17 +1029,24 @@ function get_psi_saves!(odet::OdeState, ctrl::DconControl, intr::DconInternal)
     end
 end
 
-function compute_transforms(intr::DconInternal, odet::OdeState)
+"""
+    build_ureal(intr::DconInternal, odet::OdeState)
+
+Constructs the transformation matrices to convert the complex solution vectors
+to real-valued vectors in each region between fixups. Effectively "undos" the
+Gaussian reduction applied during fixups throughout the integration, such that
+we have the true solution vectors for use in GPEC.
+"""
+function build_ureal(intr::DconInternal, odet::OdeState)
 
     # Gaussian reduction matrices for each fixup
     gauss = Array{ComplexF64,3}(undef, intr.mpert, intr.mpert, odet.ifix)
     # Transformation matrices for each region between fixups (ifix + 1 regions)
     transforms = Array{ComplexF64,3}(undef, intr.mpert, intr.mpert, odet.ifix + 1)
-    
-    identity = Matrix{ComplexF64}(I, intr.mpert, intr.mpert)
-    mask = trues(intr.mpert)
 
     # Construct gaussian reduction matrices for each fixup
+    identity = Matrix{ComplexF64}(I, intr.mpert, intr.mpert)
+    mask = trues(intr.mpert)
     for ifix in 1:odet.ifix
         gauss[:, :, ifix] = copy(identity)
         mask .= true
@@ -1065,5 +1076,17 @@ function compute_transforms(intr::DconInternal, odet::OdeState)
         transforms[:, :, ifix] = gauss[:, :, ifix] * transforms[:, :, ifix + 1]
     end
 
-    return transforms
+    # Now that we have the transform matrices, we can apply them to the solution vectors
+    # "undoing" the Gaussian reductions to get the true solution vectors
+    ureal = Array{ComplexF64}(undef, odet.step, intr.mpert, intr.mpert)
+    jfix = 1
+    for ifix in 1:odet.ifix+1
+        kfix = odet.fixstep[ifix]
+        for istep in jfix:kfix
+            ureal[istep, :, :] .= odet.u_store[:,:,1,istep] * transforms[:, :, ifix]
+        end
+        jfix = kfix + 1
+    end
+
+    return ureal
 end
