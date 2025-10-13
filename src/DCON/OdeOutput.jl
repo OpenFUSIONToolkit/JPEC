@@ -130,73 +130,6 @@ end
 
 # TODO: I don't think this function is essentially for the minimal working version - can convert later if needed
 # function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::Equilibrium.PlasmaEquilibrium, odet::OdeState)
-#     # Access all variables from structs, not globals.
-#     # Pretty much just giving them all aliases so we don't have to type `intr.` and `ctrl.` every time.
-#     u = odet.u #TODO: is ud the same as u
-#     mpert = intr.mpert
-#     out_evals = dout.out_evals
-#     bin_evals = dout.bin_evals
-#     nn = intr.nn
-#     evals_out_unit = fNames.evals_out_unit
-#     evals_bin_unit = fNames.evals_bin_unit
-#     sq = equil.sq
-#     psifac = intr.sing.psifac
-#     q = equil.sq.f[4]
-
-#     # Compute plasma response matrix
-#     temp = conj.(transpose(u[:, 1:mpert, 1]))
-#     wp = u[:, 1:mpert, 2]
-#     wp = conj.(transpose(wp))
-
-#     ipiv = zeros(Int, mpert)
-#     info = Ref{Int}(0)
-
-#     temp_lapack = copy(temp) # copy just renames a function pretty much
-#     LAPACK.zgetrf!(temp_lapack, ipiv)
-#     wp_lapack = copy(wp)
-#     LAPACK.zgetrs!('N', temp_lapack, ipiv, wp_lapack)
-#     wp = (wp_lapack + conj.(transpose(wp_lapack))) / 2
-
-#     # Compute and sort eigenvalues
-#     evals = zeros(Float64, mpert)
-#     work = zeros(ComplexF64, 2*mpert-1)
-#     rwork = zeros(Float64, 3*mpert-2)
-#     evals, _ = LAPACK.zheev!('N', 'U', wp)
-#     index = sortperm(-abs.(1 ./ evals), rev=true) # TODO: Should this still be rev
-
-#     # Compute and sort inverse eigenvalues
-#     evalsi, _ = LAPACK.zheev!('N', 'U', wp)
-#     indexi = sortperm(-abs.(evalsi), rev = true) # TODO: Should this still be rev
-
-#     # Write ascii eigenvalues
-#     if out_evals && odet.istep > 0
-#         @printf(evals_out_unit, "\nistep = %d, psifac = %.5e, q = %.5e\n", odet.istep, psifac, q)
-#         @printf(evals_out_unit, "\n     i     eval       evali      err\n")
-#         for ipert in 1:mpert
-#             @printf(evals_out_unit, "%6d %11.3e %11.3e %11.3e\n",
-#                 ipert,
-#                 evalsi[indexi[ipert]],
-#                 evals[index[ipert]],
-#                 evalsi[indexi[ipert]] * evals[index[ipert]] - 1)
-#         end
-#         @printf(evals_out_unit, "\n     i     eval       evali      err\n")
-#     end
-
-#     # Write binary eigenvalues
-#     if bin_evals && psifac > 0.1
-#         spline_eval(sq, psifac, 0) #TODO: Where does sq come from?
-#         q = sq.f[4]
-#         singfac = abs(odet.m1 - nn * q)
-#         logpsi1 = log10(psifac)
-#         logpsi2 = log10(singfac)
-#         for ipert in 2:mpert
-#             write(evals_bin_unit, Float32(ipert), Float32(psifac),
-#                 Float32(logpsi1), Float32(logpsi2),
-#                 Float32(q), Float32(1 / evals[index[ipert]]))
-#         end
-#         write(io, evals_bin_unit) # End record #TODO: Looks like the function call should be write(io, stuff). Will it be written to rhe right place?
-#     end
-
 #     return
 # end
 
@@ -282,14 +215,12 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m
 
     # Compute inverse plasma response matrix
     uu = u[:, 1:mpert, :]
-    wp = adjoint(uu[:, :, 1])         # adjoint = conjugate transpose
+    wp = adjoint(uu[:, :, 1])
     temp = adjoint(uu[:, :, 2])
 
     # Compute wp using LU decomposition
     temp_fact = lu(temp)
     wp = temp_fact \ wp
-
-    # Symmetrize
     wp = (wp + adjoint(wp)) / 2
 
     # Compute and sort inverse eigenvalues

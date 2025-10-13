@@ -60,7 +60,7 @@ Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equili
      6. g^ψθ · J
      7. J (Jacobian)
      8. ∂J/∂ψ
-  - The ψ grid is taken directly from `rzphi.xs`, and θ is scaled from `[0,1]` to `[0, 2π]`.    # TODO: add kinetic metric tensor components
+  - The ψ grid is taken directly from `rzphi.xs`, and θ is scaled from `[0,1]` to `[0, 2π]`.
 """
 function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true)
 

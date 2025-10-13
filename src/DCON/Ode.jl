@@ -8,9 +8,8 @@ A mutable struct to hold the state of the ODE solver for DCON.
 This struct contains all necessary fields to manage the ODE integration process,
 including solution vectors, tolerances, and flags for the integration process.
 """
-#TODO: variable description review by DCON expert (once finished), evaluate if all variables need to be part of the struct
-# TODO: remove msol variable, I think it just makes things more confusing. Either use mpert or 2*mpert in loops. This might actually
-# cause issues in ode_resist_cross, there's some logic I don't understand there where msol is increased. Might be better to keep it for now
+# TODO: Rethink msol variable, I think the Fortran implementation is confusing. Explicitly use mpert or 2*mpert in loops when possible. Might
+# cause issues in ode_resist_cross, there's some logic I don't understand there where msol is increased, will need careful thinking
 @kwdef mutable struct OdeState
     # Initialization parameters
     mpert::Int                  # poloidal mode number count
@@ -19,28 +18,28 @@ including solution vectors, tolerances, and flags for the integration process.
     msing::Int                   # number of singular surfaces
     numsteps_init::Int             # initial size of data store
 
-    # Saved data
-    psi_store::Vector{Float64} = Vector{Float64}(undef, numsteps_init)  # psi at each step
-    u_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, mpert, 2, numsteps_init) # store of u: mpert x mpert x 2 x nsteps
-    ud_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, mpert, 2, numsteps_init) # store of ud: mpert x mpert x 2 x nsteps
-    step::Int = 1                    # current number of stored steps (this is like istep in Fortran)
+    # Saved data throughout integration
+    step::Int = 1                    # current step of integration (this is like istep in Fortran)
+    psi_store::Vector{Float64} = Vector{Float64}(undef, numsteps_init)  # psi at each step of integration
+    u_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, mpert, 2, numsteps_init) # store of u at each step of integration
+    ud_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, mpert, 2, numsteps_init) # store of ud at each step of integration
     ca_r::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, msing) # asymptotic coefficients just right of singular surface
     ca_l::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, msing) # asymptotic coefficients just left of singular surface
     index::Array{Int,2} = zeros(Int, mpert, numunorms_init)                                   # indices for sorting solutions
     sing_flags::Vector{Bool} = falses(numunorms_init)                     # flags for singular solutions
     fixfac::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, numunorms_init)             # fixup factors for Gaussian reduction
-    fixstep::Vector{Float64} = zeros(Float64, numunorms_init)               # psi values at which unorms were performed
+    fixstep::Vector{Float64} = zeros(Float64, numunorms_init)               # step number where unorms were performed
 
     # Data for integrator
-    singfac::Float64 = 0.0      # separation from singular surface in terms of m - nq
     psifac::Float64 = 0.0       # normalized flux coordinate
     q::Float64 = 0.0            # q value at psifac
-    next::String = ""           # next action ("cross" or "finish")
-    ising::Int = 0               # index of next singular surface
     u::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, 2)            # solution vectors
     ud::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, 2)           # derivative of solution vectors used in GPEC
-    m1::Int = 0                 # poloidal mode number for the first singular surface (?)
+    ising::Int = 0               # index of next singular surface
+    m1::Int = 0                 # poloidal mode number for the next singular surface (?)
     psimax::Float64 = 0.0         # maximum psi value for the integrator
+    singfac::Float64 = 0.0      # separation from singular surface in terms of m - nq
+    next::String = ""           # next integration action ("cross" or "finish")
     ua::Array{ComplexF64,3} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2) # asympototic solutions at singular surface
     ca::Array{ComplexF64,3} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2) # asymptotic coefficients at singular surface
     psi_prev::Float64 = 0.0     # previous psi value
@@ -167,44 +166,6 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
         write_output(outp, :euler_h5, odet.ca_r; dsetname="singular/ca_right")
         # TODO: restype writing would also be added here, Matt says not needed for now (or maybe ever)
     end
-
-    # TODO: get rid of this eventually
-    # This is a rough sketch of the original Fortran logic for comparison
-    # while true # inside plasma (break out when at the edge)
-    # Rough sketch of Fortran logic for comparison
-    # while true # inside sing surface (break out when close to singular surface)
-    # if odet.istep > 0
-    #     ode_unorm!(odet, intr, ctrl, false)
-    # end
-    # Always record the first and last point in an inter-rational region
-    # these are important for resonant quantities
-    # recording the last point is critical for matching the nominal edge
-    # test = ode_test(odet, intr, ctrl)
-    # force_output = odet.first || test
-    # ode_output_step(odet, intr, ctrl, equil; force=force_output)
-    # ode_record_edge!(intr, odet, ctrl, equil)
-    # test && break # break out of loop if ode_test returns true
-    # ode_step!(odet, equil, intr, ctrl, ffit)
-    # odet.first = false
-    # end
-
-    #     # Re-initialize
-    #     odet.ising == ctrl.ksing && break
-    #     if odet.next == "cross"
-    #         if ctrl.res_flag
-    #             error("res_flag = true not implemented yet!")
-    #             #ode_resist_cross()
-    #         elseif ctrl.kin_flag
-    #             error("kin_flag = true not implemented yet!")
-    #             #ode_kin_cross()
-    #         else
-    #             ode_ideal_cross!(odet, equil, intr, ctrl, ffit)
-    #         end
-    #     else
-    #         break
-    #     end
-    #     odet.flag_count = 0
-    # end
     return odet
 end
 
@@ -587,19 +548,6 @@ the solution at the new point.
 """
 function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, ctrl::DconControl, ffit::FourFitVars, outp::DconOutput)
 
-    # print!(integrator) = begin
-    #     u = integrator.u
-    #     # params = integrator.p
-    #     # params is a tuple: (ctrl, equil, intr, odet, ffit)
-    #     # du = similar(u)
-    #     # sing_der!(du, u, params, integrator.t)
-    #     fmt(x) = @sprintf("%.5e", x)
-    #     println("       ψ=", fmt(integrator.t),
-    #         ", max|u|=", fmt(maximum(abs.(u))))
-    #         # ", max|du|=", fmt(maximum(abs.(du))))
-    #     last_psi[] = integrator.t
-    # end
-
     # Set up the callback to be run at every step
     cb = DiscreteCallback((u, t, integrator) -> true, integrator_callback!)
 
@@ -613,10 +561,6 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
     else
         psiout = odet.psimax
     end
-
-    # Print out every tenth of the inter-rational interval
-    # Δψ = (odet.psimax - odet.psifac) / 10
-    # last_psi = Ref(0.0)
 
     # TODO: need input here! Fortran emphasized that it was important to record data at the first and last step
     # However, the recording for u, ud, psi is now done after integration. Is there anything still within
@@ -635,22 +579,6 @@ function ode_step!(odet::OdeState, equil::Equilibrium.PlasmaEquilibrium, intr::D
     # Update u and psifac with the solution at the end of the interval
     odet.u .= sol.u[end]
     odet.psifac = sol.t[end]
-
-    # Save the data after integration by evaluating stored solution
-    # (This used to be done during integration using ode_output_step)
-    # We use save nodes that include the first and last point in an interrational region, which are important
-    # for resonant quantities. Recording the last point is critical for matching the nominal edge
-    # TODO: does this get messed up by u_norming?
-    # for isave in (odet.ising-1)*ctrl.saves_per_region+1:odet.ising*ctrl.saves_per_region
-    #     # Evaluate solution derivative ud at psi, u for GPEC (NOT du)
-    #     u_interp = sol(odet.psi_saves[isave])
-    #     du_interp = similar(u_interp)
-    #     sing_der!(du_interp, u_interp, (ctrl, equil, intr, odet, ffit, outp), odet.psi_saves[isave])
-
-    #     # Store interpolated solutions at save points
-    #     odet.u_saves[:, :, :, isave] .= u_interp
-    #     odet.ud_saves[:, :, :, isave] .= odet.ud
-    # end
 
     # TODO: same as above, this might not be needed
     ode_output_step!(odet, intr, ctrl, equil, outp) # always output final condition
@@ -674,11 +602,6 @@ function integrator_callback!(integrator)
     rtol, atol = compute_tols(intr, odet, ctrl)
     integrator.opts.reltol = rtol
     # integrator.opts.abstol = atol
-
-    # TODO: Print status every Δψ, maybe get rid of this at some point? Good for debugging rn
-    # if integrator.t >= last_psi[] + Δψ
-    #     print!(integrator)
-    # end
 
     # Note: no need for istep > 0 condition, since this is called after the first integration step always
     ode_unorm!(odet, intr, ctrl, outp, false)

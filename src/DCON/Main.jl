@@ -151,6 +151,9 @@ function Main(path::String)
         end
         odet = ode_run(ctrl, equil, intr, ffit, outp)
         if intr.size_edge > 0
+            # TODO: this logic might be deprecated since we do a lot
+            # of things in memory, but leaving for now. Should be updated
+            # once we actually test size_edge > 0 cases.
             # Find peak index in dw_edge[pre_edge:i_edge]
             dw_slice = real.(intr.dw_edge[intr.pre_edge:intr.i_edge])
             peak_index = findmax(dw_slice)[2] + (intr.pre_edge - 1)
@@ -161,9 +164,6 @@ function Main(path::String)
             println("Re-Integrating to peak dW @ qlim = $(intr.qlim), psilim = $(intr.psilim)")
             # Full re-run because outputs were written to disk each step
             # making it hard to backtrack
-            # if outp.bin_euler
-            #    bin_close(euler_bin_unit) # TODO: Need to decide ho we're handling io
-            # end
             odet = ode_run(ctrl, equil, intr, ffit, outp)
         end
     end

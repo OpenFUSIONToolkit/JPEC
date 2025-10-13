@@ -129,6 +129,7 @@ function mscvac(
 
     # TODO: this allows VACUUM to be called from a specified folder, like the rest of the Julia DCON
     # vac.in is hardcoded in the fortran, so this just changes the working directory temporarily for VACUUM
+    # Eventually, find a better way to do this
     cd(folder) do
         return ccall((:__vacuum_mod_MOD_mscvac, libvac),
             Nothing,

@@ -6,7 +6,6 @@ Scan all singular surfaces and calculate asymptotic vmat and mmat matrices and M
 function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput)
     write_output(outp, :dcon_out, "\n Singular Surfaces:")
     write_output(outp, :dcon_out, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
-    # msol = intr.mpert # TODO: is msol used anywhere else? It's a global in Fortran and very confusing
     for ising in 1:intr.msing
         sing_vmat!(intr, ctrl, equil, ffit, outp, ising)
     end
@@ -236,10 +235,9 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # ongoing TODO: list here
     # figure out if there's a direct way of doing the banded->dense matrix conversion to Julia (very messy right now)
-    # avoided hardcoding of binomial coefficients for cleanup
 
     # Initial allocations
-    msol = 2 * intr.mpert # TODO: make sure this doesn't get updated as a global elsewhere in the Fortran
+    msol = 2 * intr.mpert
     q = zeros(Float64, 4)
     singfac = zeros(Float64, intr.mpert, 4)
     f_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
@@ -669,9 +667,6 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
         error("kin_flag not implemented yet")
     else
         # See equation 23 in Glasser 2016 DCON paper for derivation
-        # TODO: these comments are a work in progress and should be checked, but I think they're close
-        # main thing is I'm not sure where singfac comes from
-
         # du[1] = - K * u[1] + u[2]
         du[:, :, 1] .= u[:, :, 2] .* odet.singfac_vec .- kmat * u[:, :, 1]
 
