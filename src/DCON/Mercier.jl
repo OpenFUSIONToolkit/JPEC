@@ -3,7 +3,6 @@
 
 Evaluates Mercier criterion for local stability and modifies results in place
 within the local stability array.
-
 """
 function mercier_scan!(locstab_fs::Matrix{Float64}, plasma_eq::Equilibrium.PlasmaEquilibrium)
 

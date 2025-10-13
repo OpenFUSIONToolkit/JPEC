@@ -5,16 +5,16 @@
 # index = sortperm(key; rev = true) # for descending order
 
 # This will return the indices of the sort range in descending order
-function sortperm_subrange(key::Vector{Float64}, mrange::UnitRange{Int}; descend = true )
-    sorted_inds = sort(mrange; by = i -> key[i], rev = descend)
+function sortperm_subrange(key::Vector{Float64}, mrange::UnitRange{Int}; descend=true)
+    sorted_inds = sort(mrange; by=i -> key[i], rev=descend)
     return collect(sorted_inds)
 end
 
 #If you want to mutate an existing index array like your original code:
-function sortperm_subrange!(key::Vector{Float64}, index::Vector{Int}, mrange::UnitRange{Int}; descend = true )
-    sorted_inds = sort(mrange; by = i -> key[i], rev = descend)
+function sortperm_subrange!(key::Vector{Float64}, index::Vector{Int}, mrange::UnitRange{Int}; descend=true)
+    sorted_inds = sort(mrange; by=i -> key[i], rev=descend)
     for (j, i) in enumerate(sorted_inds)
-        index[first(mrange) + j - 1] = i
+        index[first(mrange)+j-1] = i
     end
 end
 
@@ -73,8 +73,9 @@ end
     write_output(out::DconOutput, key::Symbol, data; dsetname=nothing, slice=:)
 
 Writes `data` to the file corresponding to `key`.
-- For text files: appends a line.
-- For HDF5 files: writes into `dsetname` at `slice`.
+
+  - For text files: appends a line.
+  - For HDF5 files: writes into `dsetname` at `slice`.
 """
 function write_output(out::DconOutput, key::Symbol, data; dsetname=nothing, slice=:)
     handle = out.handles[key]
@@ -102,15 +103,18 @@ end
     close_files(out::DconOutput)
 
 Closes all open files.
+
 # TODO: is there a way to make the code run this if it errors out anywhere?
+
 # In existing state, files will remain open if there is an error, so you have
+
 # to manually exit and reopen Julia.
 """
 function close_files(out::DconOutput)
     for (key, handle) in out.handles
         close(handle)
     end
-    empty!(out.handles)
+    return empty!(out.handles)
 end
 
 """
@@ -121,6 +125,6 @@ in ascending order.
 # TODO: this is no longer used, but might be useful code? Leaving for now, but likely can be removed
 function chebyshev_nodes(a::Float64, b::Float64, N::Int)
     j = 0:N-1
-    nodes = (a+b)/2 .+ (b-a)/2 .* cos.(π * j ./ (N - 1))
+    nodes = (a + b) / 2 .+ (b - a) / 2 .* cos.(π * j ./ (N - 1))
     return reverse(nodes)
 end

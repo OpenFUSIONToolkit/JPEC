@@ -130,19 +130,19 @@ function mscvac(
     # TODO: this allows VACUUM to be called from a specified folder, like the rest of the Julia DCON
     # vac.in is hardcoded in the fortran, so this just changes the working directory temporarily for VACUUM
     cd(folder) do
-        ccall((:__vacuum_mod_MOD_mscvac, libvac),
+        return ccall((:__vacuum_mod_MOD_mscvac, libvac),
             Nothing,
             (Ptr{ComplexF64},       # wv(mpert,mpert)
-            Ref{Cint},            # mpert
-            Ref{Cint},            # mtheta
-            Ref{Cint},            # mthvac
-            Ref{Cint},            # complex_flag (logical)
-            Ref{Cdouble},         # kernelsignin
-            Ref{Cint},            # wall_flag (logical)
-            Ref{Cint},            # farwal_flag (logical)
-            Ptr{Cdouble},         # grrio(:,:)
-            Ptr{Cdouble},         # xzptso(:,:)
-            Ptr{UInt8}),          # op_ahgfile (optional)
+                Ref{Cint},            # mpert
+                Ref{Cint},            # mtheta
+                Ref{Cint},            # mthvac
+                Ref{Cint},            # complex_flag (logical)
+                Ref{Cdouble},         # kernelsignin
+                Ref{Cint},            # wall_flag (logical)
+                Ref{Cint},            # farwal_flag (logical)
+                Ptr{Cdouble},         # grrio(:,:)
+                Ptr{Cdouble},         # xzptso(:,:)
+                Ptr{UInt8}),          # op_ahgfile (optional)
             pointer(wv),
             Ref(Int32(mpert)),
             Ref(Int32(mtheta)),

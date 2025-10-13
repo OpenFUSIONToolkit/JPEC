@@ -60,33 +60,33 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
         write_output(outp, :euler_h5, Vector(equil.sq.xs); dsetname="splines/sq/xs")
         # TODO: getting errors when trying to dump just fs, so splitting for now, which adds so many lines
         #  This should be fixed if we separate these like Nik mentioned
-        write_output(outp, :euler_h5, equil.sq.fs[:,1]; dsetname="splines/sq/fs/2piF")
-        write_output(outp, :euler_h5, equil.sq.fs[:,2]; dsetname="splines/sq/fs/mu0p")
-        write_output(outp, :euler_h5, equil.sq.fs[:,3]; dsetname="splines/sq/fs/dVdpsi")
-        write_output(outp, :euler_h5, equil.sq.fs[:,4]; dsetname="splines/sq/fs/q")
-        write_output(outp, :euler_h5, equil.sq.fs1[:,1]; dsetname="splines/sq/fs1/2piF")
-        write_output(outp, :euler_h5, equil.sq.fs1[:,2]; dsetname="splines/sq/fs1/mu0p")
-        write_output(outp, :euler_h5, equil.sq.fs1[:,3]; dsetname="splines/sq/fs1/dVdpsi")
-        write_output(outp, :euler_h5, equil.sq.fs1[:,4]; dsetname="splines/sq/fs1/q")
+        write_output(outp, :euler_h5, equil.sq.fs[:, 1]; dsetname="splines/sq/fs/2piF")
+        write_output(outp, :euler_h5, equil.sq.fs[:, 2]; dsetname="splines/sq/fs/mu0p")
+        write_output(outp, :euler_h5, equil.sq.fs[:, 3]; dsetname="splines/sq/fs/dVdpsi")
+        write_output(outp, :euler_h5, equil.sq.fs[:, 4]; dsetname="splines/sq/fs/q")
+        write_output(outp, :euler_h5, equil.sq.fs1[:, 1]; dsetname="splines/sq/fs1/2piF")
+        write_output(outp, :euler_h5, equil.sq.fs1[:, 2]; dsetname="splines/sq/fs1/mu0p")
+        write_output(outp, :euler_h5, equil.sq.fs1[:, 3]; dsetname="splines/sq/fs1/dVdpsi")
+        write_output(outp, :euler_h5, equil.sq.fs1[:, 4]; dsetname="splines/sq/fs1/q")
         write_output(outp, :euler_h5, 0; dsetname="splines/sq/xpower") # TODO: equil.sq.xpower
         write_output(outp, :euler_h5, Vector(equil.rzphi.xs); dsetname="splines/rzphi/xs")
         write_output(outp, :euler_h5, Vector(equil.rzphi.ys); dsetname="splines/rzphi/ys")
-        write_output(outp, :euler_h5, equil.rzphi.fs[:,1]; dsetname="splines/rzphi/fs/rcoords")
-        write_output(outp, :euler_h5, equil.rzphi.fs[:,2]; dsetname="splines/rzphi/fs/offset")
-        write_output(outp, :euler_h5, equil.rzphi.fs[:,3]; dsetname="splines/rzphi/fs/nu")
-        write_output(outp, :euler_h5, equil.rzphi.fs[:,4]; dsetname="splines/rzphi/fs/jac")
-        write_output(outp, :euler_h5, equil.rzphi.fsx[:,1]; dsetname="splines/rzphi/fsx/rcoords")
-        write_output(outp, :euler_h5, equil.rzphi.fsx[:,2]; dsetname="splines/rzphi/fsx/offset")
-        write_output(outp, :euler_h5, equil.rzphi.fsx[:,3]; dsetname="splines/rzphi/fsx/nu")
-        write_output(outp, :euler_h5, equil.rzphi.fsx[:,4]; dsetname="splines/rzphi/fsx/jac")
-        write_output(outp, :euler_h5, equil.rzphi.fsy[:,1]; dsetname="splines/rzphi/fsy/rcoords")
-        write_output(outp, :euler_h5, equil.rzphi.fsy[:,2]; dsetname="splines/rzphi/fsy/offset")
-        write_output(outp, :euler_h5, equil.rzphi.fsy[:,3]; dsetname="splines/rzphi/fsy/nu")
-        write_output(outp, :euler_h5, equil.rzphi.fsy[:,4]; dsetname="splines/rzphi/fsy/jac")
-        write_output(outp, :euler_h5, equil.rzphi.fsxy[:,1]; dsetname="splines/rzphi/fsxy/rcoords")
-        write_output(outp, :euler_h5, equil.rzphi.fsxy[:,2]; dsetname="splines/rzphi/fsxy/offset")
-        write_output(outp, :euler_h5, equil.rzphi.fsxy[:,3]; dsetname="splines/rzphi/fsxy/nu")
-        write_output(outp, :euler_h5, equil.rzphi.fsxy[:,4]; dsetname="splines/rzphi/fsxy/jac")
+        write_output(outp, :euler_h5, equil.rzphi.fs[:, 1]; dsetname="splines/rzphi/fs/rcoords")
+        write_output(outp, :euler_h5, equil.rzphi.fs[:, 2]; dsetname="splines/rzphi/fs/offset")
+        write_output(outp, :euler_h5, equil.rzphi.fs[:, 3]; dsetname="splines/rzphi/fs/nu")
+        write_output(outp, :euler_h5, equil.rzphi.fs[:, 4]; dsetname="splines/rzphi/fs/jac")
+        write_output(outp, :euler_h5, equil.rzphi.fsx[:, 1]; dsetname="splines/rzphi/fsx/rcoords")
+        write_output(outp, :euler_h5, equil.rzphi.fsx[:, 2]; dsetname="splines/rzphi/fsx/offset")
+        write_output(outp, :euler_h5, equil.rzphi.fsx[:, 3]; dsetname="splines/rzphi/fsx/nu")
+        write_output(outp, :euler_h5, equil.rzphi.fsx[:, 4]; dsetname="splines/rzphi/fsx/jac")
+        write_output(outp, :euler_h5, equil.rzphi.fsy[:, 1]; dsetname="splines/rzphi/fsy/rcoords")
+        write_output(outp, :euler_h5, equil.rzphi.fsy[:, 2]; dsetname="splines/rzphi/fsy/offset")
+        write_output(outp, :euler_h5, equil.rzphi.fsy[:, 3]; dsetname="splines/rzphi/fsy/nu")
+        write_output(outp, :euler_h5, equil.rzphi.fsy[:, 4]; dsetname="splines/rzphi/fsy/jac")
+        write_output(outp, :euler_h5, equil.rzphi.fsxy[:, 1]; dsetname="splines/rzphi/fsxy/rcoords")
+        write_output(outp, :euler_h5, equil.rzphi.fsxy[:, 2]; dsetname="splines/rzphi/fsxy/offset")
+        write_output(outp, :euler_h5, equil.rzphi.fsxy[:, 3]; dsetname="splines/rzphi/fsxy/nu")
+        write_output(outp, :euler_h5, equil.rzphi.fsxy[:, 4]; dsetname="splines/rzphi/fsxy/jac")
         write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/x0") # TODO: equil.rzphi.x0
         write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/y0") # TODO: equil.rzphi.y0
         write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/xpower") # TODO: equil.rzphi.xpower
@@ -99,7 +99,7 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
         write_output(outp, :crit_out, @sprintf("   ising   psi         q          di      re alpha   im alpha\n"))
         write_output(outp, :crit_out, @sprintf("%6d%11.3e%11.3e%11.3e%11.3e%11.3e\n", odet.ising, singp.psifac, singp.q, singp.di, real(singp.alpha), imag(singp.alpha)))
     end
-    write_output(outp, :crit_out, "    psifac      dpsi        q       singfac     eval1\n")
+    return write_output(outp, :crit_out, "    psifac      dpsi        q       singfac     eval1\n")
 end
 
 """
@@ -116,7 +116,7 @@ Additional output (e.g., eigenvalue dumps, binary solution logging) may be added
 function ode_output_step!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, outp::DconOutput)
 
     # Compute and print critical data for each time step
-    ode_output_monitor!(odet, intr, ctrl, equil, outp)
+    return ode_output_monitor!(odet, intr, ctrl, equil, outp)
     # if dout.out_evals || dout.bin_evals
     #     ode_output_get_evals(intr, ctrl, dout, fNames, equil, odet) # this is just outputs
     # end
@@ -209,13 +209,15 @@ If the crossing satisfies sharpness and consistency conditions, it's logged and 
 A termination flag (`termbycross_flag`) set within DconControl can be used to stop integration upon detection.
 
 ### Notes
-- Zero-crossing detection is based on changes in the sign of `crit`.
-- `u_med` is constructed as a linear interpolation between current and saved `u`.
-- This function updates psi_prev, crit_prev, u_prev, and nzero in the `odet` state.
+
+  - Zero-crossing detection is based on changes in the sign of `crit`.
+  - `u_med` is constructed as a linear interpolation between current and saved `u`.
+  - This function updates psi_prev, crit_prev, u_prev, and nzero in the `odet` state.
 
 ### TODO
-- Restore or redirect output to appropriate logging units.
-- Replace `error(...)` with graceful shutdown if zero crossing is an intended exit condition.
+
+  - Restore or redirect output to appropriate logging units.
+  - Replace `error(...)` with graceful shutdown if zero crossing is an intended exit condition.
 """
 function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, outp::DconOutput)
 
@@ -236,7 +238,7 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
             println("Zero crossing detected at psi = $psi_med, q = $q_med")
             write_output(outp, :dcon_out, @sprintf("Zero crossing at psi = %10.3e, q = %10.3e", psi_med, q_med))
             write_output(outp, :crit_out, @sprintf("Zero crossing at psi = %10.3e, q = %10.3e", psi_med, q_med))
-            write_output(outp, :crit_out, @sprintf("%11.3e%11.3e%11.3e%11.3e%11.3e", psi_med,dpsi,q_med,singfac_med,crit_med))
+            write_output(outp, :crit_out, @sprintf("%11.3e%11.3e%11.3e%11.3e%11.3e", psi_med, dpsi, q_med, singfac_med, crit_med))
             odet.nzero += 1
         end
         if ctrl.termbycross_flag
@@ -247,12 +249,12 @@ function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconContr
     end
 
     # Write new crit
-    write_output(outp, :crit_out, @sprintf("%11.3e%11.3e%11.3e%11.3e%11.3e", odet.psifac,dpsi,odet.q,singfac,crit))
+    write_output(outp, :crit_out, @sprintf("%11.3e%11.3e%11.3e%11.3e%11.3e", odet.psifac, dpsi, odet.q, singfac, crit))
 
     # Update saved values
     odet.psi_prev = odet.psifac
     odet.crit_prev = crit
-    odet.u_prev .= odet.u
+    return odet.u_prev .= odet.u
 end
 
 """
@@ -276,7 +278,7 @@ A tuple `(q, singfac, logpsi1, logpsi2, crit)` of critical data for the time ste
 # TODO: on self-contained functions like this, it feels silly to pass in these large structs when we only need one variable
 # Should we just pass in the variables we need? This seems more readable to me personally
 #function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, intr::DconInternal, odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium) # (alternate version)
-function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, m1::Int, nn::Int, sq::Spl.CubicSpline)
+function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m1::Int, nn::Int, sq::Spl.CubicSpline)
 
     # Compute inverse plasma response matrix
     uu = u[:, 1:mpert, :]
