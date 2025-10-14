@@ -31,9 +31,9 @@ end
     alpha::ComplexF64 = 0.0 + 0.0im
     n1::Vector{Int} = Int[]
     n2::Vector{Int} = Int[]
-    power::Union{Missing, Vector{ComplexF64}} = missing # we know the size of these, but it depends on mpert
-    vmat::Union{Missing, Array{ComplexF64,4}} = missing
-    mmat::Union{Missing, Array{ComplexF64,4}} = missing
+    power::Union{Missing,Vector{ComplexF64}} = missing # we know the size of these, but it depends on mpert
+    vmat::Union{Missing,Array{ComplexF64,4}} = missing
+    mmat::Union{Missing,Array{ComplexF64,4}} = missing
     m0mat::Matrix{ComplexF64} = zeros(ComplexF64, 2, 2)
     restype::ResistType = ResistType()
 end
@@ -74,20 +74,20 @@ end
     sol_base::Int = 50
     msing::Int = 0
     kmsing::Int = 0
-    sing::Union{Nothing, Vector{SingType}} = SingType[]
-    kinsing::Union{Nothing, Vector{SingType}} = SingType[]
+    sing::Union{Nothing,Vector{SingType}} = SingType[]
+    kinsing::Union{Nothing,Vector{SingType}} = SingType[]
     psilim::Float64 = 0.0
     qlim::Float64 = 0.0
     q1lim::Float64 = 0.0
     # TODO: how to initialize a spline? This will be a spline of size mpsi x 5
-    locstab::Union{Missing, Spl.CubicSpline{Float64}} = missing
+    locstab::Union{Missing,Spl.CubicSpline{Float64}} = missing
     size_edge::Int = 0
     pre_edge::Int = 1
     i_edge::Int = 1
     # TODO: what are the lengths of these? can use to initialize
-    q_edge::Union{Missing, Vector{Float64}} = missing
-    psi_edge::Union{Missing, Vector{Float64}} = missing
-    dw_edge::Union{Missing, Vector{ComplexF64}} = missing
+    q_edge::Union{Missing,Vector{Float64}} = missing
+    psi_edge::Union{Missing,Vector{Float64}} = missing
+    dw_edge::Union{Missing,Vector{ComplexF64}} = missing
 end
 
 @kwdef mutable struct DconControl
@@ -100,8 +100,6 @@ end
     res_flag::Bool = false
     fft_flag::Bool = false
     node_flag::Bool = false
-    # saves_per_region::Int = 2 # number of u to save per interrational region, must be >> 0 to run GPEC
-    # save_spacing::String = "Chebyshev" # method for determining spacing of saved u points
     mthvac::Int = 480
     sing_start::Int = 0
     nn::Int = 0
@@ -155,15 +153,15 @@ end
 # Since file I/O in Julia will be very different than Fortran, this will likely be reworked significantly
 @kwdef mutable struct DconOutput
     # output switches
-    write_crit_out::Bool   = true
-    write_dcon_out::Bool   = true
-    write_euler_h5::Bool   = true
-    write_eqdata_h5::Bool  = false
+    write_crit_out::Bool = true
+    write_dcon_out::Bool = true
+    write_euler_h5::Bool = true
+    write_eqdata_h5::Bool = false
 
     # filenames
-    fname_crit_out::String  = "crit.out"
-    fname_dcon_out::String  = "dcon.out"
-    fname_euler_h5::String  = "euler.h5"
+    fname_crit_out::String = "crit.out"
+    fname_dcon_out::String = "dcon.out"
+    fname_euler_h5::String = "euler.h5"
     fname_eqdata_h5::String = "eqdata.h5"
 
     handles::Dict{Symbol,Any} = Dict()
@@ -224,23 +222,7 @@ end
     fmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     kmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     gmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
-    # kaats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # gaats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # f0mats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # pmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # paats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # kkmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # kkaats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # r1mats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # r2mats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # r3mats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # akmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # bkmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # ckmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
 
-    # k0s::JPEC.Spl.SplineType
-
-    # ipiva::Union{Nothing,Vector{Int}} = nothing
     # TODO: these might be deprecated? They're used with a ahb_flag in free
     asmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     bsmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
@@ -249,10 +231,6 @@ end
 
     parallel_threads::Int = 0
     dcon_kin_threads::Int = 0
-
-    # kinetic ABCDEH mats for sing_mod
-    # kwmats::Vector{JPEC.Spl.CubicSpline{ComplexF64}} = [JPEC.Spl.CubicSpline{ComplexF64}() for _ in 1:6]
-    # ktmats::Vector{JPEC.Spl.CubicSpline{ComplexF64}} = [JPEC.Spl.CubicSpline{ComplexF64}() for _ in 1:6]
 end
 
 FourFitVars(mpert::Int) = FourFitVars(; mpert)

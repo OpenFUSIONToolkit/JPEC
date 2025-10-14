@@ -2,7 +2,7 @@ module DCON
 
 # All imports and includes for the DCON module
 using LinearAlgebra
-using LinearAlgebra.LAPACK #required for banded matrix operations
+using LinearAlgebra.LAPACK
 using TOML
 using FFTW
 using OrdinaryDiffEq
@@ -22,5 +22,8 @@ include("Fourfit.jl")
 include("OdeOutput.jl")
 include("Utils.jl")
 include("Free.jl")
+
+# This is used for various small tolerances throughout DCON
+const eps = 1e-10
 
 end

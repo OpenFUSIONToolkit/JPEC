@@ -12,12 +12,14 @@ sq_in, rz_in, ro, zo, psio).
 Performs component-wise Lagrange extrapolation for a vector-valued function.
 
 ## Arguments:
-- `xx`: A (m × n) matrix where each row contains the x-values for each component.
-- `ff`: A (m × n) matrix where each row contains function values at the corresponding `xx`.
-- `x`: A scalar Float64 value at which to extrapolate.
+
+  - `xx`: A (m × n) matrix where each row contains the x-values for each component.
+  - `ff`: A (m × n) matrix where each row contains function values at the corresponding `xx`.
+  - `x`: A scalar Float64 value at which to extrapolate.
 
 ## Returns:
-- A vector of length n representing the extrapolated function values at `x`.
+
+  - A vector of length n representing the extrapolated function values at `x`.
 """
 function inverse_extrap(xx::Matrix{Float64}, ff::Matrix{Float64}, x::Float64)::Vector{Float64}
     m, n = size(ff)             # m = number of data points, n = number of components
@@ -74,11 +76,11 @@ function equilibrium_solver(input::InverseRunInput)
 
     x = rz_in.fs[:, :, 1] .- ro
     y = rz_in.fs[:, :, 2] .- zo
-    r2 = x.^2 .+ y.^2
+    r2 = x .^ 2 .+ y .^ 2
 
     twopi = 2 * pi
 
-    deta = zeros(Float64, mx+1, my+1)
+    deta = zeros(Float64, mx + 1, my + 1)
     for ipsi in 0:mx, itheta in 0:my
         if r2[ipsi+1, itheta+1] == 0.0
             deta[ipsi+1, itheta+1] = 0.0
@@ -108,7 +110,7 @@ function equilibrium_solver(input::InverseRunInput)
 
     deta[1, :] = inverse_extrap(r2[2:me+1, :], deta[2:me+1, :], 0.0)
 
-    rz_in_fs = zeros(Float64, mx+1, my+1, 3)
+    rz_in_fs = zeros(Float64, mx + 1, my + 1, 3)
     rz_in_fs[:, :, 1] = r2
     rz_in_fs[:, :, 2] = deta
 
@@ -126,8 +128,8 @@ function equilibrium_solver(input::InverseRunInput)
     # c     set up radial grid (only "ldp" implemented)
     # c-----------------------------------------------------------------------
     if grid_type == "ldp"
-        xs = psilow .+ (psihigh - psilow) .* (sin.(range(0.0, 1.0; length=mpsi+1) .* (π/2))).^2
-        fs = zeros(Float64, mpsi+1, 4)
+        xs = psilow .+ (psihigh - psilow) .* (sin.(range(0.0, 1.0; length=mpsi + 1) .* (π / 2))) .^ 2
+        fs = zeros(Float64, mpsi + 1, 4)
         sq = Spl.spline_setup(xs, fs; bctype="extrap")
     else
         error("Only 'ldp' grid_type is implemented for now.")
@@ -144,12 +146,12 @@ function equilibrium_solver(input::InverseRunInput)
     end
 
     # (/"  r2  "," deta "," dphi ","  jac "/)
-    rzphi_fs = zeros(Float64, mpsi+1, mtheta+1, 4)
+    rzphi_fs = zeros(Float64, mpsi + 1, mtheta + 1, 4)
     rzphi_xs = copy(sq_xs)
     rzphi_ys = collect(0:mtheta) ./ mtheta
 
     # (/"  b0  ","      ","      " /)
-    eqfun_fs = zeros(Float64, mpsi+1, mtheta+1, 3)
+    eqfun_fs = zeros(Float64, mpsi + 1, mtheta + 1, 3)
     eqfun_xs = copy(sq_xs)
     eqfun_ys = collect(0:mtheta) ./ mtheta
 
@@ -177,25 +179,25 @@ function equilibrium_solver(input::InverseRunInput)
             rfac = sqrt(f_rz_in[1])
             r = ro + rfac * cos(twopi * (theta + f_rz_in[2]))
             jacfac = fx_rz_in[1] * (1 + fy_rz_in[2]) - fy_rz_in[1] * fx_rz_in[2]
-            w11 = (1 + fy_rz_in[2]) * twopi^ 2 * rfac / jacfac
+            w11 = (1 + fy_rz_in[2]) * twopi^2 * rfac / jacfac
             w12 = -fy_rz_in[1] * pi / (rfac * jacfac)
-            bp = psio * sqrt(w11*w11 + w12*w12) / r
+            bp = psio * sqrt(w11 * w11 + w12 * w12) / r
             bt = f_sq_in[1] / r
-            b = sqrt(bp*bp + bt*bt)
+            b = sqrt(bp * bp + bt * bt)
 
-    #         spl.fs[itheta+1, 1] = f_rz_[1]
-    #         spl.fs[itheta+1, 2] = f_rz_[2]
-    #         spl.fs[itheta+1, 3] = r*jacfac
-    #         spl.fs[itheta+1, 4] = spl.fs[itheta+1, 3]/(r*r)
-    #         spl.fs[itheta+1, 5] = spl.fs[itheta+1, 3]*bp^(config.power_bp)*b^(config.power_b)/r^(config.power_r)
+            #         spl.fs[itheta+1, 1] = f_rz_[1]
+            #         spl.fs[itheta+1, 2] = f_rz_[2]
+            #         spl.fs[itheta+1, 3] = r*jacfac
+            #         spl.fs[itheta+1, 4] = spl.fs[itheta+1, 3]/(r*r)
+            #         spl.fs[itheta+1, 5] = spl.fs[itheta+1, 3]*bp^(config.power_bp)*b^(config.power_b)/r^(config.power_r)
         end
 
-    #     spl.xs = spl.integral!()
-    #     spl.xs = spl.fsi[:, 5] ./ spl.fs[end, 5]
-    #     spl.fs[:, 2] .= spl.fs[:, 2] .+ rzphi.ys .- spl.xs
-    #     spl.fs[:, 4] .= (spl.fs[:, 3] ./ spl.fsi[end, 3]) ./ (spl.fs[:, 5] ./ spl.fsi[end, 5]) .* spl.fsi[end, 3] * twopi * pi
-    #     spl.fs[:, 3] .= f_sq[1] * pi / psio .* (spl.fsi[:, 4] .- spl.fsi[end, 4] .* spl.xs)
-    #     # spl.xs = Spl.spline_setup(spl.xs, spl.fs; bctype="periodic").integral!()
+        #     spl.xs = spl.integral!()
+        #     spl.xs = spl.fsi[:, 5] ./ spl.fs[end, 5]
+        #     spl.fs[:, 2] .= spl.fs[:, 2] .+ rzphi.ys .- spl.xs
+        #     spl.fs[:, 4] .= (spl.fs[:, 3] ./ spl.fsi[end, 3]) ./ (spl.fs[:, 5] ./ spl.fsi[end, 5]) .* spl.fsi[end, 3] * twopi * pi
+        #     spl.fs[:, 3] .= f_sq[1] * pi / psio .* (spl.fsi[:, 4] .- spl.fsi[end, 4] .* spl.xs)
+        #     # spl.xs = Spl.spline_setup(spl.xs, spl.fs; bctype="periodic").integral!()
 
         for itheta in 0:mtheta
             theta = rzphi_ys[itheta+1]

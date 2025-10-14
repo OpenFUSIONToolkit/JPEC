@@ -10,12 +10,14 @@ Initializes the starting radius and state vector for solving the LAR ODE system.
 Also evaluates the initial derivative using the analytic model.
 
 ## Arguments:
-- `rmin`: Normalized starting radius (as a fraction of `lar_a`).
-- `lar_input`: A `LargeAspectRatioConfig` object containing equilibrium parameters.
+
+  - `rmin`: Normalized starting radius (as a fraction of `lar_a`).
+  - `lar_input`: A `LargeAspectRatioConfig` object containing equilibrium parameters.
 
 ## Returns:
-- `r`: Physical radius corresponding to `rmin * lar_a`.
-- `y`: Initial state vector of length 5.
+
+  - `r`: Physical radius corresponding to `rmin * lar_a`.
+  - `y`: Initial state vector of length 5.
 """
 function lar_init_conditions(rmin::Float64, lar_input::LargeAspectRatioConfig)
     lar_a = lar_input.lar_a
@@ -82,8 +84,8 @@ function lar_der(dy::Vector{Float64}, r::Float64, y::Vector{Float64}, lar_input:
     bsq = (y[1] / max(r, eps()))^2 + y[2]^2     # B²
     q = r^2 * y[2] / (lar_r0 * max(y[1], eps()))
 
-    dy[1] = -pp/bsq*y[1] + sigma*y[2]*r
-    dy[2] = -pp/bsq*y[2] - sigma*y[1]/max(r, eps())
+    dy[1] = -pp / bsq * y[1] + sigma * y[2] * r
+    dy[2] = -pp / bsq * y[2] - sigma * y[1] / max(r, eps())
     dy[3] = y[1] * lar_r0 / max(r, eps())
     dy[4] = ((q / max(r, eps()))^2) * y[5] / max(r, eps())
     dy[5] = y[2] * (r / max(q, eps()))^2 * (r / lar_r0) * (1 - 2 * (lar_r0 * q / max(y[2], eps()))^2 * pp)
@@ -122,7 +124,7 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
 
     function dydr(du, u, p, r)
         lar_input = p
-        lar_der(du, r, u, lar_input)
+        return lar_der(du, r, u, lar_input)
     end
 
     r0, y0 = lar_init_conditions(rmin, lar_input)
@@ -130,7 +132,7 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
     p = lar_input
 
     prob = ODEProblem(dydr, y0, tspan, p)
-    sol = solve(prob, Rosenbrock23(autodiff=AutoFiniteDiff());  reltol=1e-6, abstol=1e-8, maxiters=10000)
+    sol = solve(prob, Rosenbrock23(; autodiff=AutoFiniteDiff()); reltol=1e-6, abstol=1e-8, maxiters=10000)
 
     r_arr = sol.t
     y_mat = hcat(sol.u...)'
@@ -144,15 +146,15 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
         xfac = 1 - x^2
         pval = p00 * xfac^lar_input.p_pres
         sigma = (sigma_type == "wesson") ?
-            sigma0 * xfac^lar_input.p_sig :
-            sigma0 / (1 + x^(2 * lar_input.p_sig))^(1 + 1 / lar_input.p_sig)
+                sigma0 * xfac^lar_input.p_sig :
+                sigma0 / (1 + x^(2 * lar_input.p_sig))^(1 + 1 / lar_input.p_sig)
         q = r^2 * y[2] / (lar_r0 * y[1])
         temp[i, :] = [r; y; pval; sigma; q]
     end
 
     xs_r = temp[:, 1]
     fs_r = temp[:, 2:9]
-    spl = Spl.CubicSpline(xs_r, fs_r, bctype=4)
+    spl = Spl.CubicSpline(xs_r, fs_r; bctype=4)
 
     dr = lar_a / (ma + 1)
     r = 0.0
@@ -162,28 +164,28 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
     sq_fs = zeros(ma + 1, 3)
     r_nodes = zeros(ma + 1)
 
-    for ia in 1:(ma + 1)
+    for ia in 1:(ma+1)
         r += dr
         r_nodes[ia] = r
-        f, f1 = Spl.spline_eval(spl, r,1)
-        ψ     = f[3]
-        Bphi  = f[2]
-        pval  = f[6]
-        qval  = f[8]
-        dψdr  = f1[3]
-        r2    = -(f[4] * r / f[8]) / dψdr
-        sq_xs[ia]    = ψ / psio
+        f, f1 = Spl.spline_eval(spl, r, 1)
+        ψ = f[3]
+        Bphi = f[2]
+        pval = f[6]
+        qval = f[8]
+        dψdr = f1[3]
+        r2 = -(f[4] * r / f[8]) / dψdr
+        sq_xs[ia] = ψ / psio
         sq_fs[ia, 1] = lar_r0 * Bphi
         sq_fs[ia, 2] = pval
         sq_fs[ia, 3] = qval
     end
 
-    sq_in = Spl.CubicSpline(sq_xs, sq_fs, bctype=4)
+    sq_in = Spl.CubicSpline(sq_xs, sq_fs; bctype=4)
 
-    rzphi_y_nodes = range(0.0, 2π, length=mtau + 1)
+    rzphi_y_nodes = range(0.0, 2π; length=mtau + 1)
     rzphi_fs_nodes = zeros(ma + 1, mtau + 1, 2)
 
-    for ia in 1:(ma + 1)
+    for ia in 1:(ma+1)
         r = r_nodes[ia]
         f, f1 = Spl.spline_eval(spl, r, 1)
         y4 = f[4]
@@ -194,7 +196,7 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
             r2 = 0.0
         end
 
-        for itau in 1:(mtau + 1)
+        for itau in 1:(mtau+1)
             θ = 2π * (itau - 1) / mtau
             cosθ, sinθ = cos(θ), sin(θ)
             rfac = r + r2 * cosθ
@@ -203,7 +205,7 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
         end
     end
 
-    rz_in = Spl.BicubicSpline(r_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes, bctypex=4, bctypey=2)
+    rz_in = Spl.BicubicSpline(r_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes; bctypex=4, bctypey=2)
 
     return InverseRunInput(equil_input, sq_in, rz_in, lar_r0, 0.0, psio)
 
@@ -214,24 +216,26 @@ end
 This is a Julia version of the Fortran code in sol.f, implementing Soloviev's analytical equilibrium.
 
 ## Arguments:
-- `mr`: Number of radial grid zones
-- `mz`: Number of axial grid zones
-- `ma`: Number of flux grid zones
-- `e`: Elongation
-- `a`: Minor radius
-- `r0`: Major radius
-- `q0`: Safety factor at the o-point
-- `p0fac`: Scales on axis pressure (s*P. beta changes. Phi,q constant)
-- `b0fac`: Scales on toroidal field (s*Phi,s*f,s^2*P. bt changes. Shape,beta constant)
-- `f0fac`: Scales on toroidal field (s*f. bt,q changes. Phi,p,bp constant)
+
+  - `mr`: Number of radial grid zones
+  - `mz`: Number of axial grid zones
+  - `ma`: Number of flux grid zones
+  - `e`: Elongation
+  - `a`: Minor radius
+  - `r0`: Major radius
+  - `q0`: Safety factor at the o-point
+  - `p0fac`: Scales on axis pressure (s*P. beta changes. Phi,q constant)
+  - `b0fac`: Scales on toroidal field (s*Phi,s*f,s^2*P. bt changes. Shape,beta constant)
+  - `f0fac`: Scales on toroidal field (s*f. bt,q changes. Phi,p,bp constant)
 
 ## Returns:
-- `plasma_eq`: PlasmaEquilibrium object
+
+  - `plasma_eq`: PlasmaEquilibrium object
 """
 function sol_run(
-                 equil_inputs::EquilibriumConfig,
-                 sol_inputs::SolevevConfig
-                )
+    equil_inputs::EquilibriumConfig,
+    sol_inputs::SolevevConfig
+)
 
     mr = sol_inputs.mr
     mz = sol_inputs.mz
@@ -242,7 +246,7 @@ function sol_run(
     q0 = sol_inputs.q0
     p0fac = sol_inputs.p0fac
     b0fac = sol_inputs.b0fac
-    f0fac =  sol_inputs.f0fac
+    f0fac = sol_inputs.f0fac
 
     # Validate inputs
     if p0fac < 1.0
@@ -251,8 +255,8 @@ function sol_run(
     end
 
     # Grid setup
-    r = range(0.0, stop=a, length=mr)
-    z = range(-a*e, stop=a*e, length=mz)
+    r = range(0.0; stop=a, length=mr)
+    z = range(-a * e; stop=a * e, length=mz)
     rg = [ri for ri in r, _ in z]
     zg = [zi for _ in r, zi in z]
 
@@ -295,17 +299,17 @@ function sol_run(
     # compute 2D data
     #-----------------------------------------------------------------------
     for ir in 1:(mr)
-        r[ir] = rmin + (ir-1) * (rmax - rmin) / mr
+        r[ir] = rmin + (ir - 1) * (rmax - rmin) / mr
     end
 
     for iz in 1:(mz)
-        z[iz] = zmin + (iz-1) * (zmax - zmin) / mz
+        z[iz] = zmin + (iz - 1) * (zmax - zmin) / mz
     end
 
     for iz in 1:(mz)
         for ir in 1:(mr)
-        #    rg[ir, iz] = r[ir]
-        #    zg[ir, iz] = z[iz]
+            #    rg[ir, iz] = r[ir]
+            #    zg[ir, iz] = z[iz]
             psifs[ir, iz, 1] = psio - psifac * (efac * (r[ir] * z[iz])^2 + (r[ir]^2 - r0^2)^2 / 4)
         end
     end
