@@ -2,7 +2,7 @@ module DCON
 
 # All imports and includes for the DCON module
 using LinearAlgebra
-using LinearAlgebra.LAPACK #required for banded matrix operations
+using LinearAlgebra.LAPACK
 using TOML
 using FFTW
 using OrdinaryDiffEq

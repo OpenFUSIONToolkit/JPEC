@@ -203,5 +203,5 @@ function Main(path::String)
     close_files(outp)
     println("----------------------------------")
     println("Run time: $end_time seconds")
-    return println("Normal termination.")
+    println("Normal termination.")
 end

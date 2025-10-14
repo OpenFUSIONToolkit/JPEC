@@ -66,7 +66,6 @@ function init_files(out::DconOutput, path::String)
             end
         end
     end
-    return out
 end
 
 """
@@ -114,7 +113,7 @@ function close_files(out::DconOutput)
     for (key, handle) in out.handles
         close(handle)
     end
-    return empty!(out.handles)
+    empty!(out.handles)
 end
 
 """

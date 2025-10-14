@@ -6,6 +6,7 @@ Fourier-spline representation. This is the Julia equivalent of the `fspline_type
 named `metric` in the Fortran `fourfit_make_metric` subroutine.
 
 ### Fields
+
   - `mpsi::Int`: Number of radial grid points minus one.
   - `mtheta::Int`: Number of poloidal grid points minus one.
   - `xs::Vector{Float64}`: Radial coordinates (normalized poloidal flux `ψ_norm`).
@@ -30,24 +31,28 @@ MetricData(mpsi::Int, mtheta::Int) = MetricData(; mpsi, mtheta)
 
 Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equilibrium.
 The metric coefficients stored in `metric.fs` include:
-     1. g^ψψ · J
-     2. g^θθ · J
-     3. g^ζζ · J
-     4. g^θζ · J
-     5. g^ζψ · J
-     6. g^ψθ · J
-     7. J (Jacobian)
-     8. ∂J/∂ψ
+
+ 1. g^ψψ · J
+ 2. g^θθ · J
+ 3. g^ζζ · J
+ 4. g^θζ · J
+ 5. g^ζψ · J
+ 6. g^ψθ · J
+ 7. J (Jacobian)
+ 8. ∂J/∂ψ
 
 ### Arguments
+
   - `mband::Int`: Number of Fourier modes to retain in the metric representation.
   - `fft_flag::Bool`: If `true`, enables use of Fourier fitting for storing metric coefficients.
 
 ### Returns
+
   - `metric::MetricData`:
     A structure containing the metric coefficients, coordinate grids, and Jacobians for the specified equilibrium.
 
 ### TODOs
+
 Add kinetic metric tensor components for kin_flag = true
 Remove mband if we decide to fully deprecate banded matrices
 """
@@ -141,7 +146,7 @@ end
 """
     make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal) -> FourFitVars
 
-Constructs main DCON matrices for a given toroidal mode number and returns 
+Constructs main DCON matrices for a given toroidal mode number and returns
 them as a new `FourFitVars` object. See the appendix of the 2016 Glasser
 DCON paper for details on the matrix definitions. Performs the same function
 as `fourfit_make_matrix` in the Fortran code, except F, G, and K are now
@@ -152,13 +157,16 @@ the Fortran, we also do not use OffsetArrays (indexed from -mband:mband),
 but instead use standard Julia arrays and map the zero index to the middle.
 
 ### Arguments
+
   - `metric::MetricData`:
     Metric coefficients on the (ψ, θ) grid, including Fourier representations of g^ij and J.
 
 ### Returns
+
   - `ffit::FourFitVars`: A struct holding cubic spline fits of the assembled matrices
 
 ### TODOs
+
 Add kinetic metric tensor components for kin_flag = true
 Remove mband if we decide to fully deprecate banded matrices
 Decide error throwing if factorization fails

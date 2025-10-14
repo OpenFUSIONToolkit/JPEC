@@ -87,10 +87,12 @@ including making a clear end condition to the while loop and implementing the un
 and output logic within a callback in the integration.
 
 ### TODOs
+
 Support for `res_flag` and `kin_flag`
 restype functionality if we decide to do this
 
 ### Returns
+
 An OdeState struct containing the final state of the ODE solver after integration is complete.
 """
 function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
@@ -172,6 +174,7 @@ Initialize the OdeState struct for the case of sing_start = 0 (axis initializati
 determining `psifac`, `psimax`, `ising`, `m1`, `singfac`, and initializing `u`.
 
 ### TODOs
+
 Support for `kin_flag`
 Remove while true logic
 """
@@ -304,7 +307,7 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
             odet.m1 = round(Int, ctrl.nn * intr.qlim, RoundFromZero) + sign(ctrl.nn * equil.sq.fs1[end, 4])
         end
     end
-    return odet.singfac = abs(odet.m1 - ctrl.nn * equil.sq.fs[1, 4]) # Fortran: q=sq%fs(0,4)
+    odet.singfac = abs(odet.m1 - ctrl.nn * equil.sq.fs[1, 4]) # Fortran: q=sq%fs(0,4)
 end
 
 # TODO: NOT IMPLEMENTED YET! (low priority, just make sure sing_start = 0 in dcon.toml)
@@ -383,6 +386,7 @@ and updates relevant state variables and updates `odet` for continued integratio
 location and parameters of the next singular surface and writes outputs as desired.
 
 ### TODOs
+
 Remove while true logic
 """
 function ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
@@ -457,7 +461,7 @@ function ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.
     odet.psi_prev = odet.psifac
 
     # Write next header before continuing integration
-    return write_output(outp, :crit_out, "    psifac      dpsi        q       singfac     eval1")
+    write_output(outp, :crit_out, "    psifac      dpsi        q       singfac     eval1")
 end
 
 # Example stub for kinetic crossing
@@ -481,12 +485,13 @@ a callback function to handle tolerances, normalization, output, and storage at 
 step of the integration. In Fortran, this was performed by running LSODE in one-step
 mode (so ode_step was called hundreds of times) and calling the relevant functions in
 a DO loop. Here, we use the DifferentialEquations.jl interface to achieve the same
-functionality in a more Julian way. In addition to the callback logic, this function 
+functionality in a more Julian way. In addition to the callback logic, this function
 computes and sets the next integration endpoint, and advances the solution using
 an adaptive ODE solver. The state in `odet` is then updated in-place with
 the solution at the new point.
 
 ### TODOs
+
 Check if additional output is needed at the start and end of integration
 Check sensitivity of results to tolerances, currently using same logic as Fortran
 Check absolute tolerances, currently only relative tolerances are updated
@@ -528,7 +533,7 @@ function ode_step!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaE
     # TODO: same as above, this might not be needed
     ode_output_step(ctrl, equil, intr, odet, outp) # always output final condition
 
-    return println("   ψ = $(odet.psifac), max u = $(maximum(abs, odet.u)), steps = $(odet.step-1)")
+    println("   ψ = $(odet.psifac), max u = $(maximum(abs, odet.u)), steps = $(odet.step-1)")
 end
 
 """
@@ -539,6 +544,7 @@ This handles the logic that was previously in a DO loop within ode_run and calle
 by running LSODE in one step mode in the Fortran code.
 
 ### TODOs
+
 Check if additional output is needed at the start and end of integration
 Check if ode_test is actually needed for res_flag = true case
 """
@@ -573,7 +579,7 @@ function integrator_callback!(integrator)
     odet.u_store[:, :, :, odet.step] = odet.u
     odet.ud_store[:, :, :, odet.step] = odet.ud
     # Advance stepper (just like in Fortran, a "step" starts with integration, does callback functions, then stores)
-    return odet.step += 1
+    odet.step += 1
 end
 
 """
@@ -586,12 +592,14 @@ one-step mode. Here, we call it within the integrator callback to achieve the sa
 functionality.
 
 ### TODOs
+
 Support for `kin_flag`
 Check sensitivity of results to tolerances, currently using same logic as Fortran
 
 ### Returns
-- rtol: Relative tolerance
-- atol: Absolute tolerance array matching the shape of `odet.u`
+
+  - rtol: Relative tolerance
+  - atol: Absolute tolerance array matching the shape of `odet.u`
 """
 function compute_tols(ctrl, intr, odet)
     singfac_local = Inf
@@ -645,7 +653,7 @@ function resize_storage!(odet::OdeState)
     # Replace old arrays
     odet.u_store = u_new
     odet.ud_store = ud_new
-    return odet.psi_store = psi_new
+    odet.psi_store = psi_new
 end
 
 """
@@ -658,7 +666,7 @@ removing any unused allocated space.
 function trim_storage!(odet::OdeState)
     resize!(odet.psi_store, odet.step)
     odet.u_store = odet.u_store[:, :, :, 1:odet.step]
-    return odet.ud_store = odet.ud_store[:, :, :, 1:odet.step]
+    odet.ud_store = odet.ud_store[:, :, :, 1:odet.step]
 end
 
 """
@@ -671,9 +679,11 @@ Throws an error if any vector norm is zero. Performs the same function as `ode_u
 in the Fortran code, with minor differences in indexing and array handling.
 
 ### Arguments
-- sing_flag: Indicates if normalization is occuring at a singular surface or not
+
+  - sing_flag: Indicates if normalization is occuring at a singular surface or not
 
 ### TODOs
+
 Add resizing logic for unorm arrays when ifix exceeds allocated size
 """
 function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp::DconOutput, sing_flag::Bool)
@@ -711,10 +721,11 @@ end
 
 Applies Gaussian reduction to orthogonalize solution vectors in `odet.u`. Performs
 the same function as `ode_fixup` in the Fortran code, except now `fixfac` and other
-relevant data are stored in memory instead of dumped to `euler.bin`. Used when 
+relevant data are stored in memory instead of dumped to `euler.bin`. Used when
 the spread in norms exceeds a threshold or when a rational surface is reached.
 
 ### TODOs
+
 Check if `secondary` logic is needed, currently always false
 Check if `test` logic is needed, currently always false (I don't think it ever is)
 Check if `flag_count` is used anywhere, currently always set to 0
@@ -810,6 +821,7 @@ The Fortran version of this function had more logic for stopping the integration
 which we do not include due to the callback structure of the Julia implementation.
 
 ### TODOs
+
 Implement res_flag = true logic
 Determine if this function is ever needed (definitely not for res_flag = false case)
 """
@@ -867,6 +879,7 @@ stores relevant values in `intr`. Currently, vacuum calculations are
 not implemented; this function raises an error if invoked in a vacuum region.
 
 ### TODOs
+
 Integrate vacuum code for edge calculations
 Check if this function is working properly, currently unsure of its behavior
 Check meaning of psiedge vs psi_edge in Fortran code

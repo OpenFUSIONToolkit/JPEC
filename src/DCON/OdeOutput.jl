@@ -6,6 +6,7 @@ Performs similar output writing as the Fortran `ode_output_open`,
 except we no longer need to open binary files.
 
 ### TODOs
+
 Remove deprecated outputs
 Combine spline unpacking if possible, too many extra lines
 Replace `println` statements with logging to appropriate output files
@@ -108,7 +109,7 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
         write_output(outp, :crit_out, @sprintf("   ising   psi         q          di      re alpha   im alpha\n"))
         write_output(outp, :crit_out, @sprintf("%6d%11.3e%11.3e%11.3e%11.3e%11.3e\n", odet.ising, singp.psifac, singp.q, singp.di, real(singp.alpha), imag(singp.alpha)))
     end
-    return write_output(outp, :crit_out, "    psifac      dpsi        q       singfac     eval1\n")
+    write_output(outp, :crit_out, "    psifac      dpsi        q       singfac     eval1\n")
 end
 
 """
@@ -120,6 +121,7 @@ we don't implement any output file dumping here, as Julia's in-memory storage
 structure handles this differently.
 
 ### TODOs
+
 Depending on output needs, may need to implement `ode_output_get_evals` and `ode_output_sol`
 Determine if this function is even necessary of if we should just call `ode_output_monitor` directly
 """
@@ -128,7 +130,7 @@ Determine if this function is even necessary of if we should just call `ode_outp
 function ode_output_step(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
     # Compute and print critical data for each time step
-    return ode_output_monitor(ctrl, equil, intr, odet, outp)
+    ode_output_monitor(ctrl, equil, intr, odet, outp)
     # if dout.out_evals || dout.bin_evals
     #     ode_output_get_evals(intr, ctrl, dout, fNames, equil, odet) # this is just outputs
     # end
@@ -156,6 +158,7 @@ If the crossing satisfies sharpness and consistency conditions, it's logged and
 Fortran code, with small differences in output handling.
 
 ### TODO
+
 Restore or redirect output to appropriate logging units.
 Replace `error(...)` with graceful shutdown if zero crossing is an intended exit condition.
 All the _prev variables can probably be removed and the logic can be simplified to just take the odet.step - 1 values when needed
@@ -195,7 +198,7 @@ function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibr
     # Update saved values
     odet.psi_prev = odet.psifac
     odet.crit_prev = crit
-    return odet.u_prev .= odet.u
+    odet.u_prev .= odet.u
 end
 
 """
@@ -206,17 +209,20 @@ inverse eigenvalue in combination with the equilibrium profiles to form `crit`.
 Performs the same function as `ode_output_get_crit` in the Fortran code.
 
 ### Arguments
-- `psi::Float64`: The flux surface at which to evaluate.
-- `u::Array{ComplexF64, 3}`: Solution matrix at `psi`.
-- `mpert::Int`: Number of poloidal modes considered.
-- `m1::Int`: Poloidal mode number of the perturbation.
-- `nn::Int`: Toroidal mode number of the perturbation.
-- `sq::Spl.CubicSpline`: Spline object containing equilibrium profiles.
+
+  - `psi::Float64`: The flux surface at which to evaluate.
+  - `u::Array{ComplexF64, 3}`: Solution matrix at `psi`.
+  - `mpert::Int`: Number of poloidal modes considered.
+  - `m1::Int`: Poloidal mode number of the perturbation.
+  - `nn::Int`: Toroidal mode number of the perturbation.
+  - `sq::Spl.CubicSpline`: Spline object containing equilibrium profiles.
 
 ### Returns
+
 A tuple `(q, singfac, logpsi1, logpsi2, crit)` of critical data for the time step.
 
 ### TODOs
+
 Add dVdpsi multiplication back once equilibrium bug is fixed
 Decide if we want to just pass in the relevant quantities instead of structs for functions like this
 """

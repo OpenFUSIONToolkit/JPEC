@@ -2,7 +2,7 @@
     sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput)
 
 Scan all singular surfaces and calculate asymptotic vmat and mmat matrices
-and Mericer criterion. Performs the same function as `sing_scan` in the Fortran code.   
+and Mericer criterion. Performs the same function as `sing_scan` in the Fortran code.
 """
 function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput)
     write_output(outp, :dcon_out, "\n Singular Surfaces:")
@@ -10,17 +10,18 @@ function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     for ising in 1:intr.msing
         sing_vmat!(intr, ctrl, equil, ffit, outp, ising)
     end
-    return write_output(outp, :dcon_out, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
+    write_output(outp, :dcon_out, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
 end
 
 """
     sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=200)
 
-Locate singular rational q-surfaces (q = m/nn) using a bisection method 
+Locate singular rational q-surfaces (q = m/nn) using a bisection method
 between extrema of the q-profile, and store their properties in `intr.sing`.
 Performs the same function as `sing_find` in the Fortran code.
 
 # Arguments
+
   - 'itmax::Int`: Maximum number of iterations for the bisection method (default: 200)
 """
 function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=200)
@@ -79,11 +80,12 @@ end
     sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=50)
 
 Compute and set limiter values - handles cases where user truncates
-before the last singular surface. Performs the same function as `sing_lim` 
+before the last singular surface. Performs the same function as `sing_lim`
 in the Fortran code.
 
 # Arguments
-- `itmax::Int`: The maximum number of iterations allowed for the psilim search (default: 50)
+
+  - `itmax::Int`: The maximum number of iterations allowed for the psilim search (default: 50)
 """
 function sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=50)
 
@@ -168,9 +170,11 @@ Main differences are 1-indexing for the expansion orders. See equations 41-48 in
 the 2016 Glasser DCON paper for the mathematical details.
 
 ### Arguments
-- `ising::Int`: Index of the singular surface to process (1 to `intr.msing`)
+
+  - `ising::Int`: Index of the singular surface to process (1 to `intr.msing`)
 
 ### TODOs
+
 Check logic on typing of di
 """
 function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput, ising::Int)
@@ -245,19 +249,20 @@ end
 """
     sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
 
-Calculate asymptotic mmat matrix for singular surface `ising`. 
+Calculate asymptotic mmat matrix for singular surface `ising`.
 Performs the same function as `sing_mmat` in the Fortran code.
-Main differences are 1-indexing for the expansion orders and 
+Main differences are 1-indexing for the expansion orders and
 using dense matrices instead of banded.
 
 ### Arguments
-- `ising::Int`: Index of the singular surface to process (1 to `intr.msing`)
+
+  - `ising::Int`: Index of the singular surface to process (1 to `intr.msing`)
 
 ### TODOs
+
 Figure out if there's a direct way of doing the banded->dense matrix conversion to Julia (very messy right now)
 Check third derivative accuracy in cubic splines or determine if it matters
 Better way to unpack the cubic splines
-
 """
 function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
 
@@ -490,7 +495,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Shearing terms
     singp.mmat[r1, r2[1], 1, 1] .+= 0.5
-    return singp.mmat[r1, r2[2], 2, 1] .-= 0.5
+    singp.mmat[r1, r2[2], 2, 1] .-= 0.5
 end
 
 """
@@ -501,6 +506,7 @@ See equation 47 in the Glass 2016 DCON paper. Identical to the Fortran
 `sing_solve` subroutine.
 
 ## Arguments
+
   - `singp::SingType`: The singularity data structure containing all relevant matrices and parameters.
   - `k::Int`: The current order in the power series expansion.
 """
@@ -527,10 +533,12 @@ Matrix multiplication specific to singular matrices.
 Identical to the Fortran `sing_matmul` subroutine.
 
 ## Arguments
+
   - `a::Array{ComplexF64,3}`: shape (mpert, 2 * mpert, 2)
   - `b::Array{ComplexF64,3}`: shape (mmpert, 2 * mpert, 2)
 
 ## Returns
+
   - `c::Array{ComplexF64,3}`: shape (mpert, 2 * mpert, 2)
 """
 function sing_matmul(a::Array{ComplexF64,3}, b::Array{ComplexF64,3})
@@ -559,7 +567,7 @@ end
     sing_get_ua(ctrl::DconControl, intr::DconInternal, odet::OdeState)
 
 Compute the asymptotic series solution for a given singularity.
-Fills and returns `ua` with the asymptotic solution vmat 
+Fills and returns `ua` with the asymptotic solution vmat
 for the specified singular surface and psi value. Performs
 the same function as `sing_get_ua` in the Fortran code.
 """
@@ -575,7 +583,7 @@ function sing_get_ua(ctrl::DconControl, intr::DconInternal, odet::OdeState)
     pfac = abs(dpsi)^singp.alpha
 
     # Compute power series via Horner's method
-    ua = copy(singp.vmat[:, :, :, 2*ctrl.sing_order+1])    
+    ua = copy(singp.vmat[:, :, :, 2*ctrl.sing_order+1])
     for iorder in (2*ctrl.sing_order-1):-1:0
         ua .= ua .* sqrtfac .+ singp.vmat[:, :, :, iorder+1]
     end
@@ -619,11 +627,11 @@ function sing_get_ca(ctrl::DconControl, intr::DconInternal, odet::OdeState)
     # LU factorization and solve
     temp2 .= lu(temp1) \ temp2
 
-    # Build and return ca
+    # Build ca
     ca = zeros(ComplexF64, intr.mpert, 2 * intr.mpert, 2)
     ca[:, 1:odet.msol, 1] .= temp2[1:intr.mpert, :]
     ca[:, 1:odet.msol, 2] .= temp2[intr.mpert+1:2*intr.mpert, :]
-    
+
     return ca
 end
 
@@ -655,12 +663,14 @@ All LAPACK operations are handled under the hood by Julia's LinearAlgebra packag
 more simplistic code with similar performance.
 
 ### Arguments
-- `du::Array{ComplexF64,3}`: Pre-allocated array to hold the derivative result, shape (mpert, msol, 2), updated in-place
-- `u::Array{ComplexF64,3}`: Current state array, shape (mpert, msol, 2)
-- `params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, FourFitVars, DconInternal, OdeState, DconOutput}`: Tuple of relevant structs
-- `psieval::Float64`: Current psi value at which to evaluate the derivative
+
+  - `du::Array{ComplexF64,3}`: Pre-allocated array to hold the derivative result, shape (mpert, msol, 2), updated in-place
+  - `u::Array{ComplexF64,3}`: Current state array, shape (mpert, msol, 2)
+  - `params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, FourFitVars, DconInternal, OdeState, DconOutput}`: Tuple of relevant structs
+  - `psieval::Float64`: Current psi value at which to evaluate the derivative
 
 ### TODOs
+
 Implement kin_flag functionality
 Banded matrix calculations or removing mention of their existence
 """
@@ -668,7 +678,7 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
     params::Tuple{DconControl,Equilibrium.PlasmaEquilibrium,
         FourFitVars,DconInternal,OdeState,DconOutput},
     psieval::Float64)
-    
+
     # Unpack structs
     ctrl, equil, ffit, intr, odet, _ = params
 
@@ -725,5 +735,5 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
 
     # u-derivative used in GPEC
     odet.ud[:, :, 1] .= du[:, :, 1]
-    return odet.ud[:, :, 2] .= -bmat * du[:, :, 1] - cmat * u[:, :, 1]
+    odet.ud[:, :, 2] .= -bmat * du[:, :, 1] - cmat * u[:, :, 1]
 end
