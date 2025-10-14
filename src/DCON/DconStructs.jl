@@ -100,8 +100,6 @@ end
     res_flag::Bool = false
     fft_flag::Bool = false
     node_flag::Bool = false
-    # saves_per_region::Int = 2 # number of u to save per interrational region, must be >> 0 to run GPEC
-    # save_spacing::String = "Chebyshev" # method for determining spacing of saved u points
     mthvac::Int = 480
     sing_start::Int = 0
     nn::Int = 0
@@ -224,23 +222,7 @@ end
     fmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     kmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     gmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
-    # kaats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # gaats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # f0mats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # pmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # paats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # kkmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # kkaats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # r1mats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # r2mats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # r3mats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # akmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # bkmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
-    # ckmats::Union{Nothing,Spl.CubicSpline{ComplexF64}} = nothing
 
-    # k0s::JPEC.Spl.SplineType
-
-    # ipiva::Union{Nothing,Vector{Int}} = nothing
     # TODO: these might be deprecated? They're used with a ahb_flag in free
     asmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     bsmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
@@ -249,10 +231,6 @@ end
 
     parallel_threads::Int = 0
     dcon_kin_threads::Int = 0
-
-    # kinetic ABCDEH mats for sing_mod
-    # kwmats::Vector{JPEC.Spl.CubicSpline{ComplexF64}} = [JPEC.Spl.CubicSpline{ComplexF64}() for _ in 1:6]
-    # ktmats::Vector{JPEC.Spl.CubicSpline{ComplexF64}} = [JPEC.Spl.CubicSpline{ComplexF64}() for _ in 1:6]
 end
 
 FourFitVars(mpert::Int) = FourFitVars(; mpert)

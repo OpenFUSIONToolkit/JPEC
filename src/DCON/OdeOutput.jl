@@ -3,10 +3,10 @@
 
     Write header info to output files at the start of the integration.
 """
-function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, outp::DconOutput, intr::DconInternal, odet::OdeState)
+function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
     # TODO: mess with this to condense the number of write_output calls? Maybe allow it to pass in dicts
-    # Write euler.bin header info
+    # Write euler.h5 header info
     if outp.write_euler_h5
         # Write dcon run parameters
         write_output(outp, :euler_h5, intr.mpert; dsetname="info/mpert")
@@ -103,7 +103,7 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
 end
 
 """
-    ode_output_step(odet, intr, ctrl, equil; force=false)
+    ode_output_step(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
 Performs output and monitoring tasks at each integration step.
 
@@ -113,10 +113,10 @@ Additional output (e.g., eigenvalue dumps, binary solution logging) may be added
 """
 #TODO: depending on how we restructure our outputs, this function might be uncessary
 # (i.e. if we don't need an ode_output_get_evals or ode_output_sol, can just replace calls with ode_output_monitor)
-function ode_output_step!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, outp::DconOutput)
+function ode_output_step(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
     # Compute and print critical data for each time step
-    return ode_output_monitor!(odet, intr, ctrl, equil, outp)
+    return ode_output_monitor(ctrl, equil, intr, odet, outp)
     # if dout.out_evals || dout.bin_evals
     #     ode_output_get_evals(intr, ctrl, dout, fNames, equil, odet) # this is just outputs
     # end
@@ -134,7 +134,7 @@ end
 # end
 
 """
-    ode_output_monitor!(odet, intr, ctrl, equil, outp)
+    ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
 Monitor the evolution of a critical eigenvalue (`crit`) during ODE integration and detect zero crossings, which indicate resonant or singular behavior.
 The function evaluates `crit` using `ode_output_get_crit`, and if a sign change is found, it estimates the crossing point via linear interpolation.
@@ -144,15 +144,15 @@ A termination flag (`termbycross_flag`) set within DconControl can be used to st
 ### Notes
 
   - Zero-crossing detection is based on changes in the sign of `crit`.
-  - `u_med` is constructed as a linear interpolation between current and saved `u`.
-  - This function updates psi_prev, crit_prev, u_prev, and nzero in the `odet` state.
+  - `u_med` is constructed as a linear interpolation between current and previous `u`.
 
 ### TODO
 
   - Restore or redirect output to appropriate logging units.
   - Replace `error(...)` with graceful shutdown if zero crossing is an intended exit condition.
+  - all the _prev variables can probably be removed and the logic can be simplified to just take the odet.step - 1 values when needed
 """
-function ode_output_monitor!(odet::OdeState, intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, outp::DconOutput)
+function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
     # Compute new crit
     dpsi = odet.psifac - odet.psi_prev

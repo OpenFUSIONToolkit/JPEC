@@ -17,7 +17,7 @@ function Main(path::String)
     ctrl.delta_mhigh *= 2 # for consistency with Fortran DCON TODO: why is this present in the Fortran?
 
     # Determine if qhigh is truncating before psihigh and reform equilibrium if needed
-    sing_lim!(intr, ctrl, equil)
+    sing_lim!(ctrl, equil, intr)
     if intr.psilim != equil.config.control.psihigh && ctrl.reform_eq_with_psilim
         @warn "psilim != psihigh not implemented yet, skipping reforming equilibrium splines"
         # JMH - Nik please put the logic we discussed here
@@ -79,7 +79,7 @@ function Main(path::String)
     end
 
     # Find all singular surfaces in the equilibrium
-    sing_find!(ctrl, equil, intr)
+    sing_find!(intr, ctrl, equil)
 
     # Determine poloidal mode numbers
     if ctrl.cyl_flag
@@ -149,7 +149,7 @@ function Main(path::String)
         if ctrl.verbose
             println("Integrating Euler-Lagrange equation")
         end
-        odet = ode_run(ctrl, equil, intr, ffit, outp)
+        odet = ode_run(ctrl, equil, ffit, intr, outp)
         if intr.size_edge > 0
             # TODO: this logic might be deprecated since we do a lot
             # of things in memory, but leaving for now. Should be updated
@@ -164,7 +164,7 @@ function Main(path::String)
             println("Re-Integrating to peak dW @ qlim = $(intr.qlim), psilim = $(intr.psilim)")
             # Full re-run because outputs were written to disk each step
             # making it hard to backtrack
-            odet = ode_run(ctrl, equil, intr, ffit, outp)
+            odet = ode_run(ctrl, equil, ffit, intr, outp)
         end
     end
 
@@ -176,7 +176,7 @@ function Main(path::String)
         if ctrl.verbose
             println("Computing free boundary energies")
         end
-        plasma1, vacuum1, total1 = free_run(odet, ctrl, intr, equil, ffit, outp; op_netcdf_out=false) # outp.netcdf_out)
+        plasma1, vacuum1, total1 = free_run(ctrl, equil, ffit, intr, odet, outp; op_netcdf_out=false) # outp.netcdf_out)
     end
 
     # Output results of fixed-boundary stability calculations

@@ -13,15 +13,14 @@ function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 end
 
 """
-    sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=300)
+    sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=200)
 
 Locate singular rational q-surfaces (q = m/nn) using a bisection method between extrema of the q-profile, and store their properties in `intr.sing`.
 
 # Arguments
-
   - 'itmax::Int`: Maximum number of iterations for the bisection method (default: 200)
 """
-function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=200)
+function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=200)
 
     # Shorthand to evaluate q inside bisection search
     qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
@@ -74,30 +73,25 @@ function sing_find!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, int
 end
 
 """
-    sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, eqCtrl::Equilibrium.EquilibriumControl, eqPrm::Equilibrium.EquilibriumParameters)
+    sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
 Compute and set limiter values for the DCON analysis - handles cases where user
 truncates before the last singular surface.
 
 # Arguments
 - `itmax::Int`: The maximum number of iterations allowed for the psilim search (default: 50)
-- `eps::Float64`: The convergence tolerance for the psilim search (default: 1e-10)
 """
-# JMH - this has been checked against the DIID_Ideal example (with psiedge = 0.95 to enter the last if statement).
-# There are some discrepancies at the 4-5th digit between the two, not sure if this is numerical noise,
-# an issue in the spline evals, or a bug here. However, the differences in the main internal parameters are small
-# so ignoring for now, can address in a unit test later.
-function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=50, eps=1e-10)
+function sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=50)
 
     # Shorthand to evaluate q/q1 inside newton iteration
     qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
     q1val = psi -> Spl.spline_eval(equil.sq, psi, 1)[2][4]
 
-    #compute and modify the DconInternal struct
+    # Compute and modify the DconInternal struct
     intr.qlim = min(equil.params.qmax, ctrl.qhigh)
     intr.q1lim = equil.sq.fs1[equil.config.control.mpsi+1, 4]
     intr.psilim = equil.config.control.psihigh
-    #normalize dmlim to interval [0,1)
+    # Normalize dmlim to interval [0,1)
     if ctrl.sas_flag
         while ctrl.dmlim > 1.0
             ctrl.dmlim -= 1.0
@@ -112,7 +106,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
         end
     end
 
-    #use newton iteration to find psilim
+    # Use newton iteration to find psilim
     if intr.qlim < equil.params.qmax
         # Find index jpsi that minimizes |equil.sq.fs[:,4] - qlim| and ensure within mpsi limits
         _, jpsi = findmin(abs.(equil.sq.fs[:, 4] .- intr.qlim))
@@ -142,7 +136,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
         intr.psilim = equil.config.control.psihigh
     end
 
-    #set up record for determining the peak in dW near the boundary.
+    # Set up record for determining the peak in dW near the boundary.
     if ctrl.psiedge < intr.psilim
         qedgestart = trunc(Int, Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
         intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * ctrl.nn * ctrl.nperq_edge)
@@ -528,17 +522,13 @@ function sing_matmul(a::Array{ComplexF64,3}, b::Array{ComplexF64,3})
 end
 
 """
-    sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
+    sing_get_ua(ctrl::DconControl, intr::DconInternal, odet::OdeState)
 
 Compute the asymptotic series solution for a given singularity.
 
-  - `odet`: Current ODE state (contains psifac, ua, ising, etc.)
-  - `intr`: DCON internal state (contains singularity data, mpert, etc.)
-  - `ctrl`: DCON control parameters (contains sing_order, etc.)
-
-Fills `ua` with the asymptotic solution vmat for the specified singular surface and psi value.
+Fills and returns `ua` with the asymptotic solution vmat for the specified singular surface and psi value.
 """
-function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
+function sing_get_ua(ctrl::DconControl, intr::DconInternal, odet::OdeState)
 
     singp = intr.sing[odet.ising]
     r1 = singp.r1
@@ -550,37 +540,39 @@ function sing_get_ua!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
     pfac = abs(dpsi)^singp.alpha
 
     # Compute power series via Horner's method
-    odet.ua .= singp.vmat[:, :, :, 2*ctrl.sing_order+1]
+    ua = copy(singp.vmat[:, :, :, 2*ctrl.sing_order+1])    
     for iorder in (2*ctrl.sing_order-1):-1:0
-        odet.ua .= odet.ua .* sqrtfac .+ singp.vmat[:, :, :, iorder+1]
+        ua .= ua .* sqrtfac .+ singp.vmat[:, :, :, iorder+1]
     end
 
     # Restore powers
-    odet.ua[r1, :, 1] ./= sqrtfac
-    odet.ua[r1, :, 2] .*= sqrtfac
-    odet.ua[:, r2[1], :] ./= pfac
-    odet.ua[:, r2[2], :] .*= pfac
+    ua[r1, :, 1] ./= sqrtfac
+    ua[r1, :, 2] .*= sqrtfac
+    ua[:, r2[1], :] ./= pfac
+    ua[:, r2[2], :] .*= pfac
 
     # Renormalize
     if odet.psifac < singp.psifac
-        odet.ua[:, r2[1], :] .*= abs(odet.ua[r1[1], r2[1], 1]) / odet.ua[r1[1], r2[1], 1]
-        odet.ua[:, r2[2], :] .*= abs(odet.ua[r1[1], r2[2], 1]) / odet.ua[r1[1], r2[2], 1]
+        ua[:, r2[1], :] .*= abs(ua[r1[1], r2[1], 1]) / ua[r1[1], r2[1], 1]
+        ua[:, r2[2], :] .*= abs(ua[r1[1], r2[2], 1]) / ua[r1[1], r2[2], 1]
     end
+
+    return ua
 end
 
 """
-    sing_get_ca!(odet::OdeState, intr::DconInternal)
+    sing_get_ca(ctrl::DconControl, intr::DconInternal, odet::OdeState)
 
 Compute the asymptotic expansion coefficients according to equation 50 in Glasser 2016 DCON paper.
 """
-function sing_get_ca!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
+function sing_get_ca(ctrl::DconControl, intr::DconInternal, odet::OdeState)
 
-    sing_get_ua!(odet, intr, ctrl)
+    ua = sing_get_ua(ctrl, intr, odet)
 
     # Build temp1
     temp1 = zeros(ComplexF64, 2 * intr.mpert, 2 * intr.mpert)
-    temp1[1:intr.mpert, :] .= odet.ua[:, :, 1]
-    temp1[intr.mpert+1:2*intr.mpert, :] .= odet.ua[:, :, 2]
+    temp1[1:intr.mpert, :] .= ua[:, :, 1]
+    temp1[intr.mpert+1:2*intr.mpert, :] .= ua[:, :, 2]
 
     # Built temp2
     temp2 = zeros(ComplexF64, 2 * intr.mpert, odet.msol)
@@ -589,15 +581,20 @@ function sing_get_ca!(odet::OdeState, intr::DconInternal, ctrl::DconControl)
 
     # LU factorization and solve
     temp2 .= lu(temp1) \ temp2
-    odet.ca[:, 1:odet.msol, 1] .= temp2[1:intr.mpert, :]
-    return odet.ca[:, 1:odet.msol, 2] .= temp2[intr.mpert+1:2*intr.mpert, :]
+
+    # Build and return ca
+    ca = zeros(ComplexF64, intr.mpert, 2 * intr.mpert, 2)
+    ca[:, 1:odet.msol, 1] .= temp2[1:intr.mpert, :]
+    ca[:, 1:odet.msol, 2] .= temp2[intr.mpert+1:2*intr.mpert, :]
+    
+    return ca
 end
 
 """
     sing_der!(
         du::Array{ComplexF64,3},
         u::Array{ComplexF64,3},
-        params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, DconInternal, FourFitVars, DconOutput},
+        params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, FourFitVars, DconInternal, OdeState, DconOutput},
         psieval::Float64
     )
 
@@ -622,10 +619,11 @@ more simplistic code with similar performance.
 """
 function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
     params::Tuple{DconControl,Equilibrium.PlasmaEquilibrium,
-        DconInternal,OdeState,FourFitVars,DconOutput},
+        FourFitVars,DconInternal,OdeState,DconOutput},
     psieval::Float64)
+    
     # Unpack structs
-    ctrl, equil, intr, odet, ffit, _ = params
+    ctrl, equil, ffit, intr, odet, _ = params
 
     # Spline evaluation
     odet.q = Spl.spline_eval(equil.sq, psieval, 0)[4]

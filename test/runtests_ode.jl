@@ -95,7 +95,7 @@ end
         odet.u[:, 1, 1] .= [3, 4]          # norm = 5
         odet.u[:, 2, 1] .= [0, 2]          # norm = 2
 
-        JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, false)
+        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
         # After the first run with new=True (default), unorm0 should be set to unorm
         # and new should be false
         @test odet.unorm[1:intr.mpert] ≈ [5, 2]
@@ -105,27 +105,27 @@ end
         # Case 2: Error on zero norm
         odet.u[:, 1, 1] .= 0
         odet.new = true
-        @test_throws ErrorException JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, false)
+        @test_throws ErrorException JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
 
         # Case 3: Normalization on second call
         odet.u[:, 1, 1] .= [3, 4]   # norm = 5
         odet.u[:, 2, 1] .= [0, 2]   # norm = 2
         odet.new = false
-        JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, false)
+        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
         @test odet.unorm[1:intr.mpert] ≈ [1, 1]
 
         # Case 4: Trigger fixup via ucrit
         odet.unorm0 = ones(2 * intr.mpert)
         odet.u[:, 1, 1] .= [1000, 0]   # large norm
         odet.u[:, 2, 1] .= [1, 0]      # small norm
-        JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, false)
+        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
         @test odet.new == true  # implies fixup ran
 
         # Case 5: Trigger fixup via sing_flag
         odet.new = false
         odet.u[:, 1, 1] .= [1, 0]
         odet.u[:, 2, 1] .= [1, 0]
-        JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, true)
+        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
         @test odet.new == true  # fixup triggered
     end
 end

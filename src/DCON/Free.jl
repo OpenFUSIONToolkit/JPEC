@@ -1,4 +1,4 @@
-function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput; op_netcdf_out::Bool=false)
+function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutput; op_netcdf_out::Bool=false)
 
     # TODO: it looks like vac_memory is always true - remove all ahg things and just assume true?
     vac_memory = true
@@ -41,7 +41,7 @@ function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::
     # Write file for mscvac
     # TODO: can likely remove last two arguments, ahgstr_op is deprecated
     # TODO: actually, can probably remove this function entirely and just call set_dcon_params directly
-    free_write_msc(intr.psilim, ctrl, intr, equil; inmemory_op=vac_memory, ahgstr_op=ahg_file)
+    free_write_msc(intr.psilim, ctrl, equil, intr; inmemory_op=vac_memory, ahgstr_op=ahg_file)
 
     # TODO: there is some ahb_flag logic here that has a comment "must be false if using GPEC"
     # I am assuming this means we don't have to implement any of it
@@ -245,7 +245,7 @@ function free_run(odet::OdeState, ctrl::DconControl, intr::DconInternal, equil::
     return plasma1, vacuum1, total1
 end
 
-function free_write_msc(psifac::Float64, ctrl::DconControl, intr::DconInternal, equil::Equilibrium.PlasmaEquilibrium; inmemory_op::Union{Bool,Nothing}=nothing,
+function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; inmemory_op::Union{Bool,Nothing}=nothing,
     ahgstr_op::Union{String,Nothing}=nothing)
 
     # Defaults for optional arguments
