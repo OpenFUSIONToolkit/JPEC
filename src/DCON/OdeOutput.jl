@@ -1,7 +1,16 @@
 """
     ode_output_init(ctrl, equil, outp, intr, odet)
 
-    Write header info to output files at the start of the integration.
+Write header info to output files at the start of the integration.
+Performs similar output writing as the Fortran `ode_output_open`,
+except we no longer need to open binary files.
+
+### TODOs
+Remove deprecated outputs
+Combine spline unpacking if possible, too many extra lines
+Replace `println` statements with logging to appropriate output files
+Remove `mthsurf0` if deprecated
+Place outputs in a Julia do loop for automatic file closing
 """
 function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
@@ -105,11 +114,14 @@ end
 """
     ode_output_step(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
-Performs output and monitoring tasks at each integration step.
+Performs output and monitoring tasks at each integration step by calling
+`ode_output_monitor`. to track critical eigenvalue behavior. Unlike Fortran,
+we don't implement any output file dumping here, as Julia's in-memory storage
+structure handles this differently.
 
-This function calls `ode_output_monitor` to track critical eigenvalue behavior
-and handle any diagnostics or logging associated with the current step.
-Additional output (e.g., eigenvalue dumps, binary solution logging) may be added later.
+### TODOs
+Depending on output needs, may need to implement `ode_output_get_evals` and `ode_output_sol`
+Determine if this function is even necessary of if we should just call `ode_output_monitor` directly
 """
 #TODO: depending on how we restructure our outputs, this function might be uncessary
 # (i.e. if we don't need an ode_output_get_evals or ode_output_sol, can just replace calls with ode_output_monitor)
@@ -136,21 +148,17 @@ end
 """
     ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
-Monitor the evolution of a critical eigenvalue (`crit`) during ODE integration and detect zero crossings, which indicate resonant or singular behavior.
-The function evaluates `crit` using `ode_output_get_crit`, and if a sign change is found, it estimates the crossing point via linear interpolation.
-If the crossing satisfies sharpness and consistency conditions, it's logged and `nzero` is incremented.
-A termination flag (`termbycross_flag`) set within DconControl can be used to stop integration upon detection.
-
-### Notes
-
-  - Zero-crossing detection is based on changes in the sign of `crit`.
-  - `u_med` is constructed as a linear interpolation between current and previous `u`.
+Monitor the evolution of a critical eigenvalue (`crit`) during integration
+using `ode_output_get_crit` and detect zero crossings, which indicate instability.
+If a sign change is found, it estimates the crossing point via linear interpolation.
+If the crossing satisfies sharpness and consistency conditions, it's logged and
+`nzero` is incremented. Performs the same function as `ode_output_monitor` in the
+Fortran code, with small differences in output handling.
 
 ### TODO
-
-  - Restore or redirect output to appropriate logging units.
-  - Replace `error(...)` with graceful shutdown if zero crossing is an intended exit condition.
-  - all the _prev variables can probably be removed and the logic can be simplified to just take the odet.step - 1 values when needed
+Restore or redirect output to appropriate logging units.
+Replace `error(...)` with graceful shutdown if zero crossing is an intended exit condition.
+All the _prev variables can probably be removed and the logic can be simplified to just take the odet.step - 1 values when needed
 """
 function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
@@ -193,24 +201,25 @@ end
 """
     ode_output_get_crit(psi, u, mpert, m1, nn, sq) -> (q, singfac, logpsi1, logpsi2, crit)
 
-Compute critical quantities at a given flux surface by constructing and inverting the plasma response matrix from the complex
-array `u`, symmetrizing it, computing its Hermitian eigenvalues, and using the smallest (in magnitude)
+Compute critical quantities at a given flux surface and using the smallest (in magnitude)
 inverse eigenvalue in combination with the equilibrium profiles to form `crit`.
+Performs the same function as `ode_output_get_crit` in the Fortran code.
 
-This uses Julia’s built-in linear algebra:
-`lu(temp) = zgetrf`, `temp_fact \\ wp = zgetrs`
-Under the hood, Julia calls optimized LAPACK routines via the LinearAlgebra standard library.
-
-### Main Arguments (others defined in main structs)
+### Arguments
 - `psi::Float64`: The flux surface at which to evaluate.
-- `u::Array{ComplexF64, 3}`: Complex response data array of shape `(mpert, mpert, 2)`.
+- `u::Array{ComplexF64, 3}`: Solution matrix at `psi`.
+- `mpert::Int`: Number of poloidal modes considered.
+- `m1::Int`: Poloidal mode number of the perturbation.
+- `nn::Int`: Toroidal mode number of the perturbation.
+- `sq::Spl.CubicSpline`: Spline object containing equilibrium profiles.
 
 ### Returns
 A tuple `(q, singfac, logpsi1, logpsi2, crit)` of critical data for the time step.
+
+### TODOs
+Add dVdpsi multiplication back once equilibrium bug is fixed
+Decide if we want to just pass in the relevant quantities instead of structs for functions like this
 """
-# TODO: on self-contained functions like this, it feels silly to pass in these large structs when we only need one variable
-# Should we just pass in the variables we need? This seems more readable to me personally
-#function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, intr::DconInternal, odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium) # (alternate version)
 function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m1::Int, nn::Int, sq::Spl.CubicSpline)
 
     # Compute inverse plasma response matrix

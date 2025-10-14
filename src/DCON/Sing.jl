@@ -1,7 +1,8 @@
 """
     sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput)
 
-Scan all singular surfaces and calculate asymptotic vmat and mmat matrices and Mericer criterion.
+Scan all singular surfaces and calculate asymptotic vmat and mmat matrices
+and Mericer criterion. Performs the same function as `sing_scan` in the Fortran code.   
 """
 function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput)
     write_output(outp, :dcon_out, "\n Singular Surfaces:")
@@ -15,7 +16,9 @@ end
 """
     sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=200)
 
-Locate singular rational q-surfaces (q = m/nn) using a bisection method between extrema of the q-profile, and store their properties in `intr.sing`.
+Locate singular rational q-surfaces (q = m/nn) using a bisection method 
+between extrema of the q-profile, and store their properties in `intr.sing`.
+Performs the same function as `sing_find` in the Fortran code.
 
 # Arguments
   - 'itmax::Int`: Maximum number of iterations for the bisection method (default: 200)
@@ -73,10 +76,11 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 end
 
 """
-    sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+    sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=50)
 
-Compute and set limiter values for the DCON analysis - handles cases where user
-truncates before the last singular surface.
+Compute and set limiter values - handles cases where user truncates
+before the last singular surface. Performs the same function as `sing_lim` 
+in the Fortran code.
 
 # Arguments
 - `itmax::Int`: The maximum number of iterations allowed for the psilim search (default: 50)
@@ -155,7 +159,20 @@ function sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr
     end
 end
 
-# Main differences: using 1 indexing, so zeroth order is the first index, whereas Fortran used 0 indexing for these arrays
+"""
+    sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput, ising::Int)
+
+Calculate asymptotic vmat and mmat matrices and Mercier criterion for
+singular surface `ising`. Performs the same function as `sing_vmat` in the Fortran code.
+Main differences are 1-indexing for the expansion orders. See equations 41-48 in
+the 2016 Glasser DCON paper for the mathematical details.
+
+### Arguments
+- `ising::Int`: Index of the singular surface to process (1 to `intr.msing`)
+
+### TODOs
+Check logic on typing of di
+"""
 function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput, ising::Int)
 
     # Allocations
@@ -225,6 +242,23 @@ end
 
 # Main differences: using 1 indexing, so zeroth order is the first index, whereas Fortran used 0 indexing for these arrays. Also adapted for
 # dense f/g/k arrays here, so a lot of the LAPACK operations go under the hood.
+"""
+    sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
+
+Calculate asymptotic mmat matrix for singular surface `ising`. 
+Performs the same function as `sing_mmat` in the Fortran code.
+Main differences are 1-indexing for the expansion orders and 
+using dense matrices instead of banded.
+
+### Arguments
+- `ising::Int`: Index of the singular surface to process (1 to `intr.msing`)
+
+### TODOs
+Figure out if there's a direct way of doing the banded->dense matrix conversion to Julia (very messy right now)
+Check third derivative accuracy in cubic splines or determine if it matters
+Better way to unpack the cubic splines
+
+"""
 function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
 
     # ongoing TODO: list here
@@ -462,10 +496,11 @@ end
 """
     sing_solve!(singp::SingType, k::Int)
 
-Solves iteratively for the next order in the power series `singp.vmat`. See equation 47 in the Glass 2016 DCON paper.
+Solves iteratively for the next order in the power series `singp.vmat`.
+See equation 47 in the Glass 2016 DCON paper. Identical to the Fortran
+`sing_solve` subroutine.
 
 ## Arguments
-
   - `singp::SingType`: The singularity data structure containing all relevant matrices and parameters.
   - `k::Int`: The current order in the power series expansion.
 """
@@ -489,14 +524,13 @@ end
     sing_matmul(a, b) -> c
 
 Matrix multiplication specific to singular matrices.
+Identical to the Fortran `sing_matmul` subroutine.
 
 ## Arguments
-
   - `a::Array{ComplexF64,3}`: shape (mpert, 2 * mpert, 2)
   - `b::Array{ComplexF64,3}`: shape (mmpert, 2 * mpert, 2)
 
 ## Returns
-
   - `c::Array{ComplexF64,3}`: shape (mpert, 2 * mpert, 2)
 """
 function sing_matmul(a::Array{ComplexF64,3}, b::Array{ComplexF64,3})
@@ -525,8 +559,9 @@ end
     sing_get_ua(ctrl::DconControl, intr::DconInternal, odet::OdeState)
 
 Compute the asymptotic series solution for a given singularity.
-
-Fills and returns `ua` with the asymptotic solution vmat for the specified singular surface and psi value.
+Fills and returns `ua` with the asymptotic solution vmat 
+for the specified singular surface and psi value. Performs
+the same function as `sing_get_ua` in the Fortran code.
 """
 function sing_get_ua(ctrl::DconControl, intr::DconInternal, odet::OdeState)
 
@@ -563,7 +598,9 @@ end
 """
     sing_get_ca(ctrl::DconControl, intr::DconInternal, odet::OdeState)
 
-Compute the asymptotic expansion coefficients according to equation 50 in Glasser 2016 DCON paper.
+Compute the asymptotic expansion coefficients according to equation
+50 in Glasser 2016 DCON paper. Performs the same function as
+`sing_get_ca` in the Fortran code.
 """
 function sing_get_ca(ctrl::DconControl, intr::DconInternal, odet::OdeState)
 
@@ -616,6 +653,16 @@ This follows the Julia DifferentialEquations package format for in place updatin
 Wherever possible, in-place operations on pre-allocated arrays are used to minimize memory allocations.
 All LAPACK operations are handled under the hood by Julia's LinearAlgebra package, so we can obtain a much
 more simplistic code with similar performance.
+
+### Arguments
+- `du::Array{ComplexF64,3}`: Pre-allocated array to hold the derivative result, shape (mpert, msol, 2), updated in-place
+- `u::Array{ComplexF64,3}`: Current state array, shape (mpert, msol, 2)
+- `params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, FourFitVars, DconInternal, OdeState, DconOutput}`: Tuple of relevant structs
+- `psieval::Float64`: Current psi value at which to evaluate the derivative
+
+### TODOs
+Implement kin_flag functionality
+Banded matrix calculations or removing mention of their existence
 """
 function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
     params::Tuple{DconControl,Equilibrium.PlasmaEquilibrium,

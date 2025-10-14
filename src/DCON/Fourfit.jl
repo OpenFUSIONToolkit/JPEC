@@ -5,8 +5,7 @@ A structure to hold the computed metric tensor components and their
 Fourier-spline representation. This is the Julia equivalent of the `fspline_type`
 named `metric` in the Fortran `fourfit_make_metric` subroutine.
 
-# Fields
-
+### Fields
   - `mpsi::Int`: Number of radial grid points minus one.
   - `mtheta::Int`: Number of poloidal grid points minus one.
   - `xs::Vector{Float64}`: Radial coordinates (normalized poloidal flux `ψ_norm`).
@@ -30,28 +29,7 @@ MetricData(mpsi::Int, mtheta::Int) = MetricData(; mpsi, mtheta)
     make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true) -> MetricData
 
 Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equilibrium.
-
-# Arguments
-
-  - `equil::Equilibrium.PlasmaEquilibrium`:
-    An equilibrium object containing spline data (`rzphi`) for flux coordinates and geometry.
-  - `mband::Int=10`:
-    Number of Fourier modes to retain in the metric representation.
-  - `fft_flag::Bool=true`:
-    If `true`, enables use of Fourier fitting for storing metric coefficients.
-    (Currently reserved for downstream processing.)
-
-# Returns
-
-  - `metric::MetricData`:
-    A structure containing the metric coefficients, coordinate grids, and Jacobians for the specified equilibrium.
-
-# Details
-
-  - Uses bicubic spline evaluation (`Spl.bicube_eval`) on the equilibrium geometry to compute
-    contravariant basis vectors ∇ψ, ∇θ, and ∇ζ at each grid point.
-  - The metric coefficients stored in `metric.fs` include:
-
+The metric coefficients stored in `metric.fs` include:
      1. g^ψψ · J
      2. g^θθ · J
      3. g^ζζ · J
@@ -60,9 +38,20 @@ Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equili
      6. g^ψθ · J
      7. J (Jacobian)
      8. ∂J/∂ψ
-  - The ψ grid is taken directly from `rzphi.xs`, and θ is scaled from `[0,1]` to `[0, 2π]`.
+
+### Arguments
+  - `mband::Int`: Number of Fourier modes to retain in the metric representation.
+  - `fft_flag::Bool`: If `true`, enables use of Fourier fitting for storing metric coefficients.
+
+### Returns
+  - `metric::MetricData`:
+    A structure containing the metric coefficients, coordinate grids, and Jacobians for the specified equilibrium.
+
+### TODOs
+Add kinetic metric tensor components for kin_flag = true
+Remove mband if we decide to fully deprecate banded matrices
 """
-function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true)
+function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int, fft_flag::Bool)
 
     # TODO: add kinetic metric tensor components
 
@@ -152,23 +141,29 @@ end
 """
     make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal) -> FourFitVars
 
-Constructs Fourier–poloidal coupling matrices for a given toroidal mode number and returns them as a new `FourFitVars` object.
+Constructs main DCON matrices for a given toroidal mode number and returns 
+them as a new `FourFitVars` object. See the appendix of the 2016 Glasser
+DCON paper for details on the matrix definitions. Performs the same function
+as `fourfit_make_matrix` in the Fortran code, except F, G, and K are now
+stored as dense matrices. The matrix F is stored in factorized form with
+the lower triangle only, because F is Hermitian and can be written as
+F = L · Lᴴ, which speeds up calculations later (i.e. `sing_der!``). Unlike
+the Fortran, we also do not use OffsetArrays (indexed from -mband:mband),
+but instead use standard Julia arrays and map the zero index to the middle.
 
-# Arguments
-
+### Arguments
   - `metric::MetricData`:
     Metric coefficients on the (ψ, θ) grid, including Fourier representations of g^ij and J.
-  - `equil::Equilibrium.PlasmaEquilibrium`:
-    Plasma equilibrium object providing 1D flux-surface profiles (`sq`) and normalization constants.
-  - `ctrl::DconControl`:
-    Control parameters for the DCON calculation, including mode numbers and flags.
-  - `intr::DconInternal`:
-    Internal state for the DCON calculation, including mode number ranges and splines.
 
-# Returns
+### Returns
+  - `ffit::FourFitVars`: A struct holding cubic spline fits of the assembled matrices
 
-  - `ffit::FourFitVars`:
-    A container holding cubic spline fits of the assembled matrices
+### TODOs
+Add kinetic metric tensor components for kin_flag = true
+Remove mband if we decide to fully deprecate banded matrices
+Decide error throwing if factorization fails
+Set powers if necessary
+Determine if sas_flag logic is needed
 """
 function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal)
 

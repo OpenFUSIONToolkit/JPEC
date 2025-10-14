@@ -1,3 +1,18 @@
+"""
+    free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutput; op_netcdf_out::Bool=false)
+
+Compute the free boundary energies using VACUUM. Performs the same function as `free_run` 
+in the Fortran code, except now all data is passed in memory instead of via files.
+
+### Arguments
+  - `op_netcdf_out`: Whether to write netcdf output (Bool, optional, default=false) (DEPRECATED)
+
+### TODOs
+Remove `op_netcdf_out` argument and related logic, as netcdf output is deprecated
+Remove ahg and ahb related logic
+Check if normalize is ever false, currently always true, and if not, remove related logic
+"""
+
 function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutput; op_netcdf_out::Bool=false)
 
     # TODO: it looks like vac_memory is always true - remove all ahg things and just assume true?
@@ -245,6 +260,25 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     return plasma1, vacuum1, total1
 end
 
+"""
+    free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; inmemory_op::Union{Bool,Nothing}=nothing,
+    ahgstr_op::Union{String,Nothing}=nothing)
+
+Prepare and write the necessary parameters and boundary shape to VACUUM for computing the vacuum response matrix.
+Performs the same function as `free_write_msc` in the Fortran code, except we will always use in-memory communication.
+
+### Arguments
+
+  - `psifac`: Flux surface value at the plasma boundary (Float64)
+  - `ctrl`: DCON control parameters (DconControl)
+  - `equil`: Plasma equilibrium data (Equilibrium.PlasmaEquilibrium)
+  - `intr`: Internal DCON parameters (DconInternal)
+  - `inmemory_op`: Whether to use in-memory communication with VACUUM (Bool, optional, default=false)
+  - `ahgstr_op`: Communication file name if not using in-memory (String, optional, default="ahg2msc_dcon.out")
+
+### TODOs
+Remove `inmemory_op` and `ahgstr_op` arguments and related logic, always use in-memory communication
+"""
 function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; inmemory_op::Union{Bool,Nothing}=nothing,
     ahgstr_op::Union{String,Nothing}=nothing)
 
