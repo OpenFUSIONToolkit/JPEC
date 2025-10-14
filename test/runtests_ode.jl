@@ -125,7 +125,7 @@ end
         odet.new = false
         odet.u[:, 1, 1] .= [1, 0]
         odet.u[:, 2, 1] .= [1, 0]
-        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
+        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, true)
         @test odet.new == true  # fixup triggered
     end
 end
