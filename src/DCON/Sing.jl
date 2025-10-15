@@ -14,20 +14,13 @@ function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 end
 
 """
-    sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=200)
+    sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
 
 Locate singular rational q-surfaces (q = m/nn) using a bisection method
 between extrema of the q-profile, and store their properties in `intr.sing`.
 Performs the same function as `sing_find` in the Fortran code.
-
-# Arguments
-
-  - 'itmax::Int`: Maximum number of iterations for the bisection method (default: 200)
 """
-function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=200)
-
-    # Shorthand to evaluate q inside bisection search
-    qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
+function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
 
     # Loop over extrema of q, find all rational values in between
     for iex in 2:equil.params.mextrema
@@ -49,7 +42,7 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             while it < itmax
                 it += 1
                 psifac = (psi0 + psi1) / 2
-                singfac = (m - ctrl.nn * qval(psifac)) * dm
+                singfac = (m - ctrl.nn * Spl.spline_eval(equil.sq, psifac, 0)[4]) * dm
                 if abs(singfac) <= 1e-8
                     break
                 elseif singfac > 0
@@ -77,7 +70,7 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 end
 
 """
-    sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=50)
+    sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
 Compute and set integration ψ, q, and q' limits by handling cases where user truncates
 before the last singular surface. Performs a similar function to `sing_lim`
@@ -95,11 +88,8 @@ If `qlim < qmax`, a Newton iteration is performed to find the corresponding
 Note that the Newton iteration will be triggered if either `set_psilim_via_dmlim` is true
 or `ctrl.qhigh < equil.params.qmax`. Otherwise, the equilibrium edge values are used.
 
-# Arguments
-
-  - `itmax::Int`: The maximum number of iterations allowed for the psilim search (default: 50)
 """
-function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=50)
+function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
 
     # Initial guesses based on equilibrium
     intr.qlim = min(equil.params.qmax, ctrl.qhigh) # equilibrium solve only goes up to qmax, so we're capped there
