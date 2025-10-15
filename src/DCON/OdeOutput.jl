@@ -170,7 +170,7 @@ function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibr
 
     # Compute new crit
     dpsi = odet.psifac - odet.psi_prev
-    q, singfac, logpsi1, logpsi2, crit = ode_output_get_crit(odet.psifac, odet.u, intr.mpert, odet.m1, ctrl.nn, equil.sq)
+    q, singfac, logpsi1, logsingfac, crit = ode_output_get_crit(odet.psifac, odet.u, intr.mpert, odet.m1, ctrl.nn, equil.sq)
 
     # Check for zero crossing
     if crit * odet.crit_prev < 0 # if crit changes sign, zero crossing has occurred
@@ -178,7 +178,7 @@ function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibr
         psi_med = odet.psifac - fac * (odet.psifac - odet.psi_prev)
         dpsi = psi_med - odet.psi_prev
         u_med = odet.u .- fac .* (odet.u .- odet.u_prev)
-        q_med, singfac_med, logpsi1_med, logpsi2_med, crit_med = ode_output_get_crit(psi_med, u_med, intr.mpert, odet.m1, ctrl.nn, equil.sq)
+        q_med, singfac_med, logpsi1_med, logsingfac_med, crit_med = ode_output_get_crit(psi_med, u_med, intr.mpert, odet.m1, ctrl.nn, equil.sq)
 
         if (crit_med - crit) * (crit_med - odet.crit_prev) < 0 &&
            abs(crit_med) < 0.5 * min(abs(crit), abs(odet.crit_prev))
@@ -205,7 +205,7 @@ function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibr
 end
 
 """
-    ode_output_get_crit(psi, u, mpert, m1, nn, sq) -> (q, singfac, logpsi1, logpsi2, crit)
+    ode_output_get_crit(psi, u, mpert, m1, nn, sq) -> (q, singfac, logpsi1, logsingfac, crit)
 
 Compute critical quantities at a given flux surface and using the smallest (in magnitude)
 inverse eigenvalue in combination with the equilibrium profiles to form `crit`.
@@ -222,7 +222,7 @@ Performs the same function as `ode_output_get_crit` in the Fortran code.
 
 ### Returns
 
-A tuple `(q, singfac, logpsi1, logpsi2, crit)` of critical data for the time step.
+A tuple `(q, singfac, logpsi1, logsingfac, crit)` of critical data for the time step.
 
 ### TODOs
 
@@ -250,8 +250,8 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m
     q = profiles[4]
     singfac = abs(m1 - nn * profiles[4])
     logpsi1 = log10(psi)
-    logpsi2 = log10(singfac) # TODO: why is this called logpsi2 and not logsingfac?
+    logsingfac = log10(singfac)
     crit = evalsi[indexi[1]] # * profiles[3]^2 # TODO: appears to be a bug in profiles[3]
 
-    return q, singfac, logpsi1, logpsi2, crit
+    return q, singfac, logpsi1, logsingfac, crit
 end
