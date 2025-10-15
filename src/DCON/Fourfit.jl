@@ -171,7 +171,7 @@ Add kinetic metric tensor components for kin_flag = true
 Remove mband if we decide to fully deprecate banded matrices
 Decide error throwing if factorization fails
 Set powers if necessary
-Determine if sas_flag logic is needed
+Determine if set_psilim_via_dmlim logic is needed
 """
 function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal)
 
@@ -338,7 +338,7 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
     # TODO: set powers
     # Do we need this yet? Only called if power_flag = true
 
-    if ctrl.sas_flag
+    if ctrl.set_psilim_via_dmlim
         # TODO: these seem to only be used for the ahb_flag, which I think is deprecated
         ffit.asmat = reshape(Spl.spline_eval(ffit.amats, intr.psilim), intr.mpert, intr.mpert)
         ffit.bsmat = reshape(Spl.spline_eval(ffit.bmats, intr.psilim), intr.mpert, intr.mpert)
