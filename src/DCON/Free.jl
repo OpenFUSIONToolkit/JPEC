@@ -186,12 +186,15 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
 
     # Write to euler.h5
     if outp.write_euler_h5
-        write_output(outp, :euler_h5, ep; dsetname="vacuum/ep")
-        write_output(outp, :euler_h5, ev; dsetname="vacuum/ev")
-        write_output(outp, :euler_h5, et; dsetname="vacuum/et")
-        write_output(outp, :euler_h5, wt; dsetname="vacuum/wt")
-        write_output(outp, :euler_h5, wt0; dsetname="vacuum/wt0")
-        write_output(outp, :euler_h5, ctrl.wv_farwall_flag; dsetname="vacuum/wv_farwall_flag")
+        # We open in r+ mode to add to the existing file from ode_output_init instead of overwriting it
+        h5open(joinpath(intr.dir_path, outp.fname_euler_h5), "r+") do euler_h5
+            euler_h5["vacuum/wt"] = wt
+            euler_h5["vacuum/wt0"] = wt0
+            euler_h5["vacuum/ep"] = ep
+            euler_h5["vacuum/ev"] = ev
+            euler_h5["vacuum/et"] = et
+            euler_h5["vacuum/wv_farwall_flag"] = ctrl.wv_farwall_flag
+        end
     end
 
     # Write to screen and copy to output.

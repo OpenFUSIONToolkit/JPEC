@@ -42,7 +42,7 @@ end
 """
     init_files(out::DconOutput, path::String)
 
-Open all requested output files into `path` and store handles.
+Open requested output text files into `path` and store handles.
 """
 function init_files(out::DconOutput, path::String)
     for pname in propertynames(out)
@@ -54,15 +54,12 @@ function init_files(out::DconOutput, path::String)
 
             full_path = joinpath(path, fname)
 
-            if endswith(fname, ".out") || endswith(fname, ".txt")
-                out.handles[base] = open(full_path, "w")
-
-            elseif endswith(fname, ".h5") && !haskey(out.handles, base)
-                fid = h5open(full_path, "w")
-                out.handles[base] = fid
-
-            else
-                error("Unknown file extension for $fname, need to add to init_files!")
+            if !endswith(fname, ".h5") # we don't pre-open h5 files
+                if endswith(fname, ".out") || endswith(fname, ".txt")
+                    out.handles[base] = open(full_path, "w")
+                else
+                    error("Unknown file extension for $fname, need to add to init_files!")
+                end
             end
         end
     end
@@ -71,28 +68,13 @@ end
 """
     write_output(out::DconOutput, key::Symbol, data; dsetname=nothing, slice=:)
 
-Writes `data` to the file corresponding to `key`.
-
-  - For text files: appends a line.
-  - For HDF5 files: writes into `dsetname` at `slice`.
+Writes `data` to the text file corresponding to `key`.
 """
-function write_output(out::DconOutput, key::Symbol, data; dsetname=nothing, slice=:)
+function write_output(out::DconOutput, key::Symbol, data)
     handle = out.handles[key]
 
     if handle isa IOStream
         println(handle, data)
-
-    elseif handle isa HDF5.File
-        if dsetname === nothing
-            error("Must specify dsetname when writing to HDF5 file $key")
-        end
-        if haskey(handle, dsetname)
-            handle[dsetname][slice...] = data
-        else
-            # create dataset if not present
-            handle[dsetname] = data
-        end
-
     else
         error("Unsupported handle type for key $key")
     end
@@ -101,13 +83,7 @@ end
 """
     close_files(out::DconOutput)
 
-Closes all open files.
-
-# TODO: is there a way to make the code run this if it errors out anywhere?
-
-# In existing state, files will remain open if there is an error, so you have
-
-# to manually exit and reopen Julia.
+Closes all open text files.
 """
 function close_files(out::DconOutput)
     for (key, handle) in out.handles

@@ -110,7 +110,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
     end
 
     if ctrl.verbose # mimicing an output from ode_output_open
-        println("   ψ=$(odet.psifac), q=$(Spl.spline_eval(equil.sq, odet.psifac, 0)[4])")
+        println("   ψ = $(odet.psifac), q = $(Spl.spline_eval(equil.sq, odet.psifac, 0)[4])")
     end
 
     # Write header data to files
@@ -144,24 +144,27 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         if ctrl.verbose
             println("Writing saved integration data to euler.h5...")
         end
-        write_output(outp, :euler_h5, odet.msol; dsetname="integration/msol")
-        write_output(outp, :euler_h5, odet.step; dsetname="integration/nstep")
-        write_output(outp, :euler_h5, odet.psi_store; dsetname="integration/psi")
-        write_output(outp, :euler_h5, Spl.spline_eval(equil.sq, odet.psi_store, 0)[4]; dsetname="integration/q")
-        write_output(outp, :euler_h5, odet.u_store; dsetname="integration/u")
-        write_output(outp, :euler_h5, odet.ud_store; dsetname="integration/ud")
-        write_output(outp, :euler_h5, odet.ifix; dsetname="normalizations/mfix")
-        write_output(outp, :euler_h5, odet.fixstep[1:odet.ifix]; dsetname="normalizations/psifix")
-        write_output(outp, :euler_h5, odet.fixfac[:, :, 1:odet.ifix]; dsetname="normalizations/fixfac")
-        write_output(outp, :euler_h5, odet.sing_flags[1:odet.ifix]; dsetname="normalizations/sing_flags")
-        write_output(outp, :euler_h5, odet.index[:, 1:odet.ifix]; dsetname="normalizations/index")
-        write_output(outp, :euler_h5, intr.msing; dsetname="singular/msing")
-        write_output(outp, :euler_h5, [intr.sing[ising].psifac for ising in 1:intr.msing]; dsetname="singular/psi")
-        write_output(outp, :euler_h5, [intr.sing[ising].q for ising in 1:intr.msing]; dsetname="singular/q")
-        write_output(outp, :euler_h5, [intr.sing[ising].q1 for ising in 1:intr.msing]; dsetname="singular/q1")
-        write_output(outp, :euler_h5, odet.ca_l; dsetname="singular/ca_left")
-        write_output(outp, :euler_h5, odet.ca_r; dsetname="singular/ca_right")
-        # TODO: restype writing would also be added here, Matt says not needed for now (or maybe ever)
+        # We open in r+ mode to add to the existing file from ode_output_init instead of overwriting it
+        h5open(joinpath(intr.dir_path, outp.fname_euler_h5), "r+") do euler_h5
+            euler_h5["integration/msol"] = odet.msol
+            euler_h5["integration/nstep"] = odet.step
+            euler_h5["integration/psi"] = odet.psi_store
+            euler_h5["integration/q"] = Spl.spline_eval(equil.sq, odet.psi_store, 0)[4]
+            euler_h5["integration/u"] = odet.u_store
+            euler_h5["integration/ud"] = odet.ud_store
+            euler_h5["normalizations/mfix"] = odet.ifix
+            euler_h5["normalizations/psifix"] = odet.fixstep[1:odet.ifix]
+            euler_h5["normalizations/fixfac"] = odet.fixfac[:, :, 1:odet.ifix]
+            euler_h5["normalizations/sing_flags"] = odet.sing_flags[1:odet.ifix]
+            euler_h5["normalizations/index"] = odet.index[:, 1:odet.ifix]
+            euler_h5["singular/msing"] = intr.msing
+            euler_h5["singular/psi"] = [intr.sing[ising].psifac for ising in 1:intr.msing]
+            euler_h5["singular/q"] = [intr.sing[ising].q for ising in 1:intr.msing]
+            euler_h5["singular/q1"] = [intr.sing[ising].q1 for ising in 1:intr.msing]
+            euler_h5["singular/ca_left"] = odet.ca_l
+            euler_h5["singular/ca_right"] = odet.ca_r
+            # TODO: restype writing would also be added here, Matt says not needed for now (or maybe ever)
+        end
     end
     return odet
 end
