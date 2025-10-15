@@ -48,14 +48,16 @@ function Main(path::String)
 
     # Dump equilibrium data to files
     if outp.write_eqdata_h5
-        write_output(outp, :eqdata_h5, Vector(equil.sq.xs); dsetname="psi")
-        write_output(outp, :eqdata_h5, Vector(equil.sq.fs[:, 1] ./ (2π)); dsetname="f")
-        write_output(outp, :eqdata_h5, Vector(equil.sq.fs[:, 2]); dsetname="mu0p")
-        write_output(outp, :eqdata_h5, Vector(equil.sq.fs[:, 3]); dsetname="dV/dpsi")
-        write_output(outp, :eqdata_h5, Vector(equil.sq.fs[:, 4]); dsetname="q")
-        write_output(outp, :eqdata_h5, Vector(locstab_fs[:, 1] ./ equil.sq.xs); dsetname="di")
-        write_output(outp, :eqdata_h5, Vector(locstab_fs[:, 2] ./ equil.sq.xs); dsetname="dr")
-        write_output(outp, :eqdata_h5, Vector(locstab_fs[:, 4]); dsetname="ca1")
+        h5open(joinpath(intr.dir_path, outp.fname_eqdata_h5), "w") do eqdata_h5
+            eqdata_h5["psi"] = Vector(equil.sq.xs)
+            eqdata_h5["f"] = Vector(equil.sq.fs[:, 1] ./ (2π))
+            eqdata_h5["mu0p"] = Vector(equil.sq.fs[:, 2])
+            eqdata_h5["dVdpsi"] = Vector(equil.sq.fs[:, 3])
+            eqdata_h5["q"] = Vector(equil.sq.fs[:, 4])
+            eqdata_h5["di"] = Vector(locstab_fs[:, 1] ./ equil.sq.xs)
+            eqdata_h5["dr"] = Vector(locstab_fs[:, 2] ./ equil.sq.xs)
+            eqdata_h5["ca1"] = Vector(locstab_fs[:, 4])
+        end
     end
 
     if outp.write_dcon_out

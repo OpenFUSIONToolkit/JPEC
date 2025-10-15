@@ -15,92 +15,95 @@ Place outputs in a Julia do loop for automatic file closing
 """
 function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
-    # TODO: mess with this to condense the number of write_output calls? Maybe allow it to pass in dicts
+    # TODO: mess with this to condense the number of calls? Maybe allow it to pass in dicts
+    
     # Write euler.h5 header info
     if outp.write_euler_h5
-        # Write dcon run parameters
-        write_output(outp, :euler_h5, intr.mpert; dsetname="info/mpert")
-        write_output(outp, :euler_h5, intr.mband; dsetname="info/mband")
-        write_output(outp, :euler_h5, intr.mlow; dsetname="info/mlow")
-        write_output(outp, :euler_h5, intr.mhigh; dsetname="info/mhigh")
-        write_output(outp, :euler_h5, ctrl.nn; dsetname="info/nn")
-        write_output(outp, :euler_h5, ctrl.singfac_min; dsetname="info/singfac_min")
-        write_output(outp, :euler_h5, ctrl.kin_flag; dsetname="info/kin_flag")
-        write_output(outp, :euler_h5, ctrl.con_flag; dsetname="info/con_flag")
-        write_output(outp, :euler_h5, ctrl.mthvac; dsetname="info/mthvac")
-        write_output(outp, :euler_h5, intr.psilim; dsetname="info/psilim")
-        write_output(outp, :euler_h5, intr.qlim; dsetname="info/qlim")
-        write_output(outp, :euler_h5, outp.mthsurf0; dsetname="info/mthsurf0") #TODO: mthsurf0 is deprecated
+        h5open(joinpath(intr.dir_path, outp.fname_euler_h5), "w") do euler_h5
+            # Write DCON run parameters
+            euler_h5["info/mpert"] = intr.mpert
+            euler_h5["info/mband"] = intr.mband
+            euler_h5["info/mlow"] = intr.mlow
+            euler_h5["info/mhigh"] = intr.mhigh
+            euler_h5["info/nn"] = ctrl.nn
+            euler_h5["info/singfac_min"] = ctrl.singfac_min
+            euler_h5["info/kin_flag"] = ctrl.kin_flag
+            euler_h5["info/con_flag"] = ctrl.con_flag
+            euler_h5["info/mthvac"] = ctrl.mthvac
+            euler_h5["info/psilim"] = intr.psilim
+            euler_h5["info/qlim"] = intr.qlim
+            euler_h5["info/mthsurf0"] = outp.mthsurf0 #TODO: mthsurf0 is deprecated
+            
+            # Write equilibrium parameters
+            euler_h5["equil/nr"] = length(equil.rzphi.xs) # TODO: equil save mpsi as really mpsi - 1, fix this
+            euler_h5["equil/nz"] = length(equil.rzphi.ys)
+            euler_h5["equil/ro"] = equil.ro
+            euler_h5["equil/zo"] = equil.zo
+            euler_h5["equil/amean"] = equil.params.amean
+            euler_h5["equil/rmean"] = equil.params.rmean
+            euler_h5["equil/aratio"] = equil.params.aratio
+            euler_h5["equil/kappa"] = equil.params.kappa
+            euler_h5["equil/delta1"] = equil.params.delta1
+            euler_h5["equil/delta2"] = equil.params.delta2
+            euler_h5["equil/li1"] = equil.params.li1
+            euler_h5["equil/li2"] = equil.params.li2
+            euler_h5["equil/li3"] = equil.params.li3
+            euler_h5["equil/betap1"] = equil.params.betap1
+            euler_h5["equil/betap2"] = equil.params.betap2
+            euler_h5["equil/betap3"] = equil.params.betap3
+            euler_h5["equil/betat"] = equil.params.betat
+            euler_h5["equil/betan"] = equil.params.betan
+            euler_h5["equil/bt0"] = equil.params.bt0
+            euler_h5["equil/q0"] = equil.params.q0
+            euler_h5["equil/q95"] = equil.params.q95
+            euler_h5["equil/qmin"] = equil.params.qmin
+            euler_h5["equil/qmax"] = equil.params.qmax
+            euler_h5["equil/qa"] = equil.params.qa
+            euler_h5["equil/crnt"] = equil.params.crnt
+            euler_h5["equil/psio"] = equil.psio
+            euler_h5["equil/psilow"] = equil.config.control.psilow
+            euler_h5["equil/power_b"] = equil.config.control.power_b
+            euler_h5["equil/power_r"] = equil.config.control.power_r
+            euler_h5["equil/power_bp"] = equil.config.control.power_bp
+            euler_h5["equil/shotnum"] = 0 # TODO: equil.params.shotnum
+            euler_h5["equil/shottime"] = 0 # TODO: equil.params.shottime
 
-        # Write equilibrium parameters
-        write_output(outp, :euler_h5, length(equil.rzphi.xs); dsetname="equil/nr") # TODO: equil save mpsi as really mpsi - 1, fix this
-        write_output(outp, :euler_h5, length(equil.rzphi.ys); dsetname="equil/nz")
-        write_output(outp, :euler_h5, equil.ro; dsetname="equil/ro")
-        write_output(outp, :euler_h5, equil.zo; dsetname="equil/zo")
-        write_output(outp, :euler_h5, equil.params.amean; dsetname="equil/amean")
-        write_output(outp, :euler_h5, equil.params.rmean; dsetname="equil/rmean")
-        write_output(outp, :euler_h5, equil.params.aratio; dsetname="equil/aratio")
-        write_output(outp, :euler_h5, equil.params.kappa; dsetname="equil/kappa")
-        write_output(outp, :euler_h5, equil.params.delta1; dsetname="equil/delta1")
-        write_output(outp, :euler_h5, equil.params.delta2; dsetname="equil/delta2")
-        write_output(outp, :euler_h5, equil.params.li1; dsetname="equil/li1")
-        write_output(outp, :euler_h5, equil.params.li2; dsetname="equil/li2")
-        write_output(outp, :euler_h5, equil.params.li3; dsetname="equil/li3")
-        write_output(outp, :euler_h5, equil.params.betap1; dsetname="equil/betap1")
-        write_output(outp, :euler_h5, equil.params.betap2; dsetname="equil/betap2")
-        write_output(outp, :euler_h5, equil.params.betap3; dsetname="equil/betap3")
-        write_output(outp, :euler_h5, equil.params.betat; dsetname="equil/betat")
-        write_output(outp, :euler_h5, equil.params.betan; dsetname="equil/betan")
-        write_output(outp, :euler_h5, equil.params.bt0; dsetname="equil/bt0")
-        write_output(outp, :euler_h5, equil.params.q0; dsetname="equil/q0")
-        write_output(outp, :euler_h5, equil.params.q95; dsetname="equil/q95")
-        write_output(outp, :euler_h5, equil.params.qmin; dsetname="equil/qmin")
-        write_output(outp, :euler_h5, equil.params.qmax; dsetname="equil/qmax")
-        write_output(outp, :euler_h5, equil.params.qa; dsetname="equil/qa")
-        write_output(outp, :euler_h5, equil.params.crnt; dsetname="equil/crnt")
-        write_output(outp, :euler_h5, equil.psio; dsetname="equil/psio")
-        write_output(outp, :euler_h5, equil.config.control.psilow; dsetname="equil/psilow")
-        write_output(outp, :euler_h5, equil.config.control.power_b; dsetname="equil/power_b")
-        write_output(outp, :euler_h5, equil.config.control.power_r; dsetname="equil/power_r")
-        write_output(outp, :euler_h5, equil.config.control.power_bp; dsetname="equil/power_bp")
-        write_output(outp, :euler_h5, 0; dsetname="equil/shotnum") # TODO: equil.params.shotnum)
-        write_output(outp, :euler_h5, 0; dsetname="equil/shottime") # TODO: equil.params.shottime)
-
-        # Write spline arrays
-        write_output(outp, :euler_h5, Vector(equil.sq.xs); dsetname="splines/sq/xs")
-        # TODO: getting errors when trying to dump just fs, so splitting for now, which adds so many lines
-        #  This should be fixed if we separate these like Nik mentioned
-        write_output(outp, :euler_h5, equil.sq.fs[:, 1]; dsetname="splines/sq/fs/2piF")
-        write_output(outp, :euler_h5, equil.sq.fs[:, 2]; dsetname="splines/sq/fs/mu0p")
-        write_output(outp, :euler_h5, equil.sq.fs[:, 3]; dsetname="splines/sq/fs/dVdpsi")
-        write_output(outp, :euler_h5, equil.sq.fs[:, 4]; dsetname="splines/sq/fs/q")
-        write_output(outp, :euler_h5, equil.sq.fs1[:, 1]; dsetname="splines/sq/fs1/2piF")
-        write_output(outp, :euler_h5, equil.sq.fs1[:, 2]; dsetname="splines/sq/fs1/mu0p")
-        write_output(outp, :euler_h5, equil.sq.fs1[:, 3]; dsetname="splines/sq/fs1/dVdpsi")
-        write_output(outp, :euler_h5, equil.sq.fs1[:, 4]; dsetname="splines/sq/fs1/q")
-        write_output(outp, :euler_h5, 0; dsetname="splines/sq/xpower") # TODO: equil.sq.xpower
-        write_output(outp, :euler_h5, Vector(equil.rzphi.xs); dsetname="splines/rzphi/xs")
-        write_output(outp, :euler_h5, Vector(equil.rzphi.ys); dsetname="splines/rzphi/ys")
-        write_output(outp, :euler_h5, equil.rzphi.fs[:, 1]; dsetname="splines/rzphi/fs/rcoords")
-        write_output(outp, :euler_h5, equil.rzphi.fs[:, 2]; dsetname="splines/rzphi/fs/offset")
-        write_output(outp, :euler_h5, equil.rzphi.fs[:, 3]; dsetname="splines/rzphi/fs/nu")
-        write_output(outp, :euler_h5, equil.rzphi.fs[:, 4]; dsetname="splines/rzphi/fs/jac")
-        write_output(outp, :euler_h5, equil.rzphi.fsx[:, 1]; dsetname="splines/rzphi/fsx/rcoords")
-        write_output(outp, :euler_h5, equil.rzphi.fsx[:, 2]; dsetname="splines/rzphi/fsx/offset")
-        write_output(outp, :euler_h5, equil.rzphi.fsx[:, 3]; dsetname="splines/rzphi/fsx/nu")
-        write_output(outp, :euler_h5, equil.rzphi.fsx[:, 4]; dsetname="splines/rzphi/fsx/jac")
-        write_output(outp, :euler_h5, equil.rzphi.fsy[:, 1]; dsetname="splines/rzphi/fsy/rcoords")
-        write_output(outp, :euler_h5, equil.rzphi.fsy[:, 2]; dsetname="splines/rzphi/fsy/offset")
-        write_output(outp, :euler_h5, equil.rzphi.fsy[:, 3]; dsetname="splines/rzphi/fsy/nu")
-        write_output(outp, :euler_h5, equil.rzphi.fsy[:, 4]; dsetname="splines/rzphi/fsy/jac")
-        write_output(outp, :euler_h5, equil.rzphi.fsxy[:, 1]; dsetname="splines/rzphi/fsxy/rcoords")
-        write_output(outp, :euler_h5, equil.rzphi.fsxy[:, 2]; dsetname="splines/rzphi/fsxy/offset")
-        write_output(outp, :euler_h5, equil.rzphi.fsxy[:, 3]; dsetname="splines/rzphi/fsxy/nu")
-        write_output(outp, :euler_h5, equil.rzphi.fsxy[:, 4]; dsetname="splines/rzphi/fsxy/jac")
-        write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/x0") # TODO: equil.rzphi.x0
-        write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/y0") # TODO: equil.rzphi.y0
-        write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/xpower") # TODO: equil.rzphi.xpower
-        write_output(outp, :euler_h5, 0; dsetname="splines/rzphi/fpower") # TODO: equil.rzphi.fpower
+            # Write spline arrays
+            euler_h5["splines/sq/xs"] = Vector(equil.sq.xs)
+            # TODO: getting errors when trying to dump just fs, so splitting for now, which adds so many lines
+            # This should be fixed if we separate these like Nik mentioned
+            euler_h5["splines/sq/fs/2piF"] = equil.sq.fs[:, 1]
+            euler_h5["splines/sq/fs/mu0p"] = equil.sq.fs[:, 2]
+            euler_h5["splines/sq/fs/dVdpsi"] = equil.sq.fs[:, 3]
+            euler_h5["splines/sq/fs/q"] = equil.sq.fs[:, 4]
+            euler_h5["splines/sq/fs1/2piF"] = equil.sq.fs1[:, 1]
+            euler_h5["splines/sq/fs1/mu0p"] = equil.sq.fs1[:, 2]
+            euler_h5["splines/sq/fs1/dVdpsi"] = equil.sq.fs1[:, 3]
+            euler_h5["splines/sq/fs1/q"] = equil.sq.fs1[:, 4]
+            euler_h5["splines/sq/xpower"] = 0 # TODO: equil.sq.xpower
+            euler_h5["splines/rzphi/xs"] = Vector(equil.rzphi.xs)
+            euler_h5["splines/rzphi/ys"] = Vector(equil.rzphi.ys)
+            euler_h5["splines/rzphi/fs/rcoords"] = equil.rzphi.fs[:, 1]
+            euler_h5["splines/rzphi/fs/offset"] = equil.rzphi.fs[:, 2]
+            euler_h5["splines/rzphi/fs/nu"] = equil.rzphi.fs[:, 3]
+            euler_h5["splines/rzphi/fs/jac"] = equil.rzphi.fs[:, 4]
+            euler_h5["splines/rzphi/fsx/rcoords"] = equil.rzphi.fsx[:, 1]
+            euler_h5["splines/rzphi/fsx/offset"] = equil.rzphi.fsx[:, 2]
+            euler_h5["splines/rzphi/fsx/nu"] = equil.rzphi.fsx[:, 3]
+            euler_h5["splines/rzphi/fsx/jac"] = equil.rzphi.fsx[:, 4]
+            euler_h5["splines/rzphi/fsy/rcoords"] = equil.rzphi.fsy[:, 1]
+            euler_h5["splines/rzphi/fsy/offset"] = equil.rzphi.fsy[:, 2]
+            euler_h5["splines/rzphi/fsy/nu"] = equil.rzphi.fsy[:, 3]
+            euler_h5["splines/rzphi/fsy/jac"] = equil.rzphi.fsy[:, 4]
+            euler_h5["splines/rzphi/fsxy/rcoords"] = equil.rzphi.fsxy[:, 1]
+            euler_h5["splines/rzphi/fsxy/offset"] = equil.rzphi.fsxy[:, 2]
+            euler_h5["splines/rzphi/fsxy/nu"] = equil.rzphi.fsxy[:, 3]
+            euler_h5["splines/rzphi/fsxy/jac"] = equil.rzphi.fsxy[:, 4]
+            euler_h5["splines/rzphi/x0"] = 0 # TODO: equil.rzphi.x0
+            euler_h5["splines/rzphi/y0"] = 0 # TODO: equil.rzphi.y0
+            euler_h5["splines/rzphi/xpower"] = 0 # TODO: equil.rzphi.xpower
+            euler_h5["splines/rzphi/fpower"] = 0 # TODO: equil.rzphi.fpower
+        end
     end
 
     # Write crit.out header
