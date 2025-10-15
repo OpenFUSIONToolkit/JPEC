@@ -79,85 +79,65 @@ end
 """
     sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=50)
 
-Compute and set limiter values - handles cases where user truncates
-before the last singular surface. Performs the same function as `sing_lim`
-in the Fortran code.
+Compute and set integration ψ, q, and q' limits by handling cases where user truncates
+before the last singular surface. Performs a similar function to `sing_lim`
+in the Fortran code. Main differences include renaming of sas_flag -> set_psilim_via_dmlim,
+removing dW edge storage variables since we now store all integration terms in memory, and
+simplification of the logic.
+
+The target value `qlim` is first determined from user-specified control parameters 
+(`ctrl.qhigh` or `ctrl.dmlim`), subject to the constraint that it does not exceed 
+`equil.params.qmax`. If set_psilim_via_dmlim is true, `qlim` is adjusted to the largest
+rational surface such that `nq + dmlim < qmax`, where qmax is the maximum q value in the equilibrium.
+If `qlim < qmax`, a Newton iteration is performed to find the corresponding
+`psilim` to integrate to.
+
+Note that the Newton iteration will be triggered if either `set_psilim_via_dmlim` is true
+or `ctrl.qhigh < equil.params.qmax`. Otherwise, the equilibrium edge values are used.
 
 # Arguments
 
   - `itmax::Int`: The maximum number of iterations allowed for the psilim search (default: 50)
 """
-function sing_lim!(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=50)
+function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium; itmax=50)
 
-    # Shorthand to evaluate q/q1 inside newton iteration
-    qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
-    q1val = psi -> Spl.spline_eval(equil.sq, psi, 1)[2][4]
-
-    # Compute and modify the DconInternal struct
-    intr.qlim = min(equil.params.qmax, ctrl.qhigh)
-    intr.q1lim = equil.sq.fs1[equil.config.control.mpsi+1, 4]
+    # Initial guesses based on equilibrium
+    intr.qlim = min(equil.params.qmax, ctrl.qhigh) # equilibrium solve only goes up to qmax, so we're capped there
+    intr.q1lim = equil.sq.fs1[end, 4]
     intr.psilim = equil.config.control.psihigh
-    # Normalize dmlim to interval [0,1)
-    if ctrl.sas_flag
-        while ctrl.dmlim > 1.0
-            ctrl.dmlim -= 1.0
-        end
-        while ctrl.dmlim < 0.0
-            ctrl.dmlim += 1.0
-        end
-        #compute qlim
+    
+    # Optionally override qlim based on dmlim
+    if ctrl.set_psilim_via_dmlim
+        # Normalize dmlim ∈ [0,1)
+        ctrl.dmlim = mod(ctrl.dmlim, 1.0)
         intr.qlim = (trunc(Int, ctrl.nn * intr.qlim) + ctrl.dmlim) / ctrl.nn
-        while intr.qlim > equil.params.qmax #could also be a while true with a break condition if (qlim <= qmax) like the Fortran code
+
+        # Reduce qlim if above qmax
+        while intr.qlim > equil.params.qmax
             intr.qlim -= 1.0 / ctrl.nn
         end
     end
 
-    # Use newton iteration to find psilim
+    # If set_psilim_via_dmlim decreased qlim or qhigh < qmax, we need to find the precise psilim via newton iteration
     if intr.qlim < equil.params.qmax
-        # Find index jpsi that minimizes |equil.sq.fs[:,4] - qlim| and ensure within mpsi limits
+        # Find nearest ψ index where q ≈ qlim
         _, jpsi = findmin(abs.(equil.sq.fs[:, 4] .- intr.qlim))
         jpsi = min(jpsi, equil.config.control.mpsi - 1)
 
+        # Shorthand to evaluate q/q1 inside newton iteration
+        qval(ψ) = Spl.spline_eval(equil.sq, ψ, 0)[4]
+        q1val(ψ) = Spl.spline_eval(equil.sq, ψ, 1)[2][4]
+
         intr.psilim = equil.sq.xs[jpsi]
-        it = 0
-        while it < itmax
-            it += 1
+        for _ in 1:itmax
             dpsi = (intr.qlim - qval(intr.psilim)) / q1val(intr.psilim)
             intr.psilim += dpsi
-
-            if abs(dpsi) < eps * abs(intr.psilim)
-                intr.q1lim = q1val(intr.psilim)
-                break
-            end
+            abs(dpsi) < eps * abs(intr.psilim) && return intr.q1lim = q1val(intr.psilim)
         end
-
-        # abort if not found
-        if it > itmax
-            error("Can't find psilim.")
-        end
-
+        error("Can't find psilim after $itmax iterations.")
     else
-        intr.qlim = equil.params.qmax
-        intr.q1lim = equil.sq.fs1[equil.config.control.mpsi+1, 4]
-        intr.psilim = equil.config.control.psihigh
-    end
-
-    # Set up record for determining the peak in dW near the boundary.
-    if ctrl.psiedge < intr.psilim
-        qedgestart = trunc(Int, Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4])
-        intr.size_edge = ceil(Int, (intr.qlim - qedgestart) * ctrl.nn * ctrl.nperq_edge)
-
-        intr.dw_edge = fill(-Inf * (1 + im), intr.size_edge)
-        intr.q_edge = [qedgestart + i / (ctrl.nperq_edge * ctrl.nn) for i in 0:intr.size_edge-1]
-        intr.psi_edge = zeros(intr.size_edge)
-
-        # monitor some deeper points for an informative profile
-        intr.pre_edge = 1
-        for i in 1:intr.size_edge
-            if intr.q_edge[i] < Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4]
-                intr.pre_edge += 1
-            end
-        end
+        # Just use the equilibrium values for psilim, qlim, and q1lim
+        return
     end
 end
 
