@@ -700,7 +700,7 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
         Spl.spline_eval!(odet.cmat, ffit.cmats, psieval; derivs=0)
         cmat = reshape(odet.cmat, intr.mpert, intr.mpert)
         Spl.spline_eval!(odet.fmat, ffit.fmats, psieval; derivs=0)
-        fmat = reshape(odet.fmat, intr.mpert, intr.mpert)
+        # fmat = reshape(odet.fmat, intr.mpert, intr.mpert)
         Spl.spline_eval!(odet.kmat, ffit.kmats, psieval; derivs=0)
         kmat = reshape(odet.kmat, intr.mpert, intr.mpert)
         Spl.spline_eval!(odet.gmat, ffit.gmats, psieval; derivs=0)
@@ -715,6 +715,14 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
         ldiv!(odet.Afact, cmat)
 
         # TODO: banded matrix calculations would go here
+        fmat = fill!(BandedMatrix{ComplexF64}(undef, (intr.mpert, intr.mpert), (intr.mband, 0)), 0)
+        iqty = 1
+        for jpert in 1:intr.mpert
+            for ipert in jpert:min(intr.mpert, jpert + intr.mband)
+                fmat[ipert, jpert] = odet.fmat[iqty]
+                iqty += 1
+            end
+        end
     end
 
     # Compute du
@@ -726,7 +734,7 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
         du[:, :, 1] .= u[:, :, 2] .* odet.singfac_vec .- kmat * u[:, :, 1]
 
         # du[1] = - F⁻¹ * K * u[1] + F⁻¹ * u[2] (remember F is already stored in factored form)
-        du[:, :, 1] .= UpperTriangular(fmat') \ (LowerTriangular(fmat) \ du[:, :, 1])
+        du[:, :, 1] .= UpperTriangular(F') \ (LowerTriangular(F) \ du[:, :, 1])
 
         # du[2] = G * u[1] + K' * du[1] = G * u[1] - K^† * F⁻¹ * K * u[1] + K^† * F⁻¹ * u[2]
         du[:, :, 2] .= gmat * u[:, :, 1] .+ adjoint(kmat) * du[:, :, 1]

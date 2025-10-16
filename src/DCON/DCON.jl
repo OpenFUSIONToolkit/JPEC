@@ -7,6 +7,7 @@ using TOML
 using FFTW
 using OrdinaryDiffEq
 using HDF5
+using BandedMatrices
 import ..Equilibrium
 import ..Spl
 import ..VacuumMod
