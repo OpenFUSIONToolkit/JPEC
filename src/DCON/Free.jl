@@ -338,7 +338,7 @@ same function as `free_wvmats` in the Fortran code.
 function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
     # Number of psi grid points for the spline: 4 per q-window minimum
-    # TODO: I'm assuming Nik determined this empirically? Is hardcoding 4 spline points per q-window ok?
+    # TODO: 4 spline points is arbitrary - is there a better way?
     qedge = Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4]
     npsi = max(4, ceil(Int, (intr.qlim - qedge) * ctrl.nn * 4))
     psii = ctrl.psiedge
@@ -398,15 +398,18 @@ function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEqui
 
     # TODO: do we need an unset_dcon_params function to free VACUUM memory?
 
-    wv_spline = Spl.CubicSpline(psi_array, wv_array; bctype=3)
-    return wv_spline
+    return Spl.CubicSpline(psi_array, wv_array; bctype=3)
 end
 
 
 """
-    free_test(intr, psifac) -> (plasma1, vacuum1, total1)
+    free_compute_total(equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState) -> ComplexF64
 
-Compute total complex energy eigenvalue (total1)
+Compute total complex energy eigenvalue (total1). This is a trimmed down version of `free_run`
+that only computes the total energy eigenvalue for the mode unstable mode, used in `ode_record_edge_dW`
+which calls this function at each step in the psiedge -> psilim region of integration. This performs
+the same function as `free_test` in the Fortran code, except we have moved the creation of the
+wv matrix spline to `free_compute_wv_spline` and pass it in `odet`.wvmat_spline.
 """
 function free_compute_total(equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState)
     
