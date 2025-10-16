@@ -205,7 +205,6 @@ determining `psifac`, `psimax`, `ising`, `m1`, `singfac`, and initializing `u`.
 Support for `kin_flag`
 Remove while true logic
 """
-
 function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
     # Shorthand to evaluate q/q1 inside newton iteration
