@@ -193,7 +193,7 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
     dmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     emats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     hmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    fmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    # fmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     gmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     kmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     dbats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
@@ -207,6 +207,7 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
     g12 = zeros(ComplexF64, 2 * intr.mband + 1)
     jmat = zeros(ComplexF64, 2 * intr.mband + 1)
     jmat1 = zeros(ComplexF64, 2 * intr.mband + 1)
+    fmats = zeros(ComplexF64, mpsi, div((intr.mband+1)*(2*intr.mpert-intr.mband),2))
 
     # Instead of using Offset Arrays like in Fortran (-mband:mband), we store everything in
     # a single 1:(2*mband+1) array and map the zero index to the middle
@@ -222,7 +223,8 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
         dmat = @view dmats[ipsi, :, :]
         emat = @view emats[ipsi, :, :]
         hmat = @view hmats[ipsi, :, :]
-        fmat = @view fmats[ipsi, :, :]
+        # fmat = @view fmats[ipsi, :, :]
+        fmat = zeros(ComplexF64, intr.mpert, intr.mpert) # temporary dense matrix for factorization
         gmat = @view gmats[ipsi, :, :]
         kmat = @view kmats[ipsi, :, :]
         dbat = @view dbats[ipsi, :, :]
@@ -310,14 +312,29 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
         # Store factorized F matrix (lower triangular only) since we always will need F⁻¹ later
         # and this make computation more efficient via combined forward and back substitution
         if isposdef(Hermitian(fmat, :L))
-            fmat .= cholesky(Hermitian(fmat)).L
+            # ftemp = cholesky(Hermitian(fmat)).L
+            fmat = cholesky(Hermitian(BandedMatrix(fmat, (intr.mband, 0)), :L)).L
+            if ipsi == 1
+                display(fmat)
+                display(gmat)
+            end
+            # fmat .= cholesky(Hermitian(fmat)).L
         else
             error("cholesky: fmat is not positive definite (singular) at ipsi = $ipsi, reduce delta_mband")
         end
 
         # TODO: add kinetic matrices here
 
-        # TODO: banded matrix calculations would also go here if implemented
+        # To create the splines, we must store the matrices in banded format
+        # Note that fmats is stored as the factorized lower triangular matrix only
+        iqty = 1
+        for jpert in 1:intr.mpert
+            for ipert in jpert:min(intr.mpert, jpert + intr.mband)
+                fmats[ipsi, iqty] = fmat[ipert, jpert]
+                # gmats[ipsi, iqty] = gmat[ipert, jpert]
+                iqty += 1
+            end
+        end
     end
 
     # --- Fit splines (reshape 3D to 2D: (mpsi) × (mpert^2)) ---
@@ -348,7 +365,7 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
         ffit.asmat .= cholesky(Hermitian(ffit.asmat)).L
     end
 
-    # This is used in free_run
+    # This is used in free_run and
     ffit.jmat = jmat
 
     return ffit
