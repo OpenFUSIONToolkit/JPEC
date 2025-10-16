@@ -152,22 +152,6 @@ function Main(path::String)
             println("Integrating Euler-Lagrange equation")
         end
         odet = ode_run(ctrl, equil, ffit, intr, outp)
-        if ctrl.psiedge < intr.psilim
-            # Find the peak dW in the edge region to avoid truncation
-            # just inside a rational surface causing unphysical instability
-            odet.step = findmax(real.(odet.dW_edge))[2]
-            if ctrl.verbose
-                println("Truncating results at peak dW in the edge at ψ = $(odet.psi_store[odet.step]), q = $(Spl.spline_eval(equil.sq, odet.psi_store[odet.step], 0)[4])")
-            end
-            # Cut off integration results here (this deletes psi, u, and ud after the current odet.step)
-            trim_storage!(odet)
-            # Update u, psilim, and qlim for usage in determining wp and wt
-            intr.psilim = odet.psi_store[end]
-            intr.qlim = Spl.spline_eval(equil.sq, intr.psilim, 0)[4]
-            odet.u .= odet.u_store[:, :, :, end]
-            # TODO: decide if we should rewrite euler.h5, dump what the peak step was
-            # cut off the arrays, etc.
-        end
     end
 
     # Compute free boundary energies

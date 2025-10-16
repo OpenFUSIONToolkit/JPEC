@@ -48,7 +48,7 @@ including solution vectors, tolerances, and flags for the integration process.
     nzero::Int = 0              # count of zero crossings detected
 
     # Used for Gaussian reduction
-    new::Bool = true            # flag for new solution
+    new::Bool = true            # flag for computing new unorm0 after a fixup
     unorm::Vector{Float64} = zeros(Float64, 2 * mpert)                        # norms of solution vectors
     unorm0::Vector{Float64} = zeros(Float64, 2 * mpert)                       # initial norms of solution vectors
     ifix::Int = 0                # index for number of unorms performed
@@ -114,22 +114,17 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         error("Invalid value for sing_start: $(ctrl.sing_start) > msing = $(intr.msing)")
     end
 
+    # Since we search for the peak dW in this region, initialize to -Infinity
     if ctrl.psiedge < intr.psilim
-        # We will search for the peak dW in this region, so inialize to -Infinity
-        # This is of size odet.numsteps_init, but we only use a small number of these
-        # Minimal overhead since its just a vector of floats
         fill!(odet.dW_edge, -Inf * (1 + im))
     end
 
-    if ctrl.verbose # mimicing an output from ode_output_open
+    if ctrl.verbose # mimicing output from ode_output_open
         println("   ψ = $(odet.psifac), q = $(Spl.spline_eval(equil.sq, odet.psifac, 0)[4])")
     end
 
     # Write header data to files
     ode_output_init(ctrl, equil, intr, odet, outp)
-
-    # TODO: Ensure that this section exactly reproduces all functionality of the Fortran
-    # Might be good for ideal case, but maybe things I haven't considered break this
 
     # Always integrate once, even if no rational surfaces are crossed
     ode_step!(odet, ctrl, equil, ffit, intr, outp)
@@ -149,8 +144,25 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
     end
 
     # Deallocate unused storage of integration data
-    odet.step -= 1 # step was incremented one extra time in ode_step!
-    trim_storage!(odet)
+    if ctrl.psiedge < intr.psilim
+        # Find the peak dW in the edge region and truncate integration data there
+        odet.step = findmax(real.(odet.dW_edge))[2]
+        trim_storage!(odet)
+        if ctrl.verbose
+            println("Truncating integration at peak edge dW: ψ = $(odet.psi_store[odet.step]), q = $(Spl.spline_eval(equil.sq, odet.psi_store[odet.step], 0)[4])")
+        end
+
+        # Update u, psilim, and qlim for usage in determining wp and wt
+        intr.psilim = odet.psi_store[end]
+        intr.qlim = Spl.spline_eval(equil.sq, intr.psilim, 0)[4]
+        odet.u .= odet.u_store[:, :, :, end]
+
+        # TODO: ask Nik if there would be any issues with no overwriting psilim and qlim in euler.h5
+        # it looks like in Fortran it is not, but good to check
+    else
+        odet.step -= 1 # step was incremented one extra time in ode_step!
+        trim_storage!(odet)
+    end
 
     if outp.write_euler_h5
         if ctrl.verbose
