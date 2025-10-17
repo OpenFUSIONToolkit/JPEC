@@ -11,6 +11,7 @@ import ..Equilibrium
 import ..Spl
 import ..VacuumMod
 using Printf
+import StaticArrays: @MVector, @MMatrix
 
 # Include all necessary files
 include("DconStructs.jl")

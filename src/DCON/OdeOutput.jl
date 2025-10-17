@@ -16,7 +16,7 @@ Place outputs in a Julia do loop for automatic file closing
 function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
     # TODO: mess with this to condense the number of calls? Maybe allow it to pass in dicts
-    
+
     # Write euler.h5 header info
     if outp.write_euler_h5
         h5open(joinpath(intr.dir_path, outp.fname_euler_h5), "w") do euler_h5
@@ -33,7 +33,7 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
             euler_h5["info/psilim"] = intr.psilim
             euler_h5["info/qlim"] = intr.qlim
             euler_h5["info/mthsurf0"] = outp.mthsurf0 #TODO: mthsurf0 is deprecated
-            
+
             # Write equilibrium parameters
             euler_h5["equil/nr"] = length(equil.rzphi.xs) # TODO: equil save mpsi as really mpsi - 1, fix this
             euler_h5["equil/nz"] = length(equil.rzphi.ys)
@@ -232,18 +232,20 @@ Decide if we want to just pass in the relevant quantities instead of structs for
 function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m1::Int, nn::Int, sq::Spl.CubicSpline)
 
     # Compute inverse plasma response matrix
-    uu = u[:, 1:mpert, :]
-    wp = adjoint(uu[:, :, 1])
-    temp = adjoint(uu[:, :, 2])
+    wp = adjoint(u[:, 1:mpert, 1])         # adjoint = conjugate transpose
+    temp = adjoint(u[:, 1:mpert, 2])
 
     # Compute wp using LU decomposition
     temp_fact = lu(temp)
     wp = temp_fact \ wp
-    wp = (wp + adjoint(wp)) / 2
+
+    # Symmetrize
+    wp .+= adjoint(wp)
+    wp .*= 0.5
 
     # Compute and sort inverse eigenvalues
-    evalsi = eigen(Hermitian(wp)).values
-    indexi = sortperm(abs.(evalsi))  # bubble in Fortran sorts in descending order of -|evalsi|, we just do ascending order of |evalsi|
+    evalsi = eigvals!(Hermitian(wp))
+    indexi = sortperm(evalsi; by=abs)  # bubble in Fortran sorts in descending order of -|evalsi|, we just do ascending order of |evalsi|
 
     # Compute critical data for each time step
     profiles = Spl.spline_eval(sq, psi, 0)

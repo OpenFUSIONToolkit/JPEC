@@ -55,6 +55,7 @@ including solution vectors, tolerances, and flags for the integration process.
     fmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
     kmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
     gmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
+    tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     Afact::Union{Cholesky{ComplexF64,Matrix{ComplexF64}},Nothing} = nothing
     singfac_vec::Vector{Float64} = Vector{Float64}(undef, mpert)
 
@@ -169,7 +170,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
             euler_h5["normalizations/mfix"] = odet.ifix
             euler_h5["normalizations/fixstep"] = odet.fixstep[1:odet.ifix]
             euler_h5["normalizations/fixfac"] = odet.fixfac[:, :, 1:odet.ifix]
-            euler_h5["normalizations/sing_flag"] = odet.sing_flags[1:odet.ifix]
+            euler_h5["normalizations/sing_flag"] = odet.sing_flag[1:odet.ifix]
             euler_h5["normalizations/index"] = odet.index[:, 1:odet.ifix]
             euler_h5["singular/msing"] = intr.msing
             euler_h5["singular/psi"] = [intr.sing[ising].psifac for ising in 1:intr.msing]
@@ -637,10 +638,8 @@ function compute_tols(ctrl, intr, odet)
     # Absolute tolerances
     atol = similar(odet.u, Float64)
     for ieq in 1:size(odet.u, 3), isol in 1:size(odet.u, 2)
-        atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-        if (atol0 == 0)
-            atol0 = Inf
-        end
+        @views atol0 = maximum(abs, odet.u[:, isol, ieq]) * tol
+        atol0 == 0 && (atol0 = Inf)
         atol[:, isol, ieq] .= atol0
     end
     return rtol, atol
@@ -705,20 +704,25 @@ Add resizing logic for unorm arrays when ifix exceeds allocated size
 """
 function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp::DconOutput, sing_flag::Bool)
     # Compute norms of first solution vectors, abort if any are zero
-    odet.unorm[1:intr.mpert] .= [norm(odet.u[:, j, 1]) for j in 1:intr.mpert]
-    odet.unorm[intr.mpert+1:odet.msol] .= [norm(odet.u[:, j, 2]) for j in intr.mpert+1:odet.msol]
-    if minimum(odet.unorm[1:odet.msol]) == 0
-        jmax = argmin(odet.unorm[1:odet.msol])
+    for j in 1:intr.mpert
+        odet.unorm[j] = @views norm(odet.u[:, j, 1])
+    end
+    for j in intr.mpert+1:odet.msol
+        odet.unorm[j] = @views norm(odet.u[:, j, 2])
+    end
+    umsol = @view(odet.unorm[1:odet.msol])
+    if minimum(umsol) == 0
+        jmax = argmin(umsol)
         error("One of the first solution vector norms unorm(1,$jmax) = 0")
     end
 
     # Normalize unorm and perform Gaussian reduction if required
     if odet.new
         odet.new = false
-        odet.unorm0[1:odet.msol] .= odet.unorm[1:odet.msol]
+        odet.unorm0[1:odet.msol] .= umsol
     else
-        odet.unorm[1:odet.msol] .= odet.unorm[1:odet.msol] ./ odet.unorm0[1:odet.msol]
-        uratio = maximum(odet.unorm[1:odet.msol]) / minimum(odet.unorm[1:odet.msol])
+        @views @. odet.unorm[1:odet.msol] = odet.unorm[1:odet.msol] / odet.unorm0[1:odet.msol]
+        uratio = maximum(umsol) / minimum(umsol)
         if uratio > ctrl.ucrit || sing_flag
             # TODO: add resizing logic here as well
             if odet.ifix < ctrl.numunorms_init
@@ -777,19 +781,21 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
             odet.fixfac[isol, isol, ifix] = 1
         end
         # Sort unorm
-        odet.index[1:odet.msol, ifix] .= collect(1:odet.msol)
+        odet.index[1:odet.msol, ifix] .= 1:odet.msol
         odet.index[1:intr.mpert, ifix] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
         odet.index[intr.mpert+1:odet.msol, ifix] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
     end
 
     # Triangularize primary solutions
     mask = trues(2, odet.msol)
+    masked = zeros(typeof(abs(odet.u[1, 1, 1])), intr.mpert)
     for isol in 1:intr.mpert
         ksol = odet.index[isol, ifix]
         mask[2, ksol] = false
         if !test
             # Find max location
-            kpert = argmax(abs.(odet.u[:, ksol, 1]) .* mask[1, 1:intr.mpert])
+            @. @views masked = abs(odet.u[:, ksol, 1]) * mask[1, 1:intr.mpert]
+            @views kpert = argmax(masked)
             mask[1, kpert] = false
         end
         for jsol in 1:odet.msol
@@ -797,7 +803,7 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
                 if !test
                     odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
                 end
-                odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
+                @. @views odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
                 if !test
                     odet.u[kpert, jsol, 1] = 0
                 end
@@ -807,13 +813,12 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
 
     # Triangularize secondary solutions
     if odet.msol > intr.mpert && secondary
-        mask = trues(2, odet.msol)
+        mask .= trues(2, odet.msol)
         for isol in intr.mpert+1:odet.msol
             ksol = odet.index[isol, ifix]
             mask[2, ksol] = false
             if !test
-                absvals = abs.(odet.u[:, ksol, 2])
-                masked = absvals .* mask[1, 1:intr.mpert]
+                @. @views masked = abs(odet.u[:, ksol, 2]) * mask[1, 1:intr.mpert]
                 kpert = argmax(masked)
                 mask[1, kpert] = false
             end
@@ -822,7 +827,7 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
                     if !test
                         odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 2] / odet.u[kpert, ksol, 2]
                     end
-                    odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
+                    @. @views odet.u[:, jsol, :] = odet.u[:, jsol, :] + odet.u[:, ksol, :] * odet.fixfac[ksol, jsol, ifix]
                     if !test
                         odet.u[kpert, jsol, 2] = 0
                     end
@@ -1003,7 +1008,7 @@ function build_ureal(intr::DconInternal, odet::OdeState)
     # and mfix + 1 is the for the region after the last fixup and before the edge
     transforms[:, :, end] = copy(identity)
     for ifix in odet.ifix:-1:1
-        transforms[:, :, ifix] = gauss[:, :, ifix] * transforms[:, :, ifix + 1]
+        transforms[:, :, ifix] = gauss[:, :, ifix] * transforms[:, :, ifix+1]
     end
 
     # Now that we have the transform matrices, we can apply them to the solution vectors
@@ -1013,7 +1018,7 @@ function build_ureal(intr::DconInternal, odet::OdeState)
     for ifix in 1:odet.ifix+1
         kfix = odet.fixstep[ifix]
         for istep in jfix:kfix
-            ureal[istep, :, :] .= odet.u_store[:,:,1,istep] * transforms[:, :, ifix]
+            ureal[istep, :, :] .= odet.u_store[:, :, 1, istep] * transforms[:, :, ifix]
         end
         jfix = kfix + 1
     end
