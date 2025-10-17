@@ -160,17 +160,6 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
             # TODO: for GPEC, should add u1, u2, u3, u4? I think this would just be a
             # matter of adding u[:, :, 2] and ud to the build ureal function, yes?
             euler_h5["integration/ureal"] = ureal
-            # Note: in Julia, we write ureal directly to output, whereas this was done
-            # in idcon.f in GPEC during preprocessing. This will make all outputs relating
-            # to the normalizations unnecessary (since ureal is already the unnormalized solution, 
-            # and the user does not need to see any of this). This includes mfix, fixstep, fixfac, 
-            # sing_flag, and index. Keeping now for testing/backwards compatability with Fortran, 
-            # but eventually can delete.
-            euler_h5["normalizations/mfix"] = odet.ifix
-            euler_h5["normalizations/fixstep"] = odet.fixstep[1:odet.ifix]
-            euler_h5["normalizations/fixfac"] = odet.fixfac[:, :, 1:odet.ifix]
-            euler_h5["normalizations/sing_flag"] = odet.sing_flag[1:odet.ifix]
-            euler_h5["normalizations/index"] = odet.index[:, 1:odet.ifix]
             euler_h5["singular/msing"] = intr.msing
             euler_h5["singular/psi"] = [intr.sing[ising].psifac for ising in 1:intr.msing]
             euler_h5["singular/q"] = [intr.sing[ising].q for ising in 1:intr.msing]
