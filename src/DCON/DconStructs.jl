@@ -219,7 +219,7 @@ end
     dbats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     ebats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     fbats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
-    fmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+    fmats_lower::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     kmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     gmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
 
