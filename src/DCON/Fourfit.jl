@@ -156,6 +156,12 @@ F = L · Lᴴ, which speeds up calculations later (i.e. `sing_der!``). Unlike
 the Fortran, we also do not use OffsetArrays (indexed from -mband:mband),
 but instead use standard Julia arrays and map the zero index to the middle.
 
+Note that even when using dense matrices (delta_mband = 0), the
+`mband` still appears here for backwards compatibility with the Fortran code,
+where the Fourier splines expect it as input. So even though `mband` appears
+a lot below, it is left to make implementing banded matrices easier in the future
+and does not affect the actual matrix sizes, they are all dense.
+
 ### Arguments
 
   - `metric::MetricData`:
@@ -168,14 +174,10 @@ but instead use standard Julia arrays and map the zero index to the middle.
 ### TODOs
 
 Add kinetic metric tensor components for kin_flag = true
-Remove mband if we decide to fully deprecate banded matrices
-Decide error throwing if factorization fails
 Set powers if necessary
 Determine if sas_flag logic is needed
 """
-function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal)
-
-    # TODO: add banded matrices (if desired), kinetic matrices
+function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal, metric::MetricData)
 
     # --- Extract inputs ---
     sq = equil.sq
@@ -193,12 +195,9 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
     dmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     emats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     hmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    fmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    fmats_lower = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     gmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     kmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    dbats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    ebats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    fbats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     g11 = zeros(ComplexF64, 2 * intr.mband + 1)
     g22 = zeros(ComplexF64, 2 * intr.mband + 1)
     g33 = zeros(ComplexF64, 2 * intr.mband + 1)
@@ -222,12 +221,9 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
         dmat = @view dmats[ipsi, :, :]
         emat = @view emats[ipsi, :, :]
         hmat = @view hmats[ipsi, :, :]
-        fmat = @view fmats[ipsi, :, :]
+        fmat = @view fmats_lower[ipsi, :, :]
         gmat = @view gmats[ipsi, :, :]
         kmat = @view kmats[ipsi, :, :]
-        dbat = @view dbats[ipsi, :, :]
-        ebat = @view ebats[ipsi, :, :]
-        fbat = @view fbats[ipsi, :, :]
 
         # --- Profiles ---
         p1 = sq.fs1[ipsi, 2]
@@ -288,18 +284,12 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
                 kmat[ipert, jpert] = 2π * im * chi1 * (g23[dmidx] + g33[dmidx] * m1 / ctrl.nn)
             end
         end
-        dbat .= dmat
-        ebat .= emat
-        fbat .= fmat
 
-        # --- Factorize and build composites ---
-        # TODO: Fortran throws an error if the factorization fails for a/fmat, not sure what this delta_mband comment is referencing.
-        # I am keeping this here to most closely match the Fortran behavior, but it may be unnecessary if we only use dense matrices.
-        if isposdef(Hermitian(amat, :L))
-            amat_fact = cholesky(Hermitian(amat, :L))
-        else
-            error("cholesky: amat is not positive definite (singular) at ipsi = $ipsi, reduce delta_mband")
-        end
+        # Factorize and build composites
+        # TODO: Fortran threw an error if the factorization fails for a/fmat due to small matrix bandwidth,
+        # (i.e. we cut off too many terms and matrix no longer positive definite). Should add this back in
+        # if we implement banded matrices.
+        amat_fact = cholesky(Hermitian(amat, :L))
         temp1 = amat_fact \ dmat
         temp2 = amat_fact \ cmat
         # Use * for matrix multiplication (instead of .* for element-wise)
@@ -309,15 +299,9 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
 
         # Store factorized F matrix (lower triangular only) since we always will need F⁻¹ later
         # and this make computation more efficient via combined forward and back substitution
-        if isposdef(Hermitian(fmat, :L))
-            fmat .= cholesky(Hermitian(fmat)).L
-        else
-            error("cholesky: fmat is not positive definite (singular) at ipsi = $ipsi, reduce delta_mband")
-        end
+        fmat .= cholesky(Hermitian(fmat)).L
 
         # TODO: add kinetic matrices here
-
-        # TODO: banded matrix calculations would also go here if implemented
     end
 
     # --- Fit splines (reshape 3D to 2D: (mpsi) × (mpert^2)) ---
@@ -328,12 +312,9 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
     ffit.dmats = Spl.CubicSpline(metric.xs, reshape(dmats, mpsi, :); bctype=3)
     ffit.emats = Spl.CubicSpline(metric.xs, reshape(emats, mpsi, :); bctype=3)
     ffit.hmats = Spl.CubicSpline(metric.xs, reshape(hmats, mpsi, :); bctype=3)
-    ffit.fmats = Spl.CubicSpline(metric.xs, reshape(fmats, mpsi, :); bctype=3)
+    ffit.fmats_lower = Spl.CubicSpline(metric.xs, reshape(fmats_lower, mpsi, :); bctype=3)
     ffit.gmats = Spl.CubicSpline(metric.xs, reshape(gmats, mpsi, :); bctype=3)
     ffit.kmats = Spl.CubicSpline(metric.xs, reshape(kmats, mpsi, :); bctype=3)
-    ffit.dbats = Spl.CubicSpline(metric.xs, reshape(dbats, mpsi, :); bctype=3)
-    ffit.ebats = Spl.CubicSpline(metric.xs, reshape(ebats, mpsi, :); bctype=3)
-    ffit.fbats = Spl.CubicSpline(metric.xs, reshape(fbats, mpsi, :); bctype=3)
 
     # TODO: set powers
     # Do we need this yet? Only called if power_flag = true
