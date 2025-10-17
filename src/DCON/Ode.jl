@@ -963,7 +963,7 @@ end
     build_ureal(intr::DconInternal, odet::OdeState)
 
 Constructs the transformation matrices to convert the complex solution vectors
-to real-valued vectors in each region between fixups. Effectively "undos" the
+to real-valued vectors in each region between fixups. Effectively "undoes" the
 Gaussian reduction applied during fixups throughout the integration, such that
 we have the true solution vectors for use in GPEC.
 """
