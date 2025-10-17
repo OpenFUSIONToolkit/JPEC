@@ -32,12 +32,12 @@ end
         ifix = 1
         odet = JPEC.DCON.OdeState(msol, msol, 10, 10, 10)
         odet.u = randn(ComplexF64, msol, msol, 2)
-        odet.unorm = [norm(odet.u[:,i,1]) for i in 1:msol]
+        odet.unorm = [norm(odet.u[:, i, 1]) for i in 1:msol]
         odet.ifix = ifix
         odet.fixfac = zeros(ComplexF64, odet.msol, odet.msol, ifix)
         intr = JPEC.DCON.DconInternal()
         intr.mpert = msol
-        outp = JPEC.DCON.DconOutput(; write_crit_out = false, write_dcon_out = false, write_euler_h5 = false, write_eqdata_h5 = false)
+        outp = JPEC.DCON.DconOutput(; write_crit_out=false, write_dcon_out=false, write_euler_h5=false, write_eqdata_h5=false)
 
         # Save copy of original u and run
         u_orig = copy(odet.u)
@@ -68,10 +68,10 @@ end
         # unorm = [norm(odet.u[:,i,1]) for i in 1:msol] in the Fortran to avoid
         # also having to save unorm0
         odet.u = load_u_matrix(joinpath(@__DIR__, "test_data", "u_prefixup.dat"))
-        odet.unorm = [norm(odet.u[:,i,1]) for i in 1:msol]
+        odet.unorm = [norm(odet.u[:, i, 1]) for i in 1:msol]
         odet.ifix = ifix
         odet.fixfac = zeros(ComplexF64, odet.msol, odet.msol, ifix)
-        intr = JPEC.DCON.DconInternal(mpert=msol)
+        intr = JPEC.DCON.DconInternal(; mpert=msol)
 
         JPEC.DCON.ode_fixup!(odet, intr, outp, false, false)
 
@@ -88,14 +88,14 @@ end
         intr.mpert = msol
         ctrl = JPEC.DCON.DconControl()
         ctrl.ucrit = 10.0
-        outp = JPEC.DCON.DconOutput(; write_crit_out = false, write_dcon_out = false, write_euler_h5 = false, write_eqdata_h5 = false)
+        outp = JPEC.DCON.DconOutput(; write_crit_out=false, write_dcon_out=false, write_euler_h5=false, write_eqdata_h5=false)
 
         # Case 1: Basic norm computation
         odet.u = zeros(ComplexF64, 2, 2, 2)
-        odet.u[:,1,1] .= [3, 4]          # norm = 5
-        odet.u[:,2,1] .= [0, 2]          # norm = 2
+        odet.u[:, 1, 1] .= [3, 4]          # norm = 5
+        odet.u[:, 2, 1] .= [0, 2]          # norm = 2
 
-        JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, false)
+        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
         # After the first run with new=True (default), unorm0 should be set to unorm
         # and new should be false
         @test odet.unorm[1:intr.mpert] ≈ [5, 2]
@@ -103,29 +103,29 @@ end
         @test odet.new == false
 
         # Case 2: Error on zero norm
-        odet.u[:,1,1] .= 0
+        odet.u[:, 1, 1] .= 0
         odet.new = true
-        @test_throws ErrorException JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, false)
+        @test_throws ErrorException JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
 
         # Case 3: Normalization on second call
-        odet.u[:,1,1] .= [3,4]   # norm = 5
-        odet.u[:,2,1] .= [0,2]   # norm = 2
+        odet.u[:, 1, 1] .= [3, 4]   # norm = 5
+        odet.u[:, 2, 1] .= [0, 2]   # norm = 2
         odet.new = false
-        JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, false)
-        @test odet.unorm[1:intr.mpert] ≈ [1,1]
+        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
+        @test odet.unorm[1:intr.mpert] ≈ [1, 1]
 
         # Case 4: Trigger fixup via ucrit
-        odet.unorm0 = ones(2*intr.mpert)
-        odet.u[:,1,1] .= [1000,0]   # large norm
-        odet.u[:,2,1] .= [1,0]      # small norm
-        JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, false)
+        odet.unorm0 = ones(2 * intr.mpert)
+        odet.u[:, 1, 1] .= [1000, 0]   # large norm
+        odet.u[:, 2, 1] .= [1, 0]      # small norm
+        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
         @test odet.new == true  # implies fixup ran
 
         # Case 5: Trigger fixup via sing_flag
         odet.new = false
-        odet.u[:,1,1] .= [1,0]
-        odet.u[:,2,1] .= [1,0]
-        JPEC.DCON.ode_unorm!(odet, intr, ctrl, outp, true)
+        odet.u[:, 1, 1] .= [1, 0]
+        odet.u[:, 2, 1] .= [1, 0]
+        JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, true)
         @test odet.new == true  # fixup triggered
     end
 end

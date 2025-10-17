@@ -2,8 +2,8 @@
     mercier_scan!(locstab_fs::Array{Float64,5}, plasma_eq::PlasmaEquilibrium)
 
 Evaluates Mercier criterion for local stability and modifies results in place
-within the local stability array.
-
+within the local stability array. Performs the same function as `mercier_scan`
+in the Fortran code.
 """
 function mercier_scan!(locstab_fs::Matrix{Float64}, plasma_eq::Equilibrium.PlasmaEquilibrium)
 
@@ -69,8 +69,8 @@ function mercier_scan!(locstab_fs::Matrix{Float64}, plasma_eq::Equilibrium.Plasm
         h = twopif * p1 * v1 / (q1 * chi1^3) * (avg[2] - avg[1] / avg[5])
 
         # Store results in output spline structure
-        locstab_fs[ipsi, 1] = di * sq.xs[ipsi] # is this the right 'psis'?
-        locstab_fs[ipsi, 2] = (di + (h - 0.5)^2) * sq.xs[ipsi] # is this the right 'psis'?
+        locstab_fs[ipsi, 1] = di * sq.xs[ipsi]
+        locstab_fs[ipsi, 2] = (di + (h - 0.5)^2) * sq.xs[ipsi]
         locstab_fs[ipsi, 3] = h
     end
 end
