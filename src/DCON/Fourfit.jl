@@ -158,7 +158,7 @@ but instead use standard Julia arrays and map the zero index to the middle.
 
 Note that even when using dense matrices (delta_mband = 0), the
 `mband` still appears here for backwards compatibility with the Fortran code,
-where the Fourier splines expect it as input.` So even though `mband` appears
+where the Fourier splines expect it as input. So even though `mband` appears
 a lot below, it is left to make implementing banded matrices easier in the future
 and does not affect the actual matrix sizes, they are all dense.
 
@@ -177,7 +177,7 @@ Add kinetic metric tensor components for kin_flag = true
 Set powers if necessary
 Determine if sas_flag logic is needed
 """
-function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal)
+function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal, metric::MetricData)
 
     # --- Extract inputs ---
     sq = equil.sq
@@ -198,9 +198,6 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
     fmats_lower = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     gmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     kmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    dbats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    ebats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    fbats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
     g11 = zeros(ComplexF64, 2 * intr.mband + 1)
     g22 = zeros(ComplexF64, 2 * intr.mband + 1)
     g33 = zeros(ComplexF64, 2 * intr.mband + 1)
@@ -227,9 +224,6 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
         fmat = @view fmats_lower[ipsi, :, :]
         gmat = @view gmats[ipsi, :, :]
         kmat = @view kmats[ipsi, :, :]
-        dbat = @view dbats[ipsi, :, :]
-        ebat = @view ebats[ipsi, :, :]
-        fbat = @view fbats[ipsi, :, :]
 
         # --- Profiles ---
         p1 = sq.fs1[ipsi, 2]
@@ -290,11 +284,8 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
                 kmat[ipert, jpert] = 2π * im * chi1 * (g23[dmidx] + g33[dmidx] * m1 / ctrl.nn)
             end
         end
-        dbat .= dmat
-        ebat .= emat
-        fbat .= fmat
 
-        # --- Factorize and build composites ---
+        # Factorize and build composites
         # TODO: Fortran threw an error if the factorization fails for a/fmat due to small matrix bandwidth,
         # (i.e. we cut off too many terms and matrix no longer positive definite). Should add this back in
         # if we implement banded matrices.
@@ -324,9 +315,6 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
     ffit.fmats_lower = Spl.CubicSpline(metric.xs, reshape(fmats_lower, mpsi, :); bctype=3)
     ffit.gmats = Spl.CubicSpline(metric.xs, reshape(gmats, mpsi, :); bctype=3)
     ffit.kmats = Spl.CubicSpline(metric.xs, reshape(kmats, mpsi, :); bctype=3)
-    ffit.dbats = Spl.CubicSpline(metric.xs, reshape(dbats, mpsi, :); bctype=3)
-    ffit.ebats = Spl.CubicSpline(metric.xs, reshape(ebats, mpsi, :); bctype=3)
-    ffit.fbats = Spl.CubicSpline(metric.xs, reshape(fbats, mpsi, :); bctype=3)
 
     # TODO: set powers
     # Do we need this yet? Only called if power_flag = true

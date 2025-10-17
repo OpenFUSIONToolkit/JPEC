@@ -311,7 +311,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             f_lower[ipert, jpert, 1] = singfac[ipert, 1] * f_lower_interp[ipert, jpert, 1]
             if ctrl.sing_order ≥ 1
                 f_lower[ipert, jpert, 2] = singfac[ipert, 1] * f_lower_interp[ipert, jpert, 2] +
-                                            singfac[ipert, 2] * f_lower_interp[ipert, jpert, 1]
+                                           singfac[ipert, 2] * f_lower_interp[ipert, jpert, 1]
             end
             if ctrl.sing_order ≥ 2
                 f_lower[ipert, jpert, 3] =
@@ -334,7 +334,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             end
             if ctrl.sing_order ≥ 5
                 f_lower[ipert, jpert, 6] = 10 * singfac[ipert, 3] * f_lower_interp[ipert, jpert, 4] +
-                                     10 * singfac[ipert, 4] * f_lower_interp[ipert, jpert, 3]
+                                           10 * singfac[ipert, 4] * f_lower_interp[ipert, jpert, 3]
             end
             if ctrl.sing_order ≥ 6
                 f_lower[ipert, jpert, 7] = 20 * singfac[ipert, 4] * f_lower_interp[ipert, jpert, 4]
@@ -620,19 +620,19 @@ end
     )
 
 Evaluate the derivative of the Euler-Lagrange equations, i.e. u' in equation 24 of Glasser 2016.
+This function performs the same role as `sing_der` in the Fortran code, with main differences
+coming from hiding LAPACK operations under the hood via Julia's LinearAlgebra package,
+so the code is much more straightforward.
+
 This follows the Julia DifferentialEquations package format for in place updating.
 
     ode_function!(du, u, p, t)
 
-# "Defining your ODE function to be in-place updating can have performance benefits.
-
-# What this means is that, instead of writing a function which outputs its solution,
-
-# you write a function which updates a vector that is designated to hold the solution.
-
-# By doing this, DifferentialEquations.jl's solver packages are able to reduce the
-
-# amount of array allocations and achieve better performance."
+From DifferentialEquations.jl docs: Defining your ODE function to be in-place updating
+can have performance benefits. What this means is that, instead of writing a function
+which outputs its solution, you write a function which updates a vector that is designated
+to hold the solution. By doing this, DifferentialEquations.jl's solver packages are able
+to reduce the amount of array allocations and achieve better performance.
 
 Wherever possible, in-place operations on pre-allocated arrays are used to minimize memory allocations.
 All LAPACK operations are handled under the hood by Julia's LinearAlgebra package, so we can obtain a much
@@ -648,7 +648,6 @@ more simplistic code with similar performance.
 ### TODOs
 
 Implement kin_flag functionality
-Banded matrix calculations or removing mention of their existence
 """
 function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
     params::Tuple{DconControl,Equilibrium.PlasmaEquilibrium,
@@ -689,8 +688,6 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
         ldiv!(odet.Afact, bmat)
         # cmat = A⁻¹ * cmat
         ldiv!(odet.Afact, cmat)
-
-        # TODO: banded matrix calculations would go here
     end
 
     # Compute du

@@ -216,18 +216,17 @@ end
     dmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     emats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     hmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
-    dbats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
-    ebats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
-    fbats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     fmats_lower::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     kmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
     gmats::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing
+
+    # Used in Free.jl
+    jmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, 2 * mband + 1)
 
     # TODO: these might be deprecated? They're used with a ahb_flag in free
     asmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     bsmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     csmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
-    jmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, 2 * mband + 1)
 
     parallel_threads::Int = 0
     dcon_kin_threads::Int = 0
