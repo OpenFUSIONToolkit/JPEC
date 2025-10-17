@@ -61,6 +61,7 @@ including solution vectors, tolerances, and flags for the integration process.
     fmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
     kmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
     gmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
+    tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     Afact::Union{Cholesky{ComplexF64,Matrix{ComplexF64}}, Nothing} = nothing
     singfac_vec::Vector{Float64} = Vector{Float64}(undef, mpert)
 

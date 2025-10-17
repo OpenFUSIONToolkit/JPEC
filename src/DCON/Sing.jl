@@ -649,7 +649,7 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         # TODO: banded matrix calculations would go here
     end
 
-    tmp = zeros(ComplexF64, size(du,1), size(du,2))
+    odet.tmp .= 0
     u1 = @view(u[:, :, 1])
     u2 = @view(u[:, :, 2])
     # Compute du
@@ -663,25 +663,25 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         # du[1] = - K * u[1] + u[2]
 
         du[:, :, 1] .= u2 .* odet.singfac_vec
-        mul!(tmp, kmat, u1)
-        @views du[:, :, 1] .-= tmp
+        mul!(odet.tmp, kmat, u1)
+        @views du[:, :, 1] .-= odet.tmp
 
         # du[1] = - F⁻¹ * K * u[1] + F⁻¹ * u[2] (remember F is already stored in factored form)
         @views ldiv!(LowerTriangular(fmat), du[:, :, 1])
         @views ldiv!(UpperTriangular(fmat'), du[:, :, 1])
 
         # du[2] = G * u[1] + K' * du[1] = G * u[1] - K^† * F⁻¹ * K * u[1] + K^† * F⁻¹ * u[2]
-        mul!(tmp, gmat, u1)
-        @views du[:, :, 2] .= tmp
-        @views mul!(tmp, adjoint(kmat), du[:, :, 1])
-        @views du[:, :, 2] .+= tmp
+        mul!(odet.tmp, gmat, u1)
+        @views du[:, :, 2] .= odet.tmp
+        @views mul!(odet.tmp, adjoint(kmat), du[:, :, 1])
+        @views du[:, :, 2] .+= odet.tmp
         @views du[:, :, 1] .*= odet.singfac_vec
     end
 
     # u-derivative used in GPEC
     @views odet.ud[:,:,1] .= du[:,:,1]
-    @views mul!(tmp, bmat, du[:,:,1])
-    odet.ud[:,:,2] .= .-tmp
-    @views mul!(tmp, cmat, u[:,:,1])
-    odet.ud[:,:,2] .-= tmp
+    @views mul!(odet.tmp, bmat, du[:,:,1])
+    odet.ud[:,:,2] .= .-odet.tmp
+    @views mul!(odet.tmp, cmat, u[:,:,1])
+    odet.ud[:,:,2] .-= odet.tmp
 end
