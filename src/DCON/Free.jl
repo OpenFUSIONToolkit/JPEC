@@ -396,11 +396,11 @@ function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEqui
         wv_array[i, :] .= reshape(wv, intr.mpert^2)
     end
 
-    # TODO: do we need an unset_dcon_params function to free VACUUM memory?
+    # Free VACUUM memory
+    VacuumMod.unset_dcon_params()
 
     return Spl.CubicSpline(psi_array, wv_array; bctype=3)
 end
-
 
 """
     free_compute_total(equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState) -> ComplexF64
