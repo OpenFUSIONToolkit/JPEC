@@ -169,7 +169,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
             euler_h5["normalizations/mfix"] = odet.ifix
             euler_h5["normalizations/fixstep"] = odet.fixstep[1:odet.ifix]
             euler_h5["normalizations/fixfac"] = odet.fixfac[:, :, 1:odet.ifix]
-            euler_h5["normalizations/sing_flag"] = odet.sing_flags[1:odet.ifix]
+            euler_h5["normalizations/sing_flag"] = odet.sing_flag[1:odet.ifix]
             euler_h5["normalizations/index"] = odet.index[:, 1:odet.ifix]
             euler_h5["singular/msing"] = intr.msing
             euler_h5["singular/psi"] = [intr.sing[ising].psifac for ising in 1:intr.msing]
