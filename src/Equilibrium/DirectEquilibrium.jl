@@ -12,25 +12,23 @@ representation of the plasma equilibrium.
 Internal mutable struct to hold B-field components and their derivatives at a point.
 It is used as a temporary workspace to avoid allocations in tight loops.
 """
-mutable struct DirectBField
-    psi::Float64
-    psir::Float64   # d(psi)/dr
-    psiz::Float64   # d(psi)/dz
-    psirz::Float64  # d2(psi)/drdz
-    psirr::Float64  # d2(psi)/drdr
-    psizz::Float64  # d2(psi)/dzdz
-    f::Float64      # F = R*Bt
-    f1::Float64     # dF/d(psi_norm)
-    p::Float64      # mu0*Pressure
-    p1::Float64     # dP/d(psi_norm)
-    br::Float64     # Br
-    bz::Float64     # Bz
-    brr::Float64    # d(Br)/dr
-    brz::Float64    # d(Br)/dz
-    bzr::Float64    # d(Bz)/dr
-    bzz::Float64    # d(Bz)/dz
-
-    DirectBField() = new(zeros(Float64, 16)...)
+@kwdef mutable struct DirectBField
+    psi::Float64 = 0.0
+    psir::Float64 = 0.0   # d(psi)/dr
+    psiz::Float64 = 0.0   # d(psi)/dz
+    psirz::Float64 = 0.0  # d2(psi)/drdz
+    psirr::Float64 = 0.0  # d2(psi)/drdr
+    psizz::Float64 = 0.0  # d2(psi)/dzdz
+    f::Float64 = 0.0      # F = R*Bt
+    f1::Float64 = 0.0     # dF/d(psi_norm)
+    p::Float64 = 0.0      # mu0*Pressure
+    p1::Float64 = 0.0     # dP/d(psi_norm)
+    br::Float64 = 0.0     # Br
+    bz::Float64 = 0.0     # Bz
+    brr::Float64 = 0.0    # d(Br)/dr
+    brz::Float64 = 0.0    # d(Br)/dz
+    bzr::Float64 = 0.0    # d(Bz)/dr
+    bzz::Float64 = 0.0    # d(Bz)/dz
 end
 
 """
@@ -553,7 +551,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
             theta_val = rzphi_y_nodes[itheta]
             f, f1 = Spl.spline_eval(ff, theta_val, 1)
 
-            rzphi_fs_nodes[ipsi, itheta, 1:3] = f[1:3]
+            @views rzphi_fs_nodes[ipsi, itheta, 1:3] = f[1:3]
             jac_term = (1.0 + f1[4]) * y_out[end, 2] * (2 * pi) * psio
             rzphi_fs_nodes[ipsi, itheta, 4] = jac_term
         end
@@ -599,7 +597,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
     # 6. Calculate final physics quantities (B-field, metric components, etc.)
     println("Calculating final physics quantities (B, g_ij)...")
     eqfun_fs_nodes = zeros(Float64, mpsi + 1, mtheta + 1, 3)
-    v = zeros(Float64, 2, 3)
+    v = @MMatrix zeros(Float64, 2, 3)
 
     for ipsi in 1:(mpsi+1), itheta in 1:(mtheta+1)
         psi_norm = sq_x_nodes[ipsi]

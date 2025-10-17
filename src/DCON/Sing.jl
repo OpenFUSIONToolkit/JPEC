@@ -268,8 +268,8 @@ Better way to unpack the cubic splines
 function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
 
     # Initial allocations
-    msol = 2 * intr.mpert
-    q = zeros(Float64, 4)
+    msol = 2 * intr.mpert # TODO: make sure this doesn't get updated as a global elsewhere in the Fortran
+    q = @MVector zeros(Float64, 4)
     singfac = zeros(Float64, intr.mpert, 4)
     f_lower_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
     g_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
@@ -341,7 +341,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             end
         end
     end
-    f0_lower .= f_lower[:, :, 1]
+    @views f0_lower .= f_lower[:, :, 1]
 
     # Compute product (lower half only) of Hermitian matrix F
     # When we wrap the matrix multiplications later with Hermitian(ff),
@@ -360,7 +360,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             end
             fac1 *= (n - j) / (j + 1)
         end
-        ff_lower[:, :, n+1] ./= fac0
+        @views ff_lower[:, :, n+1] ./= fac0
         fac0 *= (n + 1)
     end
 
@@ -428,20 +428,20 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Compute zeroth-order x1
     for isol in 1:msol
-        x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
+        @views x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
     end
     # f is prefactorized so can just use this calculation to get F⁻¹x
-    x[:, :, 1, 1] = UpperTriangular(f0_lower') \ (LowerTriangular(f0_lower) \ x[:, :, 1, 1])
+    @views x[:, :, 1, 1] = UpperTriangular(f0_lower') \ (LowerTriangular(f0_lower) \ x[:, :, 1, 1])
 
     # Compute higher-order x1
     for i in 1:ctrl.sing_order
         for isol in 1:msol
             for j in 1:i
-                x[:, isol, 1, i+1] .-= Hermitian(ff_lower[:, :, j+1], :L) * x[:, isol, 1, i-j+1]
+                @views x[:, isol, 1, i+1] .-= Hermitian(ff_lower[:, :, j+1], :L) * x[:, isol, 1, i-j+1]
             end
-            x[:, isol, 1, i+1] .-= k[:, :, i+1] * v[:, isol, 1]
+            @views x[:, isol, 1, i+1] .-= k[:, :, i+1] * v[:, isol, 1]
         end
-        x[:, :, 1, i+1] = UpperTriangular(f0_lower') \ (LowerTriangular(f0_lower) \ x[:, :, 1, i+1])
+        @views x[:, :, 1, i+1] = UpperTriangular(f0_lower') \ (LowerTriangular(f0_lower) \ x[:, :, 1, i+1])
     end
 
     # Compute x2
@@ -529,10 +529,13 @@ function sing_matmul(a::Array{ComplexF64,3}, b::Array{ComplexF64,3})
     c = zeros(ComplexF64, size(a, 1), n, 2)
 
     # main computation
+    tmp = zeros(ComplexF64, size(a, 1))
     for i in 1:n
         for j in 1:2
-            c[:, i, j] .+= a[:, 1:m, j] * b[:, i, 1] +
-                           a[:, m+1:2*m, j] * b[:, i, 2]
+            @views mul!(tmp, a[:, 1:m, j], b[:, i, 1])
+            @views c[:, i, j] .+= tmp
+            @views mul!(tmp, a[:, m+1:2*m, j], b[:, i, 2])
+            @views c[:, i, j] .+= tmp
         end
     end
 
@@ -690,23 +693,36 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
         ldiv!(odet.Afact, cmat)
     end
 
+    odet.tmp .= 0
+    u1 = @view(u[:, :, 1])
+    u2 = @view(u[:, :, 2])
     # Compute du
     if false #(TODO: kin_flag)
         error("kin_flag not implemented yet")
     else
         # See equation 23 in Glasser 2016 DCON paper for derivation
         # du[1] = - K * u[1] + u[2]
-        du[:, :, 1] .= u[:, :, 2] .* odet.singfac_vec .- kmat * u[:, :, 1]
 
-        # du[1] = - F⁻¹ * K * u[1] + F⁻¹ * u[2] (F = L * Lᴴ is stored as L only)
-        du[:, :, 1] .= UpperTriangular(fmat_lower') \ (LowerTriangular(fmat_lower) \ du[:, :, 1])
+        du[:, :, 1] .= u2 .* odet.singfac_vec
+        mul!(odet.tmp, kmat, u1)
+        @views du[:, :, 1] .-= odet.tmp
+
+        # du[1] = - F⁻¹ * K * u[1] + F⁻¹ * u[2] (remember F is already stored in factored form)
+        @views ldiv!(LowerTriangular(fmat_lower), du[:, :, 1])
+        @views ldiv!(UpperTriangular(fmat_lower'), du[:, :, 1])
 
         # du[2] = G * u[1] + K' * du[1] = G * u[1] - K^† * F⁻¹ * K * u[1] + K^† * F⁻¹ * u[2]
-        du[:, :, 2] .= gmat * u[:, :, 1] .+ adjoint(kmat) * du[:, :, 1]
-        du[:, :, 1] .*= odet.singfac_vec
+        mul!(odet.tmp, gmat, u1)
+        @views du[:, :, 2] .= odet.tmp
+        @views mul!(odet.tmp, adjoint(kmat), du[:, :, 1])
+        @views du[:, :, 2] .+= odet.tmp
+        @views du[:, :, 1] .*= odet.singfac_vec
     end
 
     # u-derivative used in GPEC
-    odet.ud[:, :, 1] .= du[:, :, 1]
-    odet.ud[:, :, 2] .= -bmat * du[:, :, 1] - cmat * u[:, :, 1]
+    @views odet.ud[:, :, 1] .= du[:, :, 1]
+    @views mul!(odet.tmp, bmat, du[:, :, 1])
+    odet.ud[:, :, 2] .= .-odet.tmp
+    @views mul!(odet.tmp, cmat, u[:, :, 1])
+    odet.ud[:, :, 2] .-= odet.tmp
 end

@@ -76,7 +76,7 @@ function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int, fft_flag:
     metric.ys .= Vector(rzphi.ys .* 2π)
 
     # Temporary array for contravariant basis vectors
-    v = zeros(Float64, 3, 3)
+    v = @MMatrix zeros(Float64, 3, 3)
 
     # --- Main computation loop over the (ψ, θ) grid ---
     for ipsi in 1:mpsi
@@ -111,12 +111,14 @@ function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int, fft_flag:
             v[3, 3] = 2π * r_major / jac
 
             # Store results
-            metric.fs[ipsi, jtheta, 1] = sum(v[1, :] .^ 2) * jac
-            metric.fs[ipsi, jtheta, 2] = sum(v[2, :] .^ 2) * jac
+            v1 = @view v[1, :]
+            v2 = @view v[2, :]
+            metric.fs[ipsi, jtheta, 1] = dot(v1, v1) * jac
+            metric.fs[ipsi, jtheta, 2] = dot(v2, v2) * jac
             metric.fs[ipsi, jtheta, 3] = v[3, 3] * v[3, 3] * jac
             metric.fs[ipsi, jtheta, 4] = v[2, 3] * v[3, 3] * jac
             metric.fs[ipsi, jtheta, 5] = v[3, 3] * v[1, 3] * jac
-            metric.fs[ipsi, jtheta, 6] = sum(v[1, :] .* v[2, :]) * jac
+            metric.fs[ipsi, jtheta, 6] = dot(v1, v2) * jac
             metric.fs[ipsi, jtheta, 7] = jac
             metric.fs[ipsi, jtheta, 8] = jac1
 
