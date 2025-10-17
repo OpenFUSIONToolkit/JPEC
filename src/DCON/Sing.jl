@@ -724,5 +724,5 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
     @views mul!(odet.tmp, bmat, du[:, :, 1])
     odet.ud[:, :, 2] .= .-odet.tmp
     @views mul!(odet.tmp, cmat, u[:, :, 1])
-    odet.ud[:, :, 2] .-= odet.tmp
+    @views odet.ud[:, :, 2] .-= odet.tmp
 end
