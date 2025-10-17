@@ -29,7 +29,7 @@ including solution vectors, tolerances, and flags for the integration process.
     index::Array{Int,2} = zeros(Int, mpert, numunorms_init)                                   # indices for sorting solutions
     sing_flag::Vector{Bool} = falses(numunorms_init)                     # flags for singular solutions
     fixfac::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, numunorms_init)             # fixup factors for Gaussian reduction
-    fixstep::Vector{Int64} = zeros(Float64, numunorms_init)               # psi values at which unorms were performed
+    fixstep::Vector{Int64} = zeros(Int64, numunorms_init)               # psi values at which unorms were performed
 
     # Data for integrator
     singfac::Float64 = 0.0      # separation from singular surface in terms of m - nq
