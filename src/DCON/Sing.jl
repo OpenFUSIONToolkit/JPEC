@@ -238,7 +238,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Initial allocations
     msol = 2 * intr.mpert # TODO: make sure this doesn't get updated as a global elsewhere in the Fortran
-    q = zeros(Float64, 4)
+    q = @MVector zeros(Float64, 4)
     singfac = zeros(Float64, intr.mpert, 4)
     f_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
     g_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
@@ -308,7 +308,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             end
         end
     end
-    f0 .= f[:, :, 1]
+    @views f0 .= f[:, :, 1]
 
     # Compute product of Hermitian matrix F
     fac0 = 1
@@ -324,7 +324,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             end
             fac1 *= (n - j) / (j + 1)
         end
-        ff[:, :, n + 1] ./= fac0
+        @views ff[:, :, n + 1] ./= fac0
         fac0 *= (n + 1)
     end
 
@@ -396,20 +396,20 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Compute zeroth-order x1
     for isol=1:msol
-        x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
+        @views x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
     end
     # f is prefactorized so can just use this calculation to get F⁻¹x
-    x[:, :, 1, 1] = UpperTriangular(f0') \ (LowerTriangular(f0) \ x[:, :, 1, 1])
+   @views x[:, :, 1, 1] = UpperTriangular(f0') \ (LowerTriangular(f0) \ x[:, :, 1, 1])
 
     # Compute higher-order x1
     for i=1:ctrl.sing_order
         for isol=1:msol
             for j=1:i
-                x[:, isol, 1, i + 1] .-= ff[:, :, j + 1] * x[:, isol, 1, i - j + 1]
+                @views x[:, isol, 1, i + 1] .-= ff[:, :, j + 1] * x[:, isol, 1, i - j + 1]
             end
-            x[:, isol, 1, i + 1] .-= k[:, :, i + 1] * v[:, isol, 1]
+            @views x[:, isol, 1, i + 1] .-= k[:, :, i + 1] * v[:, isol, 1]
         end
-        x[:, :, 1, i + 1] = UpperTriangular(f0') \ (LowerTriangular(f0) \ x[:, :, 1, i + 1])
+        @views x[:, :, 1, i + 1] = UpperTriangular(f0') \ (LowerTriangular(f0) \ x[:, :, 1, i + 1])
     end
 
     # Use Hermitian property to fill the upper triangle of g
@@ -505,10 +505,13 @@ function sing_matmul(a::Array{ComplexF64,3}, b::Array{ComplexF64,3})
     c = zeros(ComplexF64, size(a,1), n, 2)
 
     # main computation
+    tmp = zeros(ComplexF64, size(a,1))
     for i in 1:n
         for j in 1:2
-            c[:, i, j] .+= a[:, 1:m, j] * b[:, i, 1] +
-                           a[:, m+1:2*m, j] * b[:, i, 2]
+            @views mul!(tmp, a[:, 1:m, j], b[:, i, 1])
+            @views c[:, i, j] .+= tmp
+            @views mul!(tmp, a[:, m+1:2*m, j], b[:, i, 2])
+            @views c[:, i, j] .+= tmp
         end
     end
 
@@ -646,6 +649,9 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         # TODO: banded matrix calculations would go here
     end
 
+    tmp = zeros(ComplexF64, size(du,1), size(du,2))
+    u1 = @view(u[:, :, 1])
+    u2 = @view(u[:, :, 2])
     # Compute du
     if false #(TODO: kin_flag)
         error("kin_flag not implemented yet")
@@ -655,17 +661,27 @@ function sing_der!(du::Array{ComplexF64, 3}, u::Array{ComplexF64, 3},
         # main thing is I'm not sure where singfac comes from
 
         # du[1] = - K * u[1] + u[2]
-        du[:, :, 1] .= u[:, :, 2] .* odet.singfac_vec .- kmat * u[:, :, 1]
+
+        du[:, :, 1] .= u2 .* odet.singfac_vec
+        mul!(tmp, kmat, u1)
+        @views du[:, :, 1] .-= tmp
 
         # du[1] = - F⁻¹ * K * u[1] + F⁻¹ * u[2] (remember F is already stored in factored form)
-        du[:, :, 1] .= UpperTriangular(fmat') \ (LowerTriangular(fmat) \ du[:, :, 1])
+        @views ldiv!(LowerTriangular(fmat), du[:, :, 1])
+        @views ldiv!(UpperTriangular(fmat'), du[:, :, 1])
 
         # du[2] = G * u[1] + K' * du[1] = G * u[1] - K^† * F⁻¹ * K * u[1] + K^† * F⁻¹ * u[2]
-        du[:, :, 2] .= gmat * u[:, :, 1] .+ adjoint(kmat) * du[:, :, 1]
-        du[:, :, 1] .*= odet.singfac_vec
+        mul!(tmp, gmat, u1)
+        @views du[:, :, 2] .= tmp
+        @views mul!(tmp, adjoint(kmat), du[:, :, 1])
+        @views du[:, :, 2] .+= tmp
+        @views du[:, :, 1] .*= odet.singfac_vec
     end
 
     # u-derivative used in GPEC
-    odet.ud[:,:,1] .= du[:,:,1]
-    odet.ud[:,:,2] .= -bmat * du[:,:,1] - cmat * u[:,:,1]
+    @views odet.ud[:,:,1] .= du[:,:,1]
+    @views mul!(tmp, bmat, du[:,:,1])
+    odet.ud[:,:,2] .= .-tmp
+    @views mul!(tmp, cmat, u[:,:,1])
+    odet.ud[:,:,2] .-= tmp
 end

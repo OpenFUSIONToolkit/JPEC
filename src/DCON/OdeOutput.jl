@@ -279,20 +279,20 @@ A tuple `(q, singfac, logpsi1, logpsi2, crit)` of critical data for the time ste
 function ode_output_get_crit(psi::Float64, u::Array{ComplexF64, 3}, mpert::Int, m1::Int, nn::Int, sq::Spl.CubicSpline)
 
     # Compute inverse plasma response matrix
-    uu = u[:, 1:mpert, :]
-    wp = adjoint(uu[:, :, 1])         # adjoint = conjugate transpose
-    temp = adjoint(uu[:, :, 2])
+    wp = adjoint(u[:, 1:mpert, 1])         # adjoint = conjugate transpose
+    temp = adjoint(u[:, 1:mpert, 2])
 
     # Compute wp using LU decomposition
     temp_fact = lu(temp)
     wp = temp_fact \ wp
 
     # Symmetrize
-    wp = (wp + adjoint(wp)) / 2
+    wp .+= adjoint(wp)
+    wp .*= 0.5
 
     # Compute and sort inverse eigenvalues
-    evalsi = eigen(Hermitian(wp)).values
-    indexi = sortperm(abs.(evalsi))  # bubble in Fortran sorts in descending order of -|evalsi|, we just do ascending order of |evalsi|
+    evalsi = eigvals!(Hermitian(wp))
+    indexi = sortperm(evalsi, by=abs)  # bubble in Fortran sorts in descending order of -|evalsi|, we just do ascending order of |evalsi|
 
     # Compute critical data for each time step
     profiles = Spl.spline_eval(sq, psi, 0)

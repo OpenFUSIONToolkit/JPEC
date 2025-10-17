@@ -163,9 +163,9 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::
         write_output(outp, :euler_h5, ureal; dsetname="integration/ureal")
         # Note: in Julia, we write ureal directly to output, whereas this was done
         # in idcon.f in GPEC during preprocessing. This will make all outputs relating
-        # to the normalizations unnecessary (since ureal is already the unnormalized solution, 
-        # and the user does not need to see any of this). This includes mfix, fixstep, fixfac, 
-        # sing_flag, and index. Keeping now for testing/backwards compatability with Fortran, 
+        # to the normalizations unnecessary (since ureal is already the unnormalized solution,
+        # and the user does not need to see any of this). This includes mfix, fixstep, fixfac,
+        # sing_flag, and index. Keeping now for testing/backwards compatability with Fortran,
         # but eventually can delete.
         write_output(outp, :euler_h5, odet.ifix; dsetname="normalizations/mfix")
         write_output(outp, :euler_h5, odet.fixstep[1:odet.ifix+1]; dsetname="normalizations/fixstep")
@@ -731,8 +731,8 @@ function compute_tols(intr, odet, ctrl)
     # Absolute tolerances
     atol = similar(odet.u, Float64)
     for ieq in 1:size(odet.u,3), isol in 1:size(odet.u,2)
-        atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-        if (atol0 == 0) atol0 = Inf end
+        @views atol0 = maximum(abs, odet.u[:, isol, ieq]) * tol
+        atol0 == 0 && (atol0 = Inf)
         atol[:, isol, ieq] .= atol0
     end
     return rtol, atol
@@ -788,20 +788,25 @@ Throws an error if any vector norm is zero.
 """
 function ode_unorm!(odet::OdeState, intr::DconInternal, ctrl::DconControl, outp::DconOutput, sing_flag::Bool)
     # Compute norms of first solution vectors, abort if any are zero
-    odet.unorm[1:intr.mpert] .= [norm(odet.u[:, j, 1]) for j in 1:intr.mpert]
-    odet.unorm[intr.mpert+1:odet.msol] .= [norm(odet.u[:, j, 2]) for j in intr.mpert+1:odet.msol]
-    if minimum(odet.unorm[1:odet.msol]) == 0
-        jmax = argmin(odet.unorm[1:odet.msol])
+    for j in 1:intr.mpert
+        odet.unorm[j] = @views norm(odet.u[:, j, 1])
+    end
+    for j in intr.mpert+1:odet.msol
+        odet.unorm[j] = @views norm(odet.u[:, j, 2])
+    end
+    umsol = @view(odet.unorm[1:odet.msol])
+    if minimum(umsol) == 0
+        jmax = argmin(umsol)
         error("One of the first solution vector norms unorm(1,$jmax) = 0")
     end
 
     # Normalize unorm and perform Gaussian reduction if required
     if odet.new
         odet.new = false
-        odet.unorm0[1:odet.msol] .= odet.unorm[1:odet.msol]
+        odet.unorm0[1:odet.msol] .= umsol
     else
-        odet.unorm[1:odet.msol] .= odet.unorm[1:odet.msol] ./ odet.unorm0[1:odet.msol]
-        uratio = maximum(odet.unorm[1:odet.msol]) / minimum(odet.unorm[1:odet.msol])
+        @views @. odet.unorm[1:odet.msol] = odet.unorm[1:odet.msol] / odet.unorm0[1:odet.msol]
+        uratio = maximum(umsol) / minimum(umsol)
         if uratio > ctrl.ucrit || sing_flag
             # TODO: add resizing logic here as well
             if odet.ifix < ctrl.numunorms_init
@@ -856,19 +861,21 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
             odet.fixfac[isol, isol, ifix] = 1
         end
         # Sort unorm
-        odet.index[1:odet.msol, ifix] .= collect(1:odet.msol)
+        odet.index[1:odet.msol, ifix] .= 1:odet.msol
         odet.index[1:intr.mpert, ifix] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
         odet.index[intr.mpert+1:odet.msol, ifix] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
     end
 
     # Triangularize primary solutions
     mask = trues(2, odet.msol)
+    masked = zeros(typeof(abs(odet.u[1,1,1])), intr.mpert)
     for isol in 1:intr.mpert
         ksol = odet.index[isol, ifix]
         mask[2, ksol] = false
         if !test
             # Find max location
-            kpert = argmax(abs.(odet.u[:, ksol, 1]) .* mask[1, 1:intr.mpert])
+            @. @views masked = abs(odet.u[:, ksol, 1]) * mask[1, 1:intr.mpert]
+            @views kpert = argmax(masked)
             mask[1, kpert] = false
         end
         for jsol in 1:odet.msol
@@ -876,7 +883,7 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
                 if !test
                     odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
                 end
-                odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
+                @. @views odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
                 if !test
                     odet.u[kpert, jsol, 1] = 0
                 end
@@ -886,13 +893,12 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
 
     # Triangularize secondary solutions
     if odet.msol > intr.mpert && secondary
-        mask = trues(2, odet.msol)
+        mask .= trues(2, odet.msol)
         for isol in intr.mpert + 1:odet.msol
             ksol = odet.index[isol, ifix]
             mask[2, ksol] = false
             if !test
-                absvals = abs.(odet.u[:, ksol, 2])
-                masked = absvals .* mask[1, 1:intr.mpert]
+                @. @views masked = abs(odet.u[:, ksol, 2]) * mask[1, 1:intr.mpert]
                 kpert = argmax(masked)
                 mask[1, kpert] = false
             end
@@ -901,7 +907,7 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
                     if !test
                         odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 2] / odet.u[kpert, ksol, 2]
                     end
-                    odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
+                    @. @views odet.u[:, jsol, :] = odet.u[:, jsol, :] + odet.u[:, ksol, :] * odet.fixfac[ksol, jsol, ifix]
                     if !test
                         odet.u[kpert, jsol, 2] = 0
                     end
