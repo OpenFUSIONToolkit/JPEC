@@ -30,8 +30,6 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
             euler_h5["info/kin_flag"] = ctrl.kin_flag
             euler_h5["info/con_flag"] = ctrl.con_flag
             euler_h5["info/mthvac"] = ctrl.mthvac
-            euler_h5["info/psilim"] = intr.psilim
-            euler_h5["info/qlim"] = intr.qlim
             euler_h5["info/mthsurf0"] = outp.mthsurf0 #TODO: mthsurf0 is deprecated
             
             # Write equilibrium parameters

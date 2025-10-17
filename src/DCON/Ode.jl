@@ -156,9 +156,6 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         intr.psilim = odet.psi_store[end]
         intr.qlim = Spl.spline_eval(equil.sq, intr.psilim, 0)[4]
         odet.u .= odet.u_store[:, :, :, end]
-
-        # TODO: ask Nik if there would be any issues with no overwriting psilim and qlim in euler.h5
-        # it looks like in Fortran it is not, but good to check
     else
         odet.step -= 1 # step was incremented one extra time in ode_step!
         trim_storage!(odet)
@@ -170,6 +167,9 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         end
         # We open in r+ mode to add to the existing file from ode_output_init instead of overwriting it
         h5open(joinpath(intr.dir_path, outp.fname_euler_h5), "r+") do euler_h5
+            # Output psilim and qlim here in case they were changed due to peak edge dW search
+            euler_h5["info/psilim"] = intr.psilim
+            euler_h5["info/qlim"] = intr.qlim
             euler_h5["integration/msol"] = odet.msol
             euler_h5["integration/nstep"] = odet.step
             euler_h5["integration/psi"] = odet.psi_store
@@ -914,9 +914,6 @@ in between psiedge and psilim using `free_compute_wv_spline`, which is then used
 """
 function ode_record_edge_dW!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal)
 
-    # Why is this not just odet.psifac >= ctrl.psiedge?
-    # TODO: ask Nik about this. Is removing the q_edge condition ok?
-    # if q_psifac >= intr.q_edge[intr.i_edge] && odet.psifac >= ctrl.psiedge
     if odet.psifac >= ctrl.psiedge
         # Only create wv matrix spline once
         if !odet.wvmat_spline_created
