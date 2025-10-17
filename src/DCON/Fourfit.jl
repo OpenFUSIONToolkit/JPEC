@@ -5,14 +5,15 @@ A structure to hold the computed metric tensor components and their
 Fourier-spline representation. This is the Julia equivalent of the `fspline_type`
 named `metric` in the Fortran `fourfit_make_metric` subroutine.
 
-# Fields
-- `mpsi::Int`: Number of radial grid points minus one.
-- `mtheta::Int`: Number of poloidal grid points minus one.
-- `xs::Vector{Float64}`: Radial coordinates (normalized poloidal flux `ψ_norm`).
-- `ys::Vector{Float64}`: Poloidal angle coordinates `θ` in radians (0 to 2π).
-- `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi, mtheta, 8)`.
-  The 8 quantities are: `g¹¹`, `g²²`, `g³³`, `g²³`, `g³¹`, `g¹²`, `J`, `∂J/∂ψ`.
-- `fspline::Spl.FourierSpline`: The fitted Fourier-cubic spline object.
+### Fields
+
+  - `mpsi::Int`: Number of radial grid points minus one.
+  - `mtheta::Int`: Number of poloidal grid points minus one.
+  - `xs::Vector{Float64}`: Radial coordinates (normalized poloidal flux `ψ_norm`).
+  - `ys::Vector{Float64}`: Poloidal angle coordinates `θ` in radians (0 to 2π).
+  - `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi, mtheta, 8)`.
+    The 8 quantities are: `g¹¹`, `g²²`, `g³³`, `g²³`, `g³¹`, `g¹²`, `J`, `∂J/∂ψ`.
+  - `fspline::Spl.FourierSpline`: The fitted Fourier-cubic spline object.
 """
 @kwdef mutable struct MetricData
     mpsi::Int
@@ -29,35 +30,33 @@ MetricData(mpsi::Int, mtheta::Int) = MetricData(; mpsi, mtheta)
     make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true) -> MetricData
 
 Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equilibrium.
+The metric coefficients stored in `metric.fs` include:
 
-# Arguments
-- `equil::Equilibrium.PlasmaEquilibrium`:
-    An equilibrium object containing spline data (`rzphi`) for flux coordinates and geometry.
-- `mband::Int=10`:
-    Number of Fourier modes to retain in the metric representation.
-- `fft_flag::Bool=true`:
-    If `true`, enables use of Fourier fitting for storing metric coefficients.
-    (Currently reserved for downstream processing.)
+ 1. g^ψψ · J
+ 2. g^θθ · J
+ 3. g^ζζ · J
+ 4. g^θζ · J
+ 5. g^ζψ · J
+ 6. g^ψθ · J
+ 7. J (Jacobian)
+ 8. ∂J/∂ψ
 
-# Returns
-- `metric::MetricData`:
+### Arguments
+
+  - `mband::Int`: Number of Fourier modes to retain in the metric representation.
+  - `fft_flag::Bool`: If `true`, enables use of Fourier fitting for storing metric coefficients.
+
+### Returns
+
+  - `metric::MetricData`:
     A structure containing the metric coefficients, coordinate grids, and Jacobians for the specified equilibrium.
 
-# Details
-- Uses bicubic spline evaluation (`Spl.bicube_eval`) on the equilibrium geometry to compute
-  contravariant basis vectors ∇ψ, ∇θ, and ∇ζ at each grid point.
-- The metric coefficients stored in `metric.fs` include:
-    1. g^ψψ · J
-    2. g^θθ · J
-    3. g^ζζ · J
-    4. g^θζ · J
-    5. g^ζψ · J
-    6. g^ψθ · J
-    7. J (Jacobian)
-    8. ∂J/∂ψ
-- The ψ grid is taken directly from `rzphi.xs`, and θ is scaled from `[0,1]` to `[0, 2π]`.
+### TODOs
+
+Add kinetic metric tensor components for kin_flag = true
+Remove mband if we decide to fully deprecate banded matrices
 """
-function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true)
+function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int, fft_flag::Bool)
 
     # TODO: add kinetic metric tensor components
 
@@ -147,21 +146,32 @@ end
 """
     make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal) -> FourFitVars
 
-Constructs Fourier–poloidal coupling matrices for a given toroidal mode number and returns them as a new `FourFitVars` object.
+Constructs main DCON matrices for a given toroidal mode number and returns
+them as a new `FourFitVars` object. See the appendix of the 2016 Glasser
+DCON paper for details on the matrix definitions. Performs the same function
+as `fourfit_make_matrix` in the Fortran code, except F, G, and K are now
+stored as dense matrices. The matrix F is stored in factorized form with
+the lower triangle only, because F is Hermitian and can be written as
+F = L · Lᴴ, which speeds up calculations later (i.e. `sing_der!``). Unlike
+the Fortran, we also do not use OffsetArrays (indexed from -mband:mband),
+but instead use standard Julia arrays and map the zero index to the middle.
 
-# Arguments
-- `metric::MetricData`:
+### Arguments
+
+  - `metric::MetricData`:
     Metric coefficients on the (ψ, θ) grid, including Fourier representations of g^ij and J.
-- `equil::Equilibrium.PlasmaEquilibrium`:
-    Plasma equilibrium object providing 1D flux-surface profiles (`sq`) and normalization constants.
-- `ctrl::DconControl`:
-    Control parameters for the DCON calculation, including mode numbers and flags.
-- `intr::DconInternal`:
-    Internal state for the DCON calculation, including mode number ranges and splines.
 
-# Returns
-- `ffit::FourFitVars`:
-    A container holding cubic spline fits of the assembled matrices
+### Returns
+
+  - `ffit::FourFitVars`: A struct holding cubic spline fits of the assembled matrices
+
+### TODOs
+
+Add kinetic metric tensor components for kin_flag = true
+Remove mband if we decide to fully deprecate banded matrices
+Decide error throwing if factorization fails
+Set powers if necessary
+Determine if sas_flag logic is needed
 """
 function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal)
 
@@ -220,9 +230,9 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
         fbat = @view fbats[ipsi, :, :]
 
         # --- Profiles ---
-        p1     = sq.fs1[ipsi, 2]
-        q      = sq.fs[ipsi, 4]
-        q1     = sq.fs1[ipsi, 4]
+        p1 = sq.fs1[ipsi, 2]
+        q = sq.fs[ipsi, 4]
+        q1 = sq.fs1[ipsi, 4]
         jtheta = -sq.fs1[ipsi, 1]
         chi1 = 2π * equil.psio
         nq = ctrl.nn * q
@@ -238,7 +248,7 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
         jmat1[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 7*intr.mband+8:8*intr.mband+8]
 
         # Fill upper half (+1:mband) with conjugate symmetry
-        for k = 1:intr.mband
+        for k in 1:intr.mband
             g11[mid+k] = conj(g11[mid-k])
             g22[mid+k] = conj(g22[mid-k])
             g33[mid+k] = conj(g33[mid-k])
@@ -262,16 +272,18 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
 
                 amat[ipert, jpert] = (2π)^2 * (ctrl.nn^2 * g22[dmidx] + ctrl.nn * (m1 + m2) * g23[dmidx] + m1 * m2 * g33[dmidx])
                 bmat[ipert, jpert] = -2π * im * chi1 * (ctrl.nn * g22[dmidx] + (m1 + nq) * g23[dmidx] + m1 * q * g33[dmidx])
-                cmat[ipert, jpert] = 2π * im * ((2π * im * chi1 * sing2 * (ctrl.nn * g12[dmidx] + m1 * g31[dmidx])) -
-                                                (q1 * chi1 * (ctrl.nn * g23[dmidx] + m1 * g33[dmidx]))) -
-                                     2π * im * (jtheta * sing1 * imat[dmidx] + ctrl.nn * p1 / chi1 * jmat[dmidx])
+                cmat[ipert, jpert] =
+                    2π * im * ((2π * im * chi1 * sing2 * (ctrl.nn * g12[dmidx] + m1 * g31[dmidx])) -
+                               (q1 * chi1 * (ctrl.nn * g23[dmidx] + m1 * g33[dmidx]))) -
+                    2π * im * (jtheta * sing1 * imat[dmidx] + ctrl.nn * p1 / chi1 * jmat[dmidx])
                 dmat[ipert, jpert] = 2π * chi1 * (g23[dmidx] + g33[dmidx] * m1 / ctrl.nn)
                 emat[ipert, jpert] = -chi1 / ctrl.nn * (q1 * chi1 * g33[dmidx] - 2π * im * chi1 * g31[dmidx] * sing2 + jtheta * imat[dmidx])
-                hmat[ipert, jpert] = (q1 * chi1)^2 * g33[dmidx] +
-                                     (2π * chi1)^2 * sing1 * sing2 * g11[dmidx] -
-                                     2π * im * chi1 * dm * q1 * chi1 * g31[dmidx] +
-                                     jtheta * q1 * chi1 * imat[dmidx] +
-                                     p1 * jmat1[dmidx]
+                hmat[ipert, jpert] =
+                    (q1 * chi1)^2 * g33[dmidx] +
+                    (2π * chi1)^2 * sing1 * sing2 * g11[dmidx] -
+                    2π * im * chi1 * dm * q1 * chi1 * g31[dmidx] +
+                    jtheta * q1 * chi1 * imat[dmidx] +
+                    p1 * jmat1[dmidx]
                 fmat[ipert, jpert] = (chi1 / ctrl.nn)^2 * g33[dmidx]
                 kmat[ipert, jpert] = 2π * im * chi1 * (g23[dmidx] + g33[dmidx] * m1 / ctrl.nn)
             end
@@ -309,7 +321,7 @@ function make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, c
     end
 
     # --- Fit splines (reshape 3D to 2D: (mpsi) × (mpert^2)) ---
-    ffit = FourFitVars(mpert=intr.mpert, mband=intr.mband)
+    ffit = FourFitVars(; mpert=intr.mpert, mband=intr.mband)
     ffit.amats = Spl.CubicSpline(metric.xs, reshape(amats, mpsi, :); bctype=3)
     ffit.bmats = Spl.CubicSpline(metric.xs, reshape(bmats, mpsi, :); bctype=3)
     ffit.cmats = Spl.CubicSpline(metric.xs, reshape(cmats, mpsi, :); bctype=3)
