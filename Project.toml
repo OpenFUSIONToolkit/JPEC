@@ -1,6 +1,6 @@
 name = "JPEC"
 uuid = "462872dd-e066-4d2e-b993-6468b5239634"
-authors = ["Rithik Banerjee <rb3736@columbia.edu>", "Daniel Burgess <daniel.burgess@columbia.edu>", "Evan Bursch <emb2333@columbia.edu>", "Jaebeom Cho <aspire1019@snu.ac.kr>", "Jacob Halpern <jmh2363@columbia.edu>", "Nikolas Logan <nikolas.logan@columbia.edu>", "Brendan C. Lyons <bclyons12@gmail.com>", "Matthew Pharr <matthewcpharr@gmail.com>", "Sunjae Lee <satelite2517@gmail.com>", "Aaron Froese <aaron.froese@generalfusion.com>", "Meg Fairborn <mef2245@columbia.edu>"]
+authors = ["Rithik Banerjee <rb3736@columbia.edu>", "Daniel Burgess <daniel.burgess@columbia.edu>", "Evan Bursch <emb2333@columbia.edu>", "Jaebeom Cho <aspire1019@snu.ac.kr>", "Meg Fairborn <mef2245@columbia.edu>", "Aaron Froese <aaron.froese@generalfusion.com>", "Jacob Halpern <jmh2363@columbia.edu>", "Sunjae Lee <satelite2517@gmail.com>", "Nikolas Logan <nikolas.logan@columbia.edu>", "Brendan C. Lyons <bclyons12@gmail.com>", "Matthew Pharr <matthewcpharr@gmail.com>"]
 version = "0.1.0"
 license = 'MIT'
 
