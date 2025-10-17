@@ -343,7 +343,7 @@ function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEqui
     npsi = max(4, ceil(Int, (intr.qlim - qedge) * ctrl.nn * 4))
     psii = ctrl.psiedge
     psi_array = zeros(Float64, npsi + 1)
-    wv_array = zeros(ComplexF64, npsi + 1, intr.mpert ^ 2)
+    wv_array = zeros(ComplexF64, npsi + 1, intr.mpert^2)
 
     for i in 1:npsi+1
         # Space points evenly in q
@@ -370,7 +370,7 @@ function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEqui
         end
 
         # Prepare vacuum matrices
-        free_write_msc(psii, ctrl, equil, intr; inmemory_op = true, ahgstr_op = "")
+        free_write_msc(psii, ctrl, equil, intr; inmemory_op=true, ahgstr_op="")
         grri = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
         xzpts = Array{Float64}(undef, ctrl.mthvac + 5, 4)
         wv = zeros(ComplexF64, intr.mpert, intr.mpert)
@@ -412,7 +412,7 @@ the same function as `free_test` in the Fortran code, except we have moved the c
 wv matrix spline to `free_compute_wv_spline` and pass it in `odet`.wvmat_spline.
 """
 function free_compute_total(equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState)
-    
+
     normalize = true
 
     wp = zeros(ComplexF64, intr.mpert, intr.mpert)

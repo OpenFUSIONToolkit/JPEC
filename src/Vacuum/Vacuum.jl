@@ -64,8 +64,8 @@ and resets the internal DCON state for future vacuum calculations.
 
 # Notes
 
-- Must be called after `set_dcon_params` if you want to reset the DCON memory.
-- No arguments are required.
+  - Must be called after `set_dcon_params` if you want to reset the DCON memory.
+  - No arguments are required.
 
 # Example
 
@@ -75,6 +75,7 @@ set_dcon_params(mthin, lmin, lmax, nnin, qa1in, xin, zin, deltain)
 
 # Reset DCON parameters
 unset_dcon_params()
+```
 """
 function unset_dcon_params()
     ccall((:unset_dcon_params_, libvac), Nothing, ())

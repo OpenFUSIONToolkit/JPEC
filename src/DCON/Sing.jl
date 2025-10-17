@@ -78,8 +78,8 @@ in the Fortran code. Main differences include renaming of sas_flag -> set_psilim
 removing dW edge storage variables since we now store all integration terms in memory, and
 simplification of the logic.
 
-The target value `qlim` is first determined from user-specified control parameters 
-(`ctrl.qhigh` or `ctrl.dmlim`), subject to the constraint that it does not exceed 
+The target value `qlim` is first determined from user-specified control parameters
+(`ctrl.qhigh` or `ctrl.dmlim`), subject to the constraint that it does not exceed
 `equil.params.qmax`. If set_psilim_via_dmlim is true, `qlim` is adjusted to the largest
 rational surface such that `nq + dmlim < qmax`, where qmax is the maximum q value in the equilibrium.
 If `qlim < qmax`, a Newton iteration is performed to find the corresponding
@@ -87,7 +87,6 @@ If `qlim < qmax`, a Newton iteration is performed to find the corresponding
 
 Note that the Newton iteration will be triggered if either `set_psilim_via_dmlim` is true
 or `ctrl.qhigh < equil.params.qmax`. Otherwise, the equilibrium edge values are used.
-
 """
 function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
 
@@ -95,7 +94,7 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
     intr.qlim = min(equil.params.qmax, ctrl.qhigh) # equilibrium solve only goes up to qmax, so we're capped there
     intr.q1lim = equil.sq.fs1[end, 4]
     intr.psilim = equil.config.control.psihigh
-    
+
     # Optionally override qlim based on dmlim
     if ctrl.set_psilim_via_dmlim
         # Normalize dmlim ∈ [0,1)

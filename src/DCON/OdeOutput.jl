@@ -16,7 +16,7 @@ Place outputs in a Julia do loop for automatic file closing
 function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
 
     # TODO: mess with this to condense the number of calls? Maybe allow it to pass in dicts
-    
+
     # Write euler.h5 header info
     if outp.write_euler_h5
         h5open(joinpath(intr.dir_path, outp.fname_euler_h5), "w") do euler_h5
@@ -31,7 +31,7 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
             euler_h5["info/con_flag"] = ctrl.con_flag
             euler_h5["info/mthvac"] = ctrl.mthvac
             euler_h5["info/mthsurf0"] = outp.mthsurf0 #TODO: mthsurf0 is deprecated
-            
+
             # Write equilibrium parameters
             euler_h5["equil/nr"] = length(equil.rzphi.xs) # TODO: equil save mpsi as really mpsi - 1, fix this
             euler_h5["equil/nz"] = length(equil.rzphi.ys)
