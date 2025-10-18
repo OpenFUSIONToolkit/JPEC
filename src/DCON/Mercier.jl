@@ -52,7 +52,7 @@ function mercier_scan!(locstab_fs::Matrix{Float64}, plasma_eq::Equilibrium.Plasm
             ff_fs[itheta, 5] = bsq
 
             # Weight by jacobian and volume element
-            ff_fs[itheta, :] .*= jac / v1
+            @views ff_fs[itheta, :] .*= jac / v1
         end
 
         ff = Spl.CubicSpline(Vector(rzphi.ys), ff_fs; bctype=2) # bctype=2 is periodic

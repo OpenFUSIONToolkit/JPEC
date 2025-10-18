@@ -23,9 +23,9 @@ including solution vectors, tolerances, and flags for the integration process.
     ca_r::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, msing) # asymptotic coefficients just right of singular surface
     ca_l::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, msing) # asymptotic coefficients just left of singular surface
     index::Array{Int,2} = zeros(Int, mpert, numunorms_init)                                   # indices for sorting solutions
-    sing_flags::Vector{Bool} = falses(numunorms_init)                     # flags for singular solutions
+    sing_flag::Vector{Bool} = falses(numunorms_init)                     # flags for singular solutions
     fixfac::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, numunorms_init)             # fixup factors for Gaussian reduction
-    fixstep::Vector{Float64} = zeros(Float64, numunorms_init)               # step number where unorms were performed
+    fixstep::Vector{Int64} = zeros(Int64, numunorms_init)               # psi values at which unorms were performed
 
     # Data for integrator
     psifac::Float64 = 0.0       # normalized flux coordinate
@@ -55,6 +55,7 @@ including solution vectors, tolerances, and flags for the integration process.
     fmat_lower::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
     kmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
     gmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
+    tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     Afact::Union{Cholesky{ComplexF64,Matrix{ComplexF64}},Nothing} = nothing
     singfac_vec::Vector{Float64} = Vector{Float64}(undef, mpert)
 
@@ -136,9 +137,14 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         ode_step!(odet, ctrl, equil, ffit, intr, outp)
     end
 
-    # Deallocate unused storage of integration data
     odet.step -= 1 # step was incremented one extra time in ode_step!
+    # Fixstep segments regions for the transforms - add last step
+    odet.fixstep = [odet.fixstep[1:odet.ifix]; odet.step]
+    # Deallocate unused storage of integration data
     trim_storage!(odet)
+
+    # Compute transformation matrices for each region between fixups
+    ureal = build_ureal(intr, odet)
 
     if outp.write_euler_h5
         if ctrl.verbose
@@ -152,11 +158,9 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
             euler_h5["integration/q"] = Spl.spline_eval(equil.sq, odet.psi_store, 0)[4]
             euler_h5["integration/u"] = odet.u_store
             euler_h5["integration/ud"] = odet.ud_store
-            euler_h5["normalizations/mfix"] = odet.ifix
-            euler_h5["normalizations/psifix"] = odet.fixstep[1:odet.ifix]
-            euler_h5["normalizations/fixfac"] = odet.fixfac[:, :, 1:odet.ifix]
-            euler_h5["normalizations/sing_flags"] = odet.sing_flags[1:odet.ifix]
-            euler_h5["normalizations/index"] = odet.index[:, 1:odet.ifix]
+            # TODO: for GPEC, should add u1, u2, u3, u4? I think this would just be a
+            # matter of adding u[:, :, 2] and ud to the build ureal function, yes?
+            euler_h5["integration/ureal"] = ureal
             euler_h5["singular/msing"] = intr.msing
             euler_h5["singular/psi"] = [intr.sing[ising].psifac for ising in 1:intr.msing]
             euler_h5["singular/q"] = [intr.sing[ising].q for ising in 1:intr.msing]
@@ -623,10 +627,8 @@ function compute_tols(ctrl, intr, odet)
     # Absolute tolerances
     atol = similar(odet.u, Float64)
     for ieq in 1:size(odet.u, 3), isol in 1:size(odet.u, 2)
-        atol0 = maximum(abs.(odet.u[:, isol, ieq])) * tol
-        if (atol0 == 0)
-            atol0 = Inf
-        end
+        @views atol0 = maximum(abs, odet.u[:, isol, ieq]) * tol
+        atol0 == 0 && (atol0 = Inf)
         atol[:, isol, ieq] .= atol0
     end
     return rtol, atol
@@ -691,20 +693,25 @@ Add resizing logic for unorm arrays when ifix exceeds allocated size
 """
 function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp::DconOutput, sing_flag::Bool)
     # Compute norms of first solution vectors, abort if any are zero
-    odet.unorm[1:intr.mpert] .= [norm(odet.u[:, j, 1]) for j in 1:intr.mpert]
-    odet.unorm[intr.mpert+1:odet.msol] .= [norm(odet.u[:, j, 2]) for j in intr.mpert+1:odet.msol]
-    if minimum(odet.unorm[1:odet.msol]) == 0
-        jmax = argmin(odet.unorm[1:odet.msol])
+    for j in 1:intr.mpert
+        odet.unorm[j] = @views norm(odet.u[:, j, 1])
+    end
+    for j in intr.mpert+1:odet.msol
+        odet.unorm[j] = @views norm(odet.u[:, j, 2])
+    end
+    umsol = @view(odet.unorm[1:odet.msol])
+    if minimum(umsol) == 0
+        jmax = argmin(umsol)
         error("One of the first solution vector norms unorm(1,$jmax) = 0")
     end
 
     # Normalize unorm and perform Gaussian reduction if required
     if odet.new
         odet.new = false
-        odet.unorm0[1:odet.msol] .= odet.unorm[1:odet.msol]
+        odet.unorm0[1:odet.msol] .= umsol
     else
-        odet.unorm[1:odet.msol] .= odet.unorm[1:odet.msol] ./ odet.unorm0[1:odet.msol]
-        uratio = maximum(odet.unorm[1:odet.msol]) / minimum(odet.unorm[1:odet.msol])
+        @views @. odet.unorm[1:odet.msol] = odet.unorm[1:odet.msol] / odet.unorm0[1:odet.msol]
+        uratio = maximum(umsol) / minimum(umsol)
         if uratio > ctrl.ucrit || sing_flag
             # TODO: add resizing logic here as well
             if odet.ifix < ctrl.numunorms_init
@@ -752,8 +759,10 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
 
     # Store data for the current fixup
     ifix = odet.ifix
-    odet.sing_flags[ifix] = sing_flag
-    odet.fixstep[ifix] = odet.step
+    odet.sing_flag[ifix] = sing_flag
+    # Since the current step has been fixed-up, we denote the end of the previous
+    # fixup region as the previous step (this just avoids a -1 index later)
+    odet.fixstep[ifix] = odet.step - 1
 
     # Initialize fixfac
     if !test
@@ -761,19 +770,21 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
             odet.fixfac[isol, isol, ifix] = 1
         end
         # Sort unorm
-        odet.index[1:odet.msol, ifix] .= collect(1:odet.msol)
+        odet.index[1:odet.msol, ifix] .= 1:odet.msol
         odet.index[1:intr.mpert, ifix] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
         odet.index[intr.mpert+1:odet.msol, ifix] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
     end
 
     # Triangularize primary solutions
     mask = trues(2, odet.msol)
+    masked = zeros(typeof(abs(odet.u[1, 1, 1])), intr.mpert)
     for isol in 1:intr.mpert
         ksol = odet.index[isol, ifix]
         mask[2, ksol] = false
         if !test
             # Find max location
-            kpert = argmax(abs.(odet.u[:, ksol, 1]) .* mask[1, 1:intr.mpert])
+            @. @views masked = abs(odet.u[:, ksol, 1]) * mask[1, 1:intr.mpert]
+            @views kpert = argmax(masked)
             mask[1, kpert] = false
         end
         for jsol in 1:odet.msol
@@ -781,7 +792,7 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
                 if !test
                     odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
                 end
-                odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
+                @. @views odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
                 if !test
                     odet.u[kpert, jsol, 1] = 0
                 end
@@ -791,13 +802,12 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
 
     # Triangularize secondary solutions
     if odet.msol > intr.mpert && secondary
-        mask = trues(2, odet.msol)
+        mask .= trues(2, odet.msol)
         for isol in intr.mpert+1:odet.msol
             ksol = odet.index[isol, ifix]
             mask[2, ksol] = false
             if !test
-                absvals = abs.(odet.u[:, ksol, 2])
-                masked = absvals .* mask[1, 1:intr.mpert]
+                @. @views masked = abs(odet.u[:, ksol, 2]) * mask[1, 1:intr.mpert]
                 kpert = argmax(masked)
                 mask[1, kpert] = false
             end
@@ -806,7 +816,7 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
                     if !test
                         odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 2] / odet.u[kpert, ksol, 2]
                     end
-                    odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
+                    @. @views odet.u[:, jsol, :] = odet.u[:, jsol, :] + odet.u[:, ksol, :] * odet.fixfac[ksol, jsol, ifix]
                     if !test
                         odet.u[kpert, jsol, 2] = 0
                     end
@@ -941,4 +951,66 @@ function get_psi_saves!(odet::OdeState, ctrl::DconControl, intr::DconInternal)
             error("Cannot recognize save_spacing = $(ctrl.save_spacing)")
         end
     end
+end
+
+"""
+    build_ureal(intr::DconInternal, odet::OdeState)
+
+Constructs the transformation matrices to convert the complex solution vectors
+to real-valued vectors in each region between fixups. Effectively "undoes" the
+Gaussian reduction applied during fixups throughout the integration, such that
+we have the true solution vectors for use in GPEC.
+"""
+function build_ureal(intr::DconInternal, odet::OdeState)
+
+    # Gaussian reduction matrices for each fixup
+    gauss = Array{ComplexF64,3}(undef, intr.mpert, intr.mpert, odet.ifix)
+    # Transformation matrices for each region between fixups (ifix + 1 regions)
+    transforms = Array{ComplexF64,3}(undef, intr.mpert, intr.mpert, odet.ifix + 1)
+
+    # Construct gaussian reduction matrices for each fixup
+    identity = Matrix{ComplexF64}(I, intr.mpert, intr.mpert)
+    mask = trues(intr.mpert)
+    for ifix in 1:odet.ifix
+        gauss[:, :, ifix] = copy(identity)
+        mask .= true
+        for isol in 1:odet.msol
+            ksol = odet.index[isol, ifix]
+            mask[ksol] = false
+            temp = copy(identity)
+            for jsol in 1:intr.mpert
+                if mask[jsol]
+                    temp[ksol, jsol] = odet.fixfac[ksol, jsol, ifix]
+                end
+            end
+            # Matrix multiplication gauss = gauss * temp
+            gauss[:, :, ifix] .= gauss[:, :, ifix] * temp
+        end
+        if odet.sing_flag[ifix]
+            gauss[:, odet.index[1, ifix], ifix] .= 0.0
+        end
+    end
+
+    # Concatenate gaussian reduction matrix to form transform matrix for each region
+    # Here, the i'th region is between the (i-1)'th and i'th fixup e.g. transforms[:, :, 1]
+    # is the transform matrix for the region between init and first fixup
+    # and mfix + 1 is the for the region after the last fixup and before the edge
+    transforms[:, :, end] = copy(identity)
+    for ifix in odet.ifix:-1:1
+        transforms[:, :, ifix] = gauss[:, :, ifix] * transforms[:, :, ifix+1]
+    end
+
+    # Now that we have the transform matrices, we can apply them to the solution vectors
+    # "undoing" the Gaussian reductions to get the true solution vectors
+    ureal = Array{ComplexF64}(undef, odet.step, intr.mpert, intr.mpert)
+    jfix = 1
+    for ifix in 1:odet.ifix+1
+        kfix = odet.fixstep[ifix]
+        for istep in jfix:kfix
+            ureal[istep, :, :] .= odet.u_store[:, :, 1, istep] * transforms[:, :, ifix]
+        end
+        jfix = kfix + 1
+    end
+
+    return ureal
 end

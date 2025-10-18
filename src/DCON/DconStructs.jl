@@ -153,10 +153,10 @@ end
 # Since file I/O in Julia will be very different than Fortran, this will likely be reworked significantly
 @kwdef mutable struct DconOutput
     # output switches
-    write_crit_out::Bool = true
-    write_dcon_out::Bool = true
+    write_crit_out::Bool = false
+    write_dcon_out::Bool = false
     write_euler_h5::Bool = true
-    write_eqdata_h5::Bool = false
+    write_eqdata_h5::Bool = true
 
     # filenames
     fname_crit_out::String = "crit.out"
