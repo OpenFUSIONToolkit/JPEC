@@ -27,6 +27,11 @@ including solution vectors, tolerances, and flags for the integration process.
     fixfac::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, numunorms_init)             # fixup factors for Gaussian reduction
     fixstep::Vector{Int64} = zeros(Int64, numunorms_init)               # psi values at which unorms were performed
 
+    # Used for to find peak dW in the edge
+    dW_edge::Vector{ComplexF64} = Array{ComplexF64}(undef, numsteps_init)  # dW at each step in the edge
+    wvmat_spline::Union{Missing,Spl.CubicSpline{ComplexF64}} = missing  # spline of wv matrices for free_test # TODO: how to initialize a spline?
+    wvmat_spline_created::Bool = false  # flag for if wv matrix spline has been computed
+
     # Data for integrator
     psifac::Float64 = 0.0       # normalized flux coordinate
     q::Float64 = 0.0            # q value at psifac
@@ -43,7 +48,7 @@ including solution vectors, tolerances, and flags for the integration process.
     nzero::Int = 0              # count of zero crossings detected
 
     # Used for Gaussian reduction
-    new::Bool = true            # flag for new solution
+    new::Bool = true            # flag for computing new unorm0 after a fixup
     unorm::Vector{Float64} = zeros(Float64, 2 * mpert)                        # norms of solution vectors
     unorm0::Vector{Float64} = zeros(Float64, 2 * mpert)                       # initial norms of solution vectors
     ifix::Int = 0                # index for number of unorms performed
@@ -110,15 +115,17 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         error("Invalid value for sing_start: $(ctrl.sing_start) > msing = $(intr.msing)")
     end
 
-    if ctrl.verbose # mimicing an output from ode_output_open
+    # Since we search for the peak dW in this region, initialize to -Infinity
+    if ctrl.psiedge < intr.psilim
+        fill!(odet.dW_edge, -Inf * (1 + im))
+    end
+
+    if ctrl.verbose # mimicing output from ode_output_open
         println("   ψ = $(odet.psifac), q = $(Spl.spline_eval(equil.sq, odet.psifac, 0)[4])")
     end
 
     # Write header data to files
     ode_output_init(ctrl, equil, intr, odet, outp)
-
-    # TODO: Ensure that this section exactly reproduces all functionality of the Fortran
-    # Might be good for ideal case, but maybe things I haven't considered break this
 
     # Always integrate once, even if no rational surfaces are crossed
     ode_step!(odet, ctrl, equil, ffit, intr, outp)
@@ -137,14 +144,23 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         ode_step!(odet, ctrl, equil, ffit, intr, outp)
     end
 
-    odet.step -= 1 # step was incremented one extra time in ode_step!
-    # Fixstep segments regions for the transforms - add last step
-    odet.fixstep = [odet.fixstep[1:odet.ifix]; odet.step]
     # Deallocate unused storage of integration data
-    trim_storage!(odet)
+    if ctrl.psiedge < intr.psilim
+        # Find the peak dW in the edge region and truncate integration data there
+        odet.step = findmax(real.(odet.dW_edge))[2]
+        trim_storage!(odet)
+        if ctrl.verbose
+            println("Truncating integration at peak edge dW: ψ = $(odet.psi_store[odet.step]), q = $(Spl.spline_eval(equil.sq, odet.psi_store[odet.step], 0)[4])")
+        end
 
-    # Compute transformation matrices for each region between fixups
-    ureal = build_ureal(intr, odet)
+        # Update u, psilim, and qlim for usage in determining wp and wt
+        intr.psilim = odet.psi_store[end]
+        intr.qlim = Spl.spline_eval(equil.sq, intr.psilim, 0)[4]
+        odet.u .= odet.u_store[:, :, :, end]
+    else
+        odet.step -= 1 # step was incremented one extra time in ode_step!
+        trim_storage!(odet)
+    end
 
     if outp.write_euler_h5
         if ctrl.verbose
@@ -152,6 +168,9 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         end
         # We open in r+ mode to add to the existing file from ode_output_init instead of overwriting it
         h5open(joinpath(intr.dir_path, outp.fname_euler_h5), "r+") do euler_h5
+            # Output psilim and qlim here in case they were changed due to peak edge dW search
+            euler_h5["info/psilim"] = intr.psilim
+            euler_h5["info/qlim"] = intr.qlim
             euler_h5["integration/msol"] = odet.msol
             euler_h5["integration/nstep"] = odet.step
             euler_h5["integration/psi"] = odet.psi_store
@@ -175,7 +194,7 @@ end
 
 
 """
-    ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax = 50)
+    ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
 Initialize the OdeState struct for the case of sing_start = 0 (axis initialization). This includes
 determining `psifac`, `psimax`, `ising`, `m1`, `singfac`, and initializing `u`.
@@ -185,8 +204,7 @@ determining `psifac`, `psimax`, `ising`, `m1`, `singfac`, and initializing `u`.
 Support for `kin_flag`
 Remove while true logic
 """
-
-function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; itmax=50)
+function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
     # Shorthand to evaluate q/q1 inside newton iteration
     qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
@@ -575,7 +593,7 @@ function integrator_callback!(integrator)
     # of this ode_test logic (i.e. res_flag = True, compute powers) in the future, but for now this is sufficient
     # force_output = ode_test(odet, intr, ctrl)
     ode_output_step(ctrl, equil, intr, odet, outp)
-    ode_record_edge!(intr, ctrl, equil, odet)
+    ode_record_edge_dW!(odet, ctrl, equil, ffit, intr)
 
     # Grow arrays if needed
     if odet.step >= size(odet.u_store, 4)
@@ -883,37 +901,31 @@ function ode_test(ctrl::DconControl, intr::DconInternal, odet::OdeState)::Bool
 end
 
 """
-    ode_record_edge!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, odet::OdeState)
+    ode_record_edge_dW!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal)
 
-Records edge quantities at the current integration point if edge conditions are met.
+Records the total dW if the integration passes `ctrl.psiedge`, which occurs
+if psiedge is less than the psilim determined in sing_lim!. This performs the same
+function as `ode_record_edge` in the Fortran code, but the logic is different since
+we store the integration in memory so we dont need the "_edge" arrays.
 
-Checks whether `psifac` and `q` exceed edge thresholds, and if so,
-stores relevant values in `intr`. Currently, vacuum calculations are
-not implemented; this function raises an error if invoked in a vacuum region.
+The dW is stored at that step index in `odet.dW_edge`; because we initialize
+dW_edge to -Inf, we can just take the max value after integration to get the
+total dW at the edge and avoid unphysical kink modes that might occur just
+inside rational surfaces.
 
-### TODOs
-
-Integrate vacuum code for edge calculations
-Check if this function is working properly, currently unsure of its behavior
-Check meaning of psiedge vs psi_edge in Fortran code
+The first time this function is called, we create a rough spline for the wv matrix
+in between psiedge and psilim using `free_compute_wv_spline`, which is then used in
+`free_compute_total` to compute the total dW at the edge.
 """
-# TODO: this function requires integration the vacuum code for free_test
-# for now, going to make it look ok and error out if we get to free_test
-# I don't think this function is working properly, but I'm not sure what its doing
-function ode_record_edge!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, odet::OdeState)
+function ode_record_edge_dW!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal)
 
-    q_psifac = Spl.spline_eval(equil.sq, odet.psifac, 0)
-    if intr.size_edge > 0
-        #TODO: WTH? fortran has both a psiedge and psi_edge and they appear to be different.
-        # someone smarter than me please double check this
-        if q_psifac >= intr.q_edge[intr.i_edge] && odet.psifac >= ctrl.psiedge
-            @error "Vacuum code not yet integrated. This run has size_edge = $(intr.size_edge) > 0 and integrator passed psiedge/q_edge"
-            #free_test(plasma1, vacuum1, total1, odet.psifac)
-            intr.dw_edge[intr.i_edge] = total1
-            intr.q_edge[intr.i_edge] = q_psifac
-            intr.psi_edge[intr.i_edge] = odet.psifac
-            intr.i_edge = min(intr.i_edge + 1, intr.size_edge)  # just to be extra safe
+    if odet.psifac >= ctrl.psiedge
+        # Only create wv matrix spline once
+        if !odet.wvmat_spline_created
+            odet.wvmat_spline = free_compute_wv_spline(ctrl, equil, intr)
+            odet.wvmat_spline_created = true
         end
+        odet.dW_edge[odet.step] = free_compute_total(equil, ffit, intr, odet)
     end
 end
 

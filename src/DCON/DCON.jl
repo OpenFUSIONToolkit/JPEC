@@ -24,7 +24,8 @@ include("OdeOutput.jl")
 include("Utils.jl")
 include("Free.jl")
 
-# This is used for various small tolerances throughout DCON
-const eps = 1e-10
+# These are used for various small tolerances and root finders throughout DCON
+global eps = 1e-10
+global itmax = 50
 
 end

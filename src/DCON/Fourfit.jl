@@ -177,7 +177,7 @@ and does not affect the actual matrix sizes, they are all dense.
 
 Add kinetic metric tensor components for kin_flag = true
 Set powers if necessary
-Determine if sas_flag logic is needed
+Determine if set_psilim_via_dmlim logic is needed
 """
 function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal, metric::MetricData)
 
@@ -321,7 +321,7 @@ function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, in
     # TODO: set powers
     # Do we need this yet? Only called if power_flag = true
 
-    if ctrl.sas_flag
+    if ctrl.set_psilim_via_dmlim
         # TODO: these seem to only be used for the ahb_flag, which I think is deprecated
         ffit.asmat = reshape(Spl.spline_eval(ffit.amats, intr.psilim), intr.mpert, intr.mpert)
         ffit.bsmat = reshape(Spl.spline_eval(ffit.bmats, intr.psilim), intr.mpert, intr.mpert)

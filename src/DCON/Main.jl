@@ -16,10 +16,17 @@ function Main(path::String)
     # TODO: dcon_kin_threads logic?
     ctrl.delta_mhigh *= 2 # for consistency with Fortran DCON TODO: why is this present in the Fortran?
 
-    # Determine if qhigh is truncating before psihigh and reform equilibrium if needed
-    sing_lim!(ctrl, equil, intr)
+    # Determine psilim and qlim (where we will integrate to)
+    sing_lim!(intr, ctrl, equil)
+    if ctrl.set_psilim_via_dmlim && ctrl.psiedge < intr.psilim
+        @warn "Only one of set_psilim_via_dmlim and psiedge < psilim can be used at a time.
+            Setting psiedge = 1.0 and determining dW from psilim = $(intr.psilim) determined from dmlim = $(ctrl.dmlim)."
+        ctrl.psiedge = 1.0
+    end
+
+    # If truncating before psihigh, reform equilibrium if desired
     if intr.psilim != equil.config.control.psihigh && ctrl.reform_eq_with_psilim
-        @warn "psilim != psihigh not implemented yet, skipping reforming equilibrium splines"
+        @warn "Reforming equilibrium splines from psihigh to psilim not implemented yet. Proceeding with psihigh = $(equil.config.control.psihigh)."
         # JMH - Nik please put the logic we discussed here
         # something like ?
         # equil.config.control.psihigh = intr.psilim
@@ -110,7 +117,7 @@ function Main(path::String)
     if ctrl.mat_flag || ctrl.ode_flag
         if ctrl.verbose
             println("     q0 = $(equil.params.q0), qmin = $(equil.params.qmin), qmax = $(equil.params.qmax), q95 = $(equil.params.q95)")
-            println("     sas_flag = $(ctrl.sas_flag), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
+            println("     set_psilim_via_dmlim = $(ctrl.set_psilim_via_dmlim), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
             println("     betat = $(equil.params.betat), betan = $(equil.params.betan), betap1 = $(equil.params.betap1)")
             println("     nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
             println(" Fourier analysis of metric tensor components")
@@ -123,7 +130,7 @@ function Main(path::String)
                 :dcon_out,
                 @sprintf("%6d %6d %6d %6d %6d %6s %11.3e %11.3e %11.3e",
                     intr.mlow, intr.mhigh, intr.mpert, intr.mband, ctrl.nn,
-                    string(ctrl.sas_flag), ctrl.dmlim, intr.qlim, intr.psilim)
+                    string(ctrl.set_psilim_via_dmlim), ctrl.dmlim, intr.qlim, intr.psilim)
             )
         end
 
@@ -156,22 +163,6 @@ function Main(path::String)
             println("Integrating Euler-Lagrange equation")
         end
         odet = ode_run(ctrl, equil, ffit, intr, outp)
-        if intr.size_edge > 0
-            # TODO: this logic might be deprecated since we do a lot
-            # of things in memory, but leaving for now. Should be updated
-            # once we actually test size_edge > 0 cases.
-            # Find peak index in dw_edge[pre_edge:i_edge]
-            dw_slice = real.(intr.dw_edge[intr.pre_edge:intr.i_edge])
-            peak_index = findmax(dw_slice)[2] + (intr.pre_edge - 1)
-            ctrl.qhigh = intr.q_edge[peak_index]
-            ctrl.sas_flag = false
-            ctrl.psiedge = equil.psihigh
-            sing_lim!(intr, ctrl, equil)
-            println("Re-Integrating to peak dW @ qlim = $(intr.qlim), psilim = $(intr.psilim)")
-            # Full re-run because outputs were written to disk each step
-            # making it hard to backtrack
-            odet = ode_run(ctrl, equil, ffit, intr, outp)
-        end
     end
 
     # Compute free boundary energies

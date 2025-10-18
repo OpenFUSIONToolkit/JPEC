@@ -81,13 +81,6 @@ end
     q1lim::Float64 = 0.0
     # TODO: how to initialize a spline? This will be a spline of size mpsi x 5
     locstab::Union{Missing,Spl.CubicSpline{Float64}} = missing
-    size_edge::Int = 0
-    pre_edge::Int = 1
-    i_edge::Int = 1
-    # TODO: what are the lengths of these? can use to initialize
-    q_edge::Union{Missing,Vector{Float64}} = missing
-    psi_edge::Union{Missing,Vector{Float64}} = missing
-    dw_edge::Union{Missing,Vector{ComplexF64}} = missing
 end
 
 @kwdef mutable struct DconControl
@@ -118,9 +111,8 @@ end
     singfac_min::Float64 = 0.0
     singfac_max::Float64 = 0.0
     cyl_flag::Bool = false
-    dmlim::Float64 = 0.5
-    lim_flag::Bool = false
-    sas_flag::Bool = false
+    set_psilim_via_dmlim::Bool = false # previously sas_flag, if true, determines psilim using outermost rational + dmlim
+    dmlim::Float64 = 0.2 # % outside the last rational surface to go out to determine dW if set_psilim_via_dmlim is true
     sing_order::Int = 2
     sort_type::String = "absm"
     termbycross_flag::Bool = false

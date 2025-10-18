@@ -119,7 +119,7 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
         wv[:, ipert] .*= singfac[ipert]
     end
 
-    # Compute complex energy eigenvalues.
+    # Compute complex energy eigenvalues
     wt .= wp .+ wv
     wt0 .= wt
 
@@ -326,4 +326,133 @@ function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.P
     else
         # TODO: this section contains ahg2msc file writing, which is deprecated, just remove
     end
+end
+
+"""
+    free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+
+Compute a spline of vacuum response matrices over the range of psi from 'ctrl.psi_edge' to
+`intr.qlim`. This is used for fast evaluation of wt during `ode_record_edge`. Performs the
+same function as `free_wvmats` in the Fortran code.
+"""
+function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+
+    # Number of psi grid points for the spline: 4 per q-window minimum
+    # TODO: 4 spline points is arbitrary - is there a better way?
+    qedge = Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4]
+    npsi = max(4, ceil(Int, (intr.qlim - qedge) * ctrl.nn * 4))
+    psii = ctrl.psiedge
+    psi_array = zeros(Float64, npsi + 1)
+    wv_array = zeros(ComplexF64, npsi + 1, intr.mpert^2)
+
+    for i in 1:npsi+1
+        # Space points evenly in q
+        qi = qedge + (intr.qlim - qedge) * (i / npsi)
+
+        # Shorthand to evaluate q/q1 inside newton iteration
+        qval(ψ) = Spl.spline_eval(equil.sq, ψ, 0)[4]
+        q1val(ψ) = Spl.spline_eval(equil.sq, ψ, 1)[2][4]
+
+        # Newton iteration to find psi at qi
+        psii = ctrl.psiedge + (intr.psilim - ctrl.psiedge) * ((i - 1) / npsi)
+        it = 0
+        for _ in 1:itmax
+            dpsi = (qi - qval(psii)) / q1val(psii)
+            psii += dpsi
+            it += 1
+            abs(dpsi) < eps * abs(psii) && break
+        end
+
+        if it == itmax
+            error("Can't find psilim after $itmax iterations.")
+        else
+            psi_array[i] = psii
+        end
+
+        # Prepare vacuum matrices
+        free_write_msc(psii, ctrl, equil, intr; inmemory_op=true, ahgstr_op="")
+        grri = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
+        xzpts = Array{Float64}(undef, ctrl.mthvac + 5, 4)
+        wv = zeros(ComplexF64, intr.mpert, intr.mpert)
+        mtheta = length(equil.rzphi.ys)
+        complex_flag = true
+        kernelsignin = 1.0
+        wall_flag = false
+        farwal_flag = false
+        ahg_file = "ahg2msc_dcon.out" # Deprecated
+
+        # Compute vacuum matrix
+        VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
+            wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
+
+        # Apply singular factor scaling
+        singfac = intr.mlow .- ctrl.nn * qi .+ collect(0:intr.mpert-1)
+        for ipert in 1:intr.mpert
+            wv[ipert, :] .*= singfac[ipert]
+            wv[:, ipert] .*= singfac[ipert]
+        end
+
+        # Store flattened matrix in spline field
+        wv_array[i, :] .= reshape(wv, intr.mpert^2)
+    end
+
+    # Free VACUUM memory
+    VacuumMod.unset_dcon_params()
+
+    return Spl.CubicSpline(psi_array, wv_array; bctype=3)
+end
+
+"""
+    free_compute_total(equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState) -> ComplexF64
+
+Compute total complex energy eigenvalue (total1). This is a trimmed down version of `free_run`
+that only computes the total energy eigenvalue for the mode unstable mode, used in `ode_record_edge_dW`
+which calls this function at each step in the psiedge -> psilim region of integration. This performs
+the same function as `free_test` in the Fortran code, except we have moved the creation of the
+wv matrix spline to `free_compute_wv_spline` and pass it in `odet`.wvmat_spline.
+"""
+function free_compute_total(equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState)
+
+    normalize = true
+
+    wp = zeros(ComplexF64, intr.mpert, intr.mpert)
+    temp = zeros(ComplexF64, intr.mpert, intr.mpert)
+    et = zeros(ComplexF64, intr.mpert)
+    wt = zeros(ComplexF64, intr.mpert, intr.mpert)
+
+    v1 = Spl.spline_eval(equil.sq, intr.psilim, 0)[3]
+
+    # Compute plasma response matrix.
+    temp = adjoint(odet.u[:, 1:intr.mpert, 1])
+    wp .= adjoint(odet.u[:, 1:intr.mpert, 2])
+    temp_fact = lu(temp)
+    wp .= temp_fact \ wp
+    wp .= adjoint(wp) / equil.psio^2
+
+    # Compute vacuum matrix from spline
+    wv = reshape(Spl.spline_eval(odet.wvmat_spline, odet.psifac, 0), intr.mpert, intr.mpert)
+
+    # Compute total energy matrix and eigen-decomposition
+    wt .= wp .+ wv
+    Ev = eigen(wt)
+
+    # Sort eigenvalues and reorder columns of wt
+    eindex = sortperm(real.(Ev.values); rev=true)
+    for ipert in 1:intr.mpert
+        wt[:, ipert] .= Ev.vectors[:, eindex[intr.mpert+1-ipert]]
+        et[ipert] = Ev.values[eindex[intr.mpert+1-ipert]]
+    end
+
+    # Normalize eigenfunction and energy (only need the first eigenmode)
+    if normalize
+        isol = 1
+        norm = 0.0 + 0.0im
+        for ipert in 1:intr.mpert, jpert in 1:intr.mpert
+            norm += ffit.jmat[jpert-ipert+intr.mband+1] * wt[ipert, isol] * conj(wt[jpert, isol])
+        end
+        norm /= v1
+        et[isol] /= norm
+    end
+
+    return et[1]
 end
