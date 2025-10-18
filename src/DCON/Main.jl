@@ -106,6 +106,10 @@ function Main(path::String)
         intr.mhigh = trunc(Int, intr.nn * equil.qmax) + ctrl.delta_mhigh
     end
     intr.mpert = intr.mhigh - intr.mlow + 1
+    if ctrl.delta_mband >= intr.mpert
+        @warn "Banded matrices not implemented yet, setting delta_mband to 0"
+        ctrl.delta_mband = 0
+    end
     intr.mband = intr.mpert - 1 - ctrl.delta_mband
     intr.mband = min(max(intr.mband, 0), intr.mpert - 1)
 
@@ -138,7 +142,7 @@ function Main(path::String)
         end
 
         # Compute matrices and populate FourFitVars struct
-        ffit = make_matrix(metric, equil, ctrl, intr)
+        ffit = make_matrix(equil, ctrl, intr, metric)
 
         if ctrl.kin_flag
             error("kin_flag not implemented yet")

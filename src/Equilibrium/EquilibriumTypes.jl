@@ -247,21 +247,30 @@ and preparing the initial splines.
 
   - `equil_input`: The original `EquilInput` object.
   - `sq_in`
+
     # x value: psin
+
     # Quantity 1: F = R*Bt  [m T]
+
     # Quantity 2: mu0 * Pressure (non-negative) [nt^2 / m^2 * mu0 = T^2]
+
     # Quantity 3: q-profile
+
     # Quantity 4: sqrt(psi_norm)
   - `psi_in`:
+
     # x, y value: R, Z [m]
+
     # z value : poloidal flux adjusted to be zero at the boundary [Weber/radian]
+
     # 1. ψ(R,Z) = ψ_boundary - ψ(R,Z)
-    # 2. if ψ = ψ * sign(ψ(centerR,centerZ))
-  - `rmin`: Minimum R-coordinate of the computational grid [m].
-  - `rmax`: Maximum R-coordinate of the computational grid [m].
-  - `zmin`: Minimum Z-coordinate of the computational grid [m].
-  - `zmax`: Maximum Z-coordinate of the computational grid [m].
-  - `psio`: The total flux difference `abs(ψ_axis - ψ_boundary)` [Weber / radian].
+
+    # 2. if ψ = ψ * sign(ψ(centerR,centerZ))       # 1D profile spline (CubicSpline)
+  - `rmin`: Minimum R-coordinate of the computational grid [m].      # 2D flux spline (BicubicSpline)
+  - `rmax`: Maximum R-coordinate of the computational grid [m].    # Minimum R-coordinate of the computational grid [m].
+  - `zmin`: Minimum Z-coordinate of the computational grid [m].    # Maximum R-coordinate of the computational grid [m].
+  - `zmax`: Maximum Z-coordinate of the computational grid [m].    # Minimum Z-coordinate of the computational grid [m].
+  - `psio`: The total flux difference `abs(ψ_axis - ψ_boundary)` [Weber / radian].    # Maximum Z-coordinate of the computational grid [m].
 """
 mutable struct DirectRunInput
     config::EquilibriumConfig
@@ -361,25 +370,43 @@ provides a complete representation of the processed plasma equilibrium in flux c
 
   - `equil_input`: The original `EquilInput` object used for the reconstruction.
   - `sq`: The final 1D profile spline (`CubicSpline{Float64}`).
+
     # x value: normalized psi
+
     # Quantity 1: Toroidal Field Function * 2π, `F * 2π` (where `F = R * B_toroidal`)
+
     # Quantity 2: Pressure * μ₀, `P * μ₀`.
+
     # Quantity 3: dVdpsi
+
     # Quantity 4: q
   - `rzphi`: The final 2D flux-coordinate mapping spline (`BicubicSpline`).
+
     # x value: normlized psi
+
     # y value: SFL poloidal angle [0,1]
+
     # Quantity 1: r_coord² = (R - ro)² + (Z - zo)²
+
     # Quantity 2: Offset between the geometric poloidal angle (η) and the new angle (θ_new)
+
     `η / (2π) - θ_new
+
     # Quantity 3: ν in ϕ=2πζ+ν(ψ,θ)
+
     # Quantity 4: Jacobian.
   - `eqfun`: A 2D spline storing local physics and geometric quantities that vary across the flux surfaces.
-    # These are pre-calculated for efficient use in subsequent stability and transport codes.
+           # Parameters for the equilibrium
+    # These are pre-calculated for efficient use in subsequent stability and transport codes.                     # Final 1D profile spline
+            # Final 2D coordinate mapping spline
     # x value: Normalized poloidal flux, ψ_norm ∈ [0, 1].
+
     # y value: SFL poloidal angle, θ_new ∈ [0, 1].
+
     # Quantity 1: Total magnetic field strength, B [T]
+
     # Quantity 2: (e₁⋅e₂ + q⋅e₃⋅e₁) / (J⋅B²).
+
     # Quantity 3: (e₂⋅e₃ + q⋅e₃⋅e₃) / (J⋅B²).
   - `ro`: R-coordinate of the magnetic axis [m].
   - `zo`: Z-coordinate of the magnetic axis [m].
