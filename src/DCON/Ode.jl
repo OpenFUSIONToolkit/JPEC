@@ -162,6 +162,8 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         trim_storage!(odet)
     end
 
+    ureal = build_ureal(intr, odet)
+
     if outp.write_euler_h5
         if ctrl.verbose
             println("Writing saved integration data to euler.h5...")
