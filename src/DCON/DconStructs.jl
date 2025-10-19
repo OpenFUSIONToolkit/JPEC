@@ -83,7 +83,7 @@ end
     locstab::Union{Missing,Spl.CubicSpline{Float64}} = missing
 end
 
-@kwdef mutable struct DconControl
+@kwdef mutable struct DconControlParameters
     verbose::Bool = true
     bal_flag::Bool = false
     mat_flag::Bool = false
@@ -143,7 +143,7 @@ end
 
 # TODO: a lot of these will be deprecated, this will be a general data structure that handles output
 # Since file I/O in Julia will be very different than Fortran, this will likely be reworked significantly
-@kwdef mutable struct DconOutput
+@kwdef mutable struct DconOutputParameters
     # output switches
     write_crit_out::Bool = false
     write_dcon_out::Bool = false

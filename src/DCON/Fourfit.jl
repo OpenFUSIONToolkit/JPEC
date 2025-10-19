@@ -146,7 +146,7 @@ function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int, fft_flag:
 end
 
 """
-    make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal) -> FourFitVars
+    make_matrix(metric::MetricData, equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControlParameters, intr::DconInternal) -> FourFitVars
 
 Constructs main DCON matrices for a given toroidal mode number and returns
 them as a new `FourFitVars` object. See the appendix of the 2016 Glasser
@@ -179,7 +179,7 @@ Add kinetic metric tensor components for kin_flag = true
 Set powers if necessary
 Determine if set_psilim_via_dmlim logic is needed
 """
-function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, intr::DconInternal, metric::MetricData)
+function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControlParameters, intr::DconInternal, metric::MetricData)
 
     # --- Extract inputs ---
     sq = equil.sq

@@ -7,8 +7,8 @@ function Main(path::String)
     # Read input data and set up data structures
     intr = DconInternal(; dir_path=path)
     inputs = TOML.parsefile(joinpath(intr.dir_path, "dcon.toml"))
-    ctrl = DconControl(; (Symbol(k) => v for (k, v) in inputs["DCON_CONTROL"])...)
-    outp = DconOutput(; (Symbol(k) => v for (k, v) in inputs["DCON_OUTPUT"])...)
+    ctrl = DconControlParameters(; (Symbol(k) => v for (k, v) in inputs["DCON_CONTROL"])...)
+    outp = DconOutputParameters(; (Symbol(k) => v for (k, v) in inputs["DCON_OUTPUT"])...)
     equil = Equilibrium.setup_equilibrium(joinpath(intr.dir_path, "equil.toml"))
     init_files(outp, intr.dir_path)
 

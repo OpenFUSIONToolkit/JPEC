@@ -83,7 +83,7 @@ OdeDataStore(numsteps_init::Int) =
 OdeState(mpert::Int, msol::Int, numsteps_init::Int, numunorms_init::Int, msing::Int) = OdeState(; mpert, msol, numsteps_init, numunorms_init, msing)
 
 """
-    `ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)`
+    `ode_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)`
 
 Main driver for integrating plasma equilibrium and detecting singular surfaces.
 Has the same functionality as `ode_run` in the Fortran code, with the addition of
@@ -101,7 +101,7 @@ restype functionality if we decide to do this
 
 An OdeState struct containing the final state of the ODE solver after integration is complete.
 """
-function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
+function ode_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutputParameters)
 
     # Initialization
     odet = OdeState(intr.mpert, intr.mpert, ctrl.numsteps_init, ctrl.numunorms_init, intr.msing)
@@ -196,7 +196,7 @@ end
 
 
 """
-    ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+    ode_axis_init!(odet::OdeState, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
 Initialize the OdeState struct for the case of sing_start = 0 (axis initialization). This includes
 determining `psifac`, `psimax`, `ising`, `m1`, `singfac`, and initializing `u`.
@@ -206,7 +206,7 @@ determining `psifac`, `psimax`, `ising`, `m1`, `singfac`, and initializing `u`.
 Support for `kin_flag`
 Remove while true logic
 """
-function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+function ode_axis_init!(odet::OdeState, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
     # Shorthand to evaluate q/q1 inside newton iteration
     qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
@@ -404,7 +404,7 @@ end
 # end
 
 """
-    ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
+    ode_ideal_cross!(odet::OdeState, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutputParameters)
 
 Handle the crossing of a rational surface during ODE integration if both `res_flag` and `kin_flag` are false.
 Performs the same function as `ode_ideal_cross` in the Fortran code. Differences mainly in integration data
@@ -416,7 +416,7 @@ location and parameters of the next singular surface and writes outputs as desir
 
 Remove while true logic
 """
-function ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
+function ode_ideal_cross!(odet::OdeState, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutputParameters)
 
     # Fixup solution at singular surface
     if ctrl.verbose
@@ -504,7 +504,7 @@ function ode_resist_cross()
 end
 
 """
-    ode_step!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
+    ode_step!(odet::OdeState, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutputParameters)
 
 Integrate the Euler-Lagrange equations to the next rational surface or edge.
 Performs the same function as `ode_step` in the Fortran code, with the addition of
@@ -523,7 +523,7 @@ Check if additional output is needed at the start and end of integration
 Check sensitivity of results to tolerances, currently using same logic as Fortran
 Check absolute tolerances, currently only relative tolerances are updated
 """
-function ode_step!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
+function ode_step!(odet::OdeState, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutputParameters)
 
     # Set up the callback to be run at every step
     cb = DiscreteCallback((u, t, integrator) -> true, integrator_callback!)
@@ -610,7 +610,7 @@ function integrator_callback!(integrator)
 end
 
 """
-    compute_tols(ctrl::DconControl, intr::DconInternal, odet::OdeState)
+    compute_tols(ctrl::DconControlParameters, intr::DconInternal, odet::OdeState)
 
 Compute relative and absolute tolerances for the ODE solver based on proximity
 to singular surfaces and magnitude of the solution vectors. In Fortran, this was
@@ -695,7 +695,7 @@ function trim_storage!(odet::OdeState)
 end
 
 """
-    ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp::DconOutput, sing_flag::Bool)
+    ode_unorm!(odet::OdeState, ctrl::DconControlParameters, intr::DconInternal, outp::DconOutputParameters, sing_flag::Bool)
 
 Computes norms of the solution vectors, normalizes them
 relative to initial values, and applies Gaussian reduction via `ode_fixup!`
@@ -711,7 +711,7 @@ in the Fortran code, with minor differences in indexing and array handling.
 
 Add resizing logic for unorm arrays when ifix exceeds allocated size
 """
-function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp::DconOutput, sing_flag::Bool)
+function ode_unorm!(odet::OdeState, ctrl::DconControlParameters, intr::DconInternal, outp::DconOutputParameters, sing_flag::Bool)
     # Compute norms of first solution vectors, abort if any are zero
     for j in 1:intr.mpert
         odet.unorm[j] = @views norm(odet.u[:, j, 1])
@@ -760,7 +760,7 @@ Check if `secondary` logic is needed, currently always false
 Check if `test` logic is needed, currently always false (I don't think it ever is)
 Check if `flag_count` is used anywhere, currently always set to 0
 """
-function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_flag::Bool, test::Bool)
+function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutputParameters, sing_flag::Bool, test::Bool)
 
     # TODO: seems like secondary is always false in fortran DCON (unless manually changed). is this needed?
     secondary = false
@@ -847,7 +847,7 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
 end
 
 """
-    ode_test(ctrl::DconControl, intr::DconInternal, odet::OdeState)::Bool
+    ode_test(ctrl::DconControlParameters, intr::DconInternal, odet::OdeState)::Bool
 
 Returns `true` if integration is complete or if any stopping criteria are met.
 The Fortran version of this function had more logic for stopping the integration
@@ -858,7 +858,7 @@ which we do not include due to the callback structure of the Julia implementatio
 Implement res_flag = true logic
 Determine if this function is ever needed (definitely not for res_flag = false case)
 """
-function ode_test(ctrl::DconControl, intr::DconInternal, odet::OdeState)::Bool
+function ode_test(ctrl::DconControlParameters, intr::DconInternal, odet::OdeState)::Bool
 
     # check if we are at end of integration
     flag = odet.psifac == odet.psimax
@@ -903,7 +903,7 @@ function ode_test(ctrl::DconControl, intr::DconInternal, odet::OdeState)::Bool
 end
 
 """
-    ode_record_edge_dW!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal)
+    ode_record_edge_dW!(odet::OdeState, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal)
 
 Records the total dW if the integration passes `ctrl.psiedge`, which occurs
 if psiedge is less than the psilim determined in sing_lim!. This performs the same
@@ -919,7 +919,7 @@ The first time this function is called, we create a rough spline for the wv matr
 in between psiedge and psilim using `free_compute_wv_spline`, which is then used in
 `free_compute_total` to compute the total dW at the edge.
 """
-function ode_record_edge_dW!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal)
+function ode_record_edge_dW!(odet::OdeState, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal)
 
     if odet.psifac >= ctrl.psiedge
         # Only create wv matrix spline once
@@ -932,14 +932,14 @@ function ode_record_edge_dW!(odet::OdeState, ctrl::DconControl, equil::Equilibri
 end
 
 """
-    get_psi_saves!(odet::OdeState, ctrl::DconControl, intr::DconInternal)
+    get_psi_saves!(odet::OdeState, ctrl::DconControlParameters, intr::DconInternal)
 
 Calculates the psi values at which to save the solution during ODE integration based on specified spacing type,
 number of saves per region, and number of rational surfaces, and saves into `odet.psi_save_nodes`. Note that
 `odet.psi_save_nodes` does not store the start/endpoints, since those are saved automatically.
 """
 # TODO: this is no longer used, but might be useful code? Leaving for now, but likely can be removed
-function get_psi_saves!(odet::OdeState, ctrl::DconControl, intr::DconInternal)
+function get_psi_saves!(odet::OdeState, ctrl::DconControlParameters, intr::DconInternal)
 
     # This function is called after the ode init functions, so the starting psi is stored in odet.psifac
     # This repeats some logic used in the init and cross functions
