@@ -12,9 +12,29 @@ mutable struct BicubicSpline
     _fsx::Array{Float64,3}
     _fsy::Array{Float64,3}
     _fsxy::Array{Float64,3}
+
+    _f::Vector{Float64}
+    _fx::Vector{Float64}
+    _fy::Vector{Float64}
+    _fxx::Vector{Float64}
+    _fxy::Vector{Float64}
+    _fyy::Vector{Float64}
 end
 
 @expose_fields BicubicSpline xs ys fs fsx fsy fsxy
+
+function BicubicSpline(handle::Ptr{Cvoid}, xs::Vector{Float64}, ys::Vector{Float64}, fs::Array{Float64,3},
+    mx::Int, my::Int, nqty::Int, bctypex::Int32, bctypey::Int32,
+    fsx::Array{Float64,3}, fsy::Array{Float64,3}, fsxy::Array{Float64,3})
+    f = Vector{Float64}(undef, nqty)
+    fx = Vector{Float64}(undef, nqty)
+    fy = Vector{Float64}(undef, nqty)
+    fxx = Vector{Float64}(undef, nqty)
+    fxy = Vector{Float64}(undef, nqty)
+    fyy = Vector{Float64}(undef, nqty)
+    return BicubicSpline(handle, xs, ys, fs, mx, my, nqty, bctypex, bctypey,
+        fsx, fsy, fsxy, f, fx, fy, fxx, fxy, fyy)
+end
 
 
 function _destroy_bicubic_spline(bicube::BicubicSpline)
@@ -105,33 +125,35 @@ end
 
 """
 bicube_eval(bicube::BicubicSpline, x, y, derivs::Int=0)
+
 ## Arguments:
-- `bicube`: A `BicubicSpline` object.
-- `x`: A Float64 value or a vector of Float64 values representing the x-coordinates to evaluate the bicubic spline at.
-- `y`: A Float64 value or a vector of Float64 values representing the y-coordinates to evaluate the bicubic spline at.
+
+  - `bicube`: A `BicubicSpline` object.
+  - `x`: A Float64 value or a vector of Float64 values representing the x-coordinates to evaluate the bicubic spline at.
+  - `y`: A Float64 value or a vector of Float64 values representing the y-coordinates to evaluate the bicubic spline at.
+
 ## Returns:
-- If `x` and `y` are single Float64 values, returns a vector of Float64 values representing the function values at that (x,y) coordinate.
-- If `x` and `y` are vectors of Float64 values, returns a 3D array of Float64 values where each slice corresponds to the function values at
-the respective (x,y) coordinates in `x` and `y`.
+
+  - If `x` and `y` are single Float64 values, returns a vector of Float64 values representing the function values at that (x,y) coordinate.
+  - If `x` and `y` are vectors of Float64 values, returns a 3D array of Float64 values where each slice corresponds to the function values at    # x -> Float64
+    the respective (x,y) coordinates in `x` and `y`.    # y -> Float64
 """
-function bicube_eval(bicube::BicubicSpline, x::Float64, y::Float64, derivs::Int=0)
+function bicube_eval!(bicube::BicubicSpline, x::Float64, y::Float64, derivs::Int=0)
     # x -> Float64
     # y -> Float64
     # Returns a vector of Float64 (nqty)
     @assert derivs in 0:2 "Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2."
 
-    f = Vector{Float64}(undef, bicube.nqty)
-
     if derivs == 0
+        f = bicube._f
         call_bicube_c_eval(bicube, x, y, f)
         return f
     elseif derivs == 1
-        fx, fy = similar(f), similar(f)
+        f, fx, fy = bicube._f, bicube._fx, bicube._fy
         call_bicube_c_eval(bicube, x, y, f, fx, fy)
         return f, fx, fy
     elseif derivs == 2
-        fx, fy = similar(f), similar(f)
-        fxx, fxy, fyy = similar(f), similar(f), similar(f)
+        f, fx, fy, fxx, fxy, fyy = bicube._f, bicube._fx, bicube._fy, bicube._fxx, bicube._fxy, bicube._fyy
         call_bicube_c_eval(bicube, x, y, f, fx, fy, fxx, fxy, fyy)
         return f, fx, fy, fxx, fxy, fyy
     end

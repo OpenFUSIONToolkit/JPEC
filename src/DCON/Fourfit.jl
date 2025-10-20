@@ -85,7 +85,7 @@ function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int, fft_flag:
             theta_norm = rzphi.ys[jtheta] # θ is from 0 to 1
 
             # Evaluate the geometry spline to get (R,Z) and their derivatives
-            f, fx, fy = Spl.bicube_eval(rzphi, psi_norm, theta_norm, 1)
+            f, fx, fy = Spl.bicube_eval!(rzphi, psi_norm, theta_norm, 1)
 
             # Extract geometric quantities from the spline data
             # See EquilibriumAPI.txt for `rzphi` quantities
@@ -323,9 +323,9 @@ function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, in
 
     if ctrl.set_psilim_via_dmlim
         # TODO: these seem to only be used for the ahb_flag, which I think is deprecated
-        ffit.asmat = reshape(Spl.spline_eval(ffit.amats, intr.psilim), intr.mpert, intr.mpert)
-        ffit.bsmat = reshape(Spl.spline_eval(ffit.bmats, intr.psilim), intr.mpert, intr.mpert)
-        ffit.csmat = reshape(Spl.spline_eval(ffit.cmats, intr.psilim), intr.mpert, intr.mpert)
+        ffit.asmat = reshape(Spl.spline_eval!(ffit.amats, intr.psilim), intr.mpert, intr.mpert)
+        ffit.bsmat = reshape(Spl.spline_eval!(ffit.bmats, intr.psilim), intr.mpert, intr.mpert)
+        ffit.csmat = reshape(Spl.spline_eval!(ffit.cmats, intr.psilim), intr.mpert, intr.mpert)
         # TODO: this is used in free.f vacuum calculations, verify this is correct
         # Should we store lower triangular factorization?
         ffit.asmat .= cholesky(Hermitian(ffit.asmat)).L
