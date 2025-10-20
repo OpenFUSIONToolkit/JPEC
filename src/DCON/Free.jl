@@ -66,6 +66,9 @@ function free_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibr
 
     # Compute vacuum response matrix.
     grri = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
+    grre = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
+    griw = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
+    grrw = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
     xzpts = Array{Float64}(undef, ctrl.mthvac + 5, 4)
 
     farwal_flag = true
@@ -83,9 +86,9 @@ function free_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibr
 
     kernelsignin = 1.0
     VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
-        wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
+        wall_flag, farwal_flag, grre, xzpts, ahg_file, intr.dir_path)
     # if bin_vac
-    #     write(vac_unit, grri)
+    #     write(vac_unit, grre)
     # end
     if ctrl.wv_farwall_flag
         temp .= wv
@@ -94,16 +97,16 @@ function free_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibr
     farwal_flag = false
     kernelsignin = -1.0
     VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
-        wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
+        wall_flag, farwal_flag, griw, xzpts, ahg_file, intr.dir_path)
     # if bin_vac
-    #     write(vac_unit, grri)
+    #     write(vac_unit, griw)
     # end
 
     kernelsignin = 1.0
     VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
-        wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
+        wall_flag, farwal_flag, grrw, xzpts, ahg_file, intr.dir_path)
     # if bin_vac
-    #     write(vac_unit, grri)
+    #     write(vac_unit, grrw)
     #     write(vac_unit, xzpts)
     #     bin_close(vac_unit)
     # end
@@ -111,6 +114,8 @@ function free_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibr
     if ctrl.wv_farwall_flag
         wv .= temp
     end
+
+    vacuum_solutions = VacuumData(grri, grre, griw, grrw, wv, xzpts)
 
     # Scale vacuum matrix by singfac = (m - nn*qlim)
     singfac = (intr.mlow .- ctrl.nn .* intr.qlim) .+ collect(0:intr.mpert-1)
@@ -260,7 +265,7 @@ function free_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibr
     #     dcon_netcdf_out(wp, wv, wt, wt0, ep, ev, et)
     # end
 
-    return plasma1, vacuum1, total1
+    return plasma1, vacuum1, total1, vacuum_solutions
 end
 
 """

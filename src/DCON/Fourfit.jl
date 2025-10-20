@@ -1,32 +1,4 @@
 """
-    MetricData
-
-A structure to hold the computed metric tensor components and their
-Fourier-spline representation. This is the Julia equivalent of the `fspline_type`
-named `metric` in the Fortran `fourfit_make_metric` subroutine.
-
-### Fields
-
-  - `mpsi::Int`: Number of radial grid points minus one.
-  - `mtheta::Int`: Number of poloidal grid points minus one.
-  - `xs::Vector{Float64}`: Radial coordinates (normalized poloidal flux `ψ_norm`).
-  - `ys::Vector{Float64}`: Poloidal angle coordinates `θ` in radians (0 to 2π).
-  - `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi, mtheta, 8)`.
-    The 8 quantities are: `g¹¹`, `g²²`, `g³³`, `g²³`, `g³¹`, `g¹²`, `J`, `∂J/∂ψ`.
-  - `fspline::Spl.FourierSpline`: The fitted Fourier-cubic spline object.
-"""
-@kwdef mutable struct MetricData
-    mpsi::Int
-    mtheta::Int
-    xs::Vector{Float64} = zeros(mpsi)
-    ys::Vector{Float64} = zeros(mtheta)
-    fs::Array{Float64,3} = zeros(mpsi, mtheta, 8)
-    fspline::Union{Spl.FourierSpline,Nothing} = nothing
-end
-
-MetricData(mpsi::Int, mtheta::Int) = MetricData(; mpsi, mtheta)
-
-"""
     make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int=10, fft_flag::Bool=true) -> MetricData
 
 Constructs the metric tensor data on a (ψ, θ) grid from an input plasma equilibrium.

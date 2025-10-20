@@ -162,7 +162,7 @@ function Main(path::String)
         if ctrl.verbose
             println("Integrating Euler-Lagrange equation")
         end
-        odet = ode_run(ctrl, equil, ffit, intr, outp)
+        odet, sol_basis = ode_run(ctrl, equil, ffit, intr, outp)
     end
 
     # Compute free boundary energies
@@ -173,7 +173,7 @@ function Main(path::String)
         if ctrl.verbose
             println("Computing free boundary energies")
         end
-        plasma1, vacuum1, total1 = free_run(ctrl, equil, ffit, intr, odet, outp; op_netcdf_out=false) # outp.netcdf_out)
+        plasma1, vacuum1, total1, vacuum_solutions = free_run(ctrl, equil, ffit, intr, odet, outp; op_netcdf_out=false) # outp.netcdf_out)
     end
 
     # Output results of fixed-boundary stability calculations
@@ -196,9 +196,24 @@ function Main(path::String)
         end
     end
 
+    solution = DconSolution(
+        nn = ctrl.nn,
+        mlow = intr.mlow,
+        mhigh = intr.mhigh,
+        mpert = intr.mpert,
+        msol = odet.msol,
+        mband = intr.mband,
+        equil = equil,
+        metric = metric,
+        sol_basis = sol_basis,
+        vacuum_sols = vacuum_solutions
+    )
+
     end_time = time() - start_time
     close_files(outp)
     println("----------------------------------")
     println("Run time: $end_time seconds")
     println("Normal termination.")
+
+    return solution
 end

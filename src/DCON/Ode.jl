@@ -162,7 +162,7 @@ function ode_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibri
         trim_storage!(odet)
     end
 
-    ureal = build_ureal(intr, odet)
+    ureal, udreal = build_realsols(intr, odet)
 
     if outp.write_euler_h5
         if ctrl.verbose
@@ -182,6 +182,7 @@ function ode_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibri
             # TODO: for GPEC, should add u1, u2, u3, u4? I think this would just be a
             # matter of adding u[:, :, 2] and ud to the build ureal function, yes?
             euler_h5["integration/ureal"] = ureal
+            euler_h5["integration/udreal"] = udreal
             euler_h5["singular/msing"] = intr.msing
             euler_h5["singular/psi"] = [intr.sing[ising].psifac for ising in 1:intr.msing]
             euler_h5["singular/q"] = [intr.sing[ising].q for ising in 1:intr.msing]
@@ -191,7 +192,16 @@ function ode_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibri
             # TODO: restype writing would also be added here, Matt says not needed for now (or maybe ever)
         end
     end
-    return odet
+
+    solution_basis = EulerLagrangeBasis(
+        npsi = odet.step,
+        psi = odet.psi_store,
+        xipsi = ureal,
+        xi1psi = udreal,
+        u = odet.u_store,
+    )
+
+    return odet, solution_basis
 end
 
 
@@ -968,14 +978,14 @@ function get_psi_saves!(odet::OdeState, ctrl::DconControlParameters, intr::DconI
 end
 
 """
-    build_ureal(intr::DconInternal, odet::OdeState)
+    build_realsols(intr::DconInternal, odet::OdeState)
 
 Constructs the transformation matrices to convert the complex solution vectors
 to real-valued vectors in each region between fixups. Effectively "undoes" the
 Gaussian reduction applied during fixups throughout the integration, such that
 we have the true solution vectors for use in GPEC.
 """
-function build_ureal(intr::DconInternal, odet::OdeState)
+function build_realsols(intr::DconInternal, odet::OdeState)
 
     # Gaussian reduction matrices for each fixup
     gauss = Array{ComplexF64,3}(undef, intr.mpert, intr.mpert, odet.ifix)
@@ -1017,14 +1027,16 @@ function build_ureal(intr::DconInternal, odet::OdeState)
     # Now that we have the transform matrices, we can apply them to the solution vectors
     # "undoing" the Gaussian reductions to get the true solution vectors
     ureal = Array{ComplexF64}(undef, odet.step, intr.mpert, intr.mpert)
+    udreal = similar(ureal)
     jfix = 1
     for ifix in 1:odet.ifix+1
         kfix = odet.fixstep[ifix]
         for istep in jfix:kfix
             ureal[istep, :, :] .= odet.u_store[:, :, 1, istep] * transforms[:, :, ifix]
+            udreal[istep, :, :] .= odet.ud_store[:, :, 1, istep] * transforms[:, :, ifix]
         end
         jfix = kfix + 1
     end
 
-    return ureal
+    return ureal, udreal
 end
