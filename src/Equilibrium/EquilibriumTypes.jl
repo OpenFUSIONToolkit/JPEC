@@ -274,8 +274,8 @@ and preparing the initial splines.
 """
 mutable struct DirectRunInput
     config::EquilibriumConfig
-    sq_in::Any       # 1D profile spline (CubicSpline)
-    psi_in::Any      # 2D flux spline (BicubicSpline)
+    sq_in::Spl.CubicSpline{Float64}       # 1D profile spline (CubicSpline)
+    psi_in::Spl.BicubicSpline      # 2D flux spline (BicubicSpline)
     rmin::Float64    # Minimum R-coordinate of the computational grid [m].
     rmax::Float64    # Maximum R-coordinate of the computational grid [m].
     zmin::Float64    # Minimum Z-coordinate of the computational grid [m].
@@ -294,8 +294,8 @@ A container struct for inputs to the `inverse_run` function.
 """
 mutable struct InverseRunInput
     config::EquilibriumConfig
-    sq_in::Any           # 1D spline input profile (e.g. F*Bt, Pressure, q)
-    rz_in::Any           # 2D bicubic spline input for (R,Z) geometry
+    sq_in::Spl.CubicSpline{Float64}   # 1D spline input profile (e.g. F*Bt, Pressure, q)
+    rz_in::Spl.BicubicSpline # 2D bicubic spline input for (R,Z) geometry
     ro::Float64          # R axis location
     zo::Float64          # Z axis location
     psio::Float64        # Total flux difference |psi_axis - psi_boundary|
@@ -414,9 +414,9 @@ provides a complete representation of the processed plasma equilibrium in flux c
 """
 mutable struct PlasmaEquilibrium
     config::EquilibriumConfig
-    params::EquilibriumParameters           # Parameters for the equilibrium
-    sq::Spl.CubicSpline                     # Final 1D profile spline
-    rzphi::Spl.BicubicSpline            # Final 2D coordinate mapping spline
+    params::EquilibriumParameters       # Parameters for the equilibrium
+    sq::Spl.CubicSpline{Float64}        # Final 1D profile spline
+    rzphi::Spl.BicubicSpline   # Final 2D coordinate mapping spline
     eqfun::Spl.BicubicSpline
     ro::Float64
     zo::Float64
