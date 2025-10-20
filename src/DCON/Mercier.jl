@@ -29,7 +29,7 @@ function mercier_scan!(locstab_fs::Matrix{Float64}, plasma_eq::Equilibrium.Plasm
             theta = rzphi.ys[itheta]
 
             # Evaluate bicubic spline at grid point
-            f, _, fy = Spl.bicube_eval!(rzphi, rzphi.xs[ipsi], theta, 1)
+            f, _, fy = Spl.bicube_deriv1!(rzphi, rzphi.xs[ipsi], theta)
 
             rfac = sqrt(f[1])
             eta = 2π * (theta + f[2])

@@ -85,7 +85,7 @@ function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int, fft_flag:
             theta_norm = rzphi.ys[jtheta] # θ is from 0 to 1
 
             # Evaluate the geometry spline to get (R,Z) and their derivatives
-            f, fx, fy = Spl.bicube_eval!(rzphi, psi_norm, theta_norm, 1)
+            f, fx, fy = Spl.bicube_deriv1!(rzphi, psi_norm, theta_norm)
 
             # Extract geometric quantities from the spline data
             # See EquilibriumAPI.txt for `rzphi` quantities

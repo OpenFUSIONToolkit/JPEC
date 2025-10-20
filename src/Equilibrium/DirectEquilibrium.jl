@@ -87,15 +87,15 @@ function direct_get_bfield!(
 )
     # 1. Evaluate 2D spline for psi(r,z) and its derivatives
     if derivs == 0
-        f_psi = Spl.bicube_eval!(psi_in, r, z, 0)
+        f_psi = Spl.bicube_eval!(psi_in, r, z)
         bf_out.psi = f_psi[1]
     elseif derivs == 1
-        f_psi, fx_psi, fy_psi = Spl.bicube_eval!(psi_in, r, z, 1)
+        f_psi, fx_psi, fy_psi = Spl.bicube_deriv1!(psi_in, r, z)
         bf_out.psi = f_psi[1]
         bf_out.psir = fx_psi[1]
         bf_out.psiz = fy_psi[1]
     else # derivs >= 2
-        f_psi, fx_psi, fy_psi, fxx_psi, fxy_psi, fyy_psi = Spl.bicube_eval!(psi_in, r, z, 2)
+        f_psi, fx_psi, fy_psi, fxx_psi, fxy_psi, fyy_psi = Spl.bicube_deriv2!(psi_in, r, z)
         bf_out.psi = f_psi[1]
         bf_out.psir = fx_psi[1]
         bf_out.psiz = fy_psi[1]
@@ -607,7 +607,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
         q = f[4]
         f_val = f[1]
 
-        f, fx, fy = Spl.bicube_eval!(rzphi, psi_norm, theta_new, 1)
+        f, fx, fy = Spl.bicube_deriv1!(rzphi, psi_norm, theta_new)
         rfac_sq = max(0.0, f[1])
         rfac = sqrt(rfac_sq)
         eta = 2.0 * pi * (theta_new + f[2])

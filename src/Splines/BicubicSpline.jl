@@ -124,7 +124,7 @@ function call_bicube_c_eval(bicube, x, y, f, fx, fy, fxx, fxy, fyy)
 end
 
 """
-bicube_eval(bicube::BicubicSpline, x, y, derivs::Int=0)
+bicube_eval!(bicube::BicubicSpline, x, y, derivs::Int=0)
 
 ## Arguments:
 
@@ -138,25 +138,22 @@ bicube_eval(bicube::BicubicSpline, x, y, derivs::Int=0)
   - If `x` and `y` are vectors of Float64 values, returns a 3D array of Float64 values where each slice corresponds to the function values at    # x -> Float64
     the respective (x,y) coordinates in `x` and `y`.    # y -> Float64
 """
-function bicube_eval!(bicube::BicubicSpline, x::Float64, y::Float64, derivs::Int=0)
-    # x -> Float64
-    # y -> Float64
-    # Returns a vector of Float64 (nqty)
-    @assert derivs in 0:2 "Invalid number of derivatives requested: $derivs. Must be 0, 1, or 2."
+function bicube_eval!(bicube::BicubicSpline, x::Float64, y::Float64)
+    f = bicube._f
+    call_bicube_c_eval(bicube, x, y, f)
+    return f
+end
 
-    if derivs == 0
-        f = bicube._f
-        call_bicube_c_eval(bicube, x, y, f)
-        return f
-    elseif derivs == 1
-        f, fx, fy = bicube._f, bicube._fx, bicube._fy
-        call_bicube_c_eval(bicube, x, y, f, fx, fy)
-        return f, fx, fy
-    elseif derivs == 2
-        f, fx, fy, fxx, fxy, fyy = bicube._f, bicube._fx, bicube._fy, bicube._fxx, bicube._fxy, bicube._fyy
-        call_bicube_c_eval(bicube, x, y, f, fx, fy, fxx, fxy, fyy)
-        return f, fx, fy, fxx, fxy, fyy
-    end
+function bicube_deriv1!(bicube::BicubicSpline, x::Float64, y::Float64)
+    f, fx, fy = bicube._f, bicube._fx, bicube._fy
+    call_bicube_c_eval(bicube, x, y, f, fx, fy)
+    return f, fx, fy
+end
+
+function bicube_deriv2!(bicube::BicubicSpline, x::Float64, y::Float64)
+    f, fx, fy, fxx, fxy, fyy = bicube._f, bicube._fx, bicube._fy, bicube._fxx, bicube._fxy, bicube._fyy
+    call_bicube_c_eval(bicube, x, y, f, fx, fy, fxx, fxy, fyy)
+    return f, fx, fy, fxx, fxy, fyy
 end
 
 function bicube_eval(bicube::BicubicSpline, xs::Vector{Float64}, ys::Vector{Float64}, derivs::Int=0)

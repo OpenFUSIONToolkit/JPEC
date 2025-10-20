@@ -303,7 +303,7 @@ function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.P
     # Compute output
     qa = Spl.spline_eval!(equil.sq, psifac, 0)[4] # TODO: this had a deriv = 1 in Fortran, but not used?
     for itheta in 1:mtheta
-        f = Spl.bicube_eval!(equil.rzphi, psifac, theta_norm[itheta], 0)
+        f = Spl.bicube_eval!(equil.rzphi, psifac, theta_norm[itheta])
         rfac[itheta] = sqrt(f[1])
         angle[itheta] = 2π * (theta_norm[itheta] + f[2])
         delta[itheta] = -f[3] / qa

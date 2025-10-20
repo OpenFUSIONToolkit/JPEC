@@ -169,7 +169,7 @@ function equilibrium_solver(input::InverseRunInput)
         spl_xs .= rzphi_ys
         for itheta in 0:mtheta
             theta = rzphi_ys[itheta+1]
-            f_rz_in, fx_rz_in, fy_rz_in = Spl.bicube_eval!(new_rz_in, psifac, theta, 1)
+            f_rz_in, fx_rz_in, fy_rz_in = Spl.bicube_deriv1!(new_rz_in, psifac, theta)
             f_sq_in = Spl.spline_eval!(sq_in, psifac, 0)
 
             if f_rz_in[1] < 0
