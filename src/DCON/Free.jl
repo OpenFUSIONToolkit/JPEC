@@ -38,14 +38,12 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     wpt = zeros(ComplexF64, intr.mpert, intr.mpert)
     wvt = zeros(ComplexF64, intr.mpert, intr.mpert)
 
-    mtheta = length(equil.rzphi.ys)
-
     # Evaluate dV/dpsi at the plasma edge
     v1 = Spl.spline_eval(equil.sq, intr.psilim, 0)[3]
 
     # Compute plasma response matrix.
     if ctrl.ode_flag
-        temp = adjoint(odet.u[:, 1:intr.mpert, 1])
+        temp .= adjoint(odet.u[:, 1:intr.mpert, 1])
         wp .= adjoint(odet.u[:, 1:intr.mpert, 2])
         # Compute wp using LU decomposition
         temp_fact = lu(temp)
@@ -70,8 +68,8 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
 
     farwal_flag = true
     kernelsignin = -1.0
-    # TODO: make this a ! function
-    VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
+    # TODO: make this a ! function, it modifies wv, grri, and xzpts in place (but only wv is used)
+    VacuumMod.mscvac(wv, intr.mpert, equil.config.control.mtheta, ctrl.mthvac, complex_flag, kernelsignin,
         wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
 
     # TODO: assuming bin_vac is deprecated for good, will remove all calls later after checking
@@ -82,7 +80,7 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     # end
 
     kernelsignin = 1.0
-    VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
+    VacuumMod.mscvac(wv, intr.mpert, equil.config.control.mtheta, ctrl.mthvac, complex_flag, kernelsignin,
         wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
     # if bin_vac
     #     write(vac_unit, grri)
@@ -93,14 +91,14 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
 
     farwal_flag = false
     kernelsignin = -1.0
-    VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
+    VacuumMod.mscvac(wv, intr.mpert, equil.config.control.mtheta, ctrl.mthvac, complex_flag, kernelsignin,
         wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
     # if bin_vac
     #     write(vac_unit, grri)
     # end
 
     kernelsignin = 1.0
-    VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
+    VacuumMod.mscvac(wv, intr.mpert, equil.config.control.mtheta, ctrl.mthvac, complex_flag, kernelsignin,
         wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
     # if bin_vac
     #     write(vac_unit, grri)
@@ -183,6 +181,10 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     #     # Fortran did DEALLOCATE(r,z,theta,dphi,thetas,project) - we assume they are module arrays
     #     # and will be GC'd or freed by dcon_dealloc below
     # end
+
+    if vac_memory
+        VacuumMod.unset_dcon_params()
+    end
 
     # Write to euler.h5
     if outp.write_euler_h5
@@ -293,16 +295,16 @@ function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.P
 
     # Allocations
     theta_norm = Vector(equil.rzphi.ys)
-    mtheta = length(theta_norm)
-    angle = zeros(Float64, mtheta)
-    r = zeros(Float64, mtheta)
-    z = zeros(Float64, mtheta)
-    delta = zeros(Float64, mtheta)
-    rfac = zeros(Float64, mtheta)
+    mtheta = equil.config.control.mtheta
+    angle = zeros(Float64, mtheta + 1)
+    r = zeros(Float64, mtheta + 1)
+    z = zeros(Float64, mtheta + 1)
+    delta = zeros(Float64, mtheta + 1)
+    rfac = zeros(Float64, mtheta + 1)
 
     # Compute output
     qa = Spl.spline_eval(equil.sq, psifac, 0)[4] # TODO: this had a deriv = 1 in Fortran, but not used?
-    for itheta in 1:mtheta
+    for itheta in 1:equil.config.control.mtheta + 1
         f = Spl.bicube_eval(equil.rzphi, psifac, theta_norm[itheta], 0)
         rfac[itheta] = sqrt(f[1])
         angle[itheta] = 2π * (theta_norm[itheta] + f[2])
@@ -321,7 +323,7 @@ function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.P
 
     # Pass all required values to VACUUM
     if inmemory
-        VacuumMod.set_dcon_params(mtheta, intr.mlow, intr.mhigh, n, qa,
+        VacuumMod.set_dcon_params(equil.config.control.mtheta, intr.mlow, intr.mhigh, n, qa,
             reverse(r), reverse(z), reverse(delta))
     else
         # TODO: this section contains ahg2msc file writing, which is deprecated, just remove
@@ -374,7 +376,6 @@ function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEqui
         grri = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
         xzpts = Array{Float64}(undef, ctrl.mthvac + 5, 4)
         wv = zeros(ComplexF64, intr.mpert, intr.mpert)
-        mtheta = length(equil.rzphi.ys)
         complex_flag = true
         kernelsignin = 1.0
         wall_flag = false
@@ -382,7 +383,7 @@ function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEqui
         ahg_file = "ahg2msc_dcon.out" # Deprecated
 
         # Compute vacuum matrix
-        VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
+        VacuumMod.mscvac(wv, intr.mpert, equil.config.control.mtheta, ctrl.mthvac, complex_flag, kernelsignin,
             wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
 
         # Apply singular factor scaling
