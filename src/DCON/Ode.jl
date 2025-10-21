@@ -603,8 +603,8 @@ function integrator_callback!(integrator)
     end
     # Save values
     odet.psi_store[odet.step] = odet.psifac
-    odet.u_store[:, :, :, odet.step] = odet.u
-    odet.ud_store[:, :, :, odet.step] = odet.ud
+    odet.u_store[:, :, :, odet.step] .= odet.u
+    odet.ud_store[:, :, :, odet.step] .= odet.ud
     # Advance stepper (just like in Fortran, a "step" starts with integration, does callback functions, then stores)
     odet.step += 1
 end
