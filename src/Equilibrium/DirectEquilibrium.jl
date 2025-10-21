@@ -334,7 +334,7 @@ function direct_fl_int(
     # Add the initial state
     push!(saved_values, [0.0; u0])
 
-    prob = ODEProblem(direct_fl_der!, u0, tspan, params)
+    prob = ODEProblem{true}(direct_fl_der!, u0, tspan, params)
     sol = solve(prob, Tsit5(); callback=callback, reltol=1e-6, abstol=1e-8, dt=2 * pi / 200, adaptive=true)
 
     if sol.retcode != :Success && sol.retcode != :Terminated
