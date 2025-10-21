@@ -213,7 +213,9 @@ end
 
 
 """
-This is a Julia version of the Fortran code in sol.f, implementing Soloviev's analytical equilibrium.
+This function handles the Soloviev analytical equilibrium model, transforming the input parameters
+into the necessary splines and scalar values for equilibrium construction. This is a Julia version
+of the Fortran code in sol.f, with no major differences except for arrays going from 0:n to 1:n+1.
 
 ## Arguments:
 
@@ -283,9 +285,9 @@ function sol_run(equil_inputs::EquilibriumConfig, sol_inputs::SolevevConfig)
 
     # Print out equilibrium info
     println("Generating Soloviev equilibrium inputs with:")
-    println("  mr=$mr, mz=$mz, ma=$ma")
-    println("  e=$e, a=$a, r0=$r0")
-    println("  q0=$q0, p0fac=$p0fac, b0fac=$b0fac, f0fac=$f0fac")
+    println("   mr=$mr, mz=$mz, ma=$ma")
+    println("   e=$e, a=$a, r0=$r0")
+    println("   q0=$q0, p0fac=$p0fac, b0fac=$b0fac, f0fac=$f0fac")
 
     return DirectRunInput(equil_inputs, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
 end
