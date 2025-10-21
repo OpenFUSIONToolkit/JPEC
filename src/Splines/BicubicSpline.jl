@@ -124,19 +124,20 @@ function call_bicube_c_eval(bicube, x, y, f, fx, fy, fxx, fxy, fyy)
 end
 
 """
-bicube_eval!(bicube::BicubicSpline, x, y, derivs::Int=0)
+    bicube_eval!(bicube::BicubicSpline, x::Float64, y::Float64)
+
+Evaluate the bicubic spline at a single point using in-place operations.
 
 ## Arguments:
 
   - `bicube`: A `BicubicSpline` object.
-  - `x`: A Float64 value or a vector of Float64 values representing the x-coordinates to evaluate the bicubic spline at.
-  - `y`: A Float64 value or a vector of Float64 values representing the y-coordinates to evaluate the bicubic spline at.
+  - `x`: A Float64 value representing the x-coordinate to evaluate the bicubic spline at.
+  - `y`: A Float64 value representing the y-coordinate to evaluate the bicubic spline at.
 
 ## Returns:
 
-  - If `x` and `y` are single Float64 values, returns a vector of Float64 values representing the function values at that (x,y) coordinate.
-  - If `x` and `y` are vectors of Float64 values, returns a 3D array of Float64 values where each slice corresponds to the function values at    # x -> Float64
-    the respective (x,y) coordinates in `x` and `y`.    # y -> Float64
+  - A vector of Float64 values representing the function values at the (x,y) coordinate.
+    The result is stored in and returned from the spline's internal work array.
 """
 function bicube_eval!(bicube::BicubicSpline, x::Float64, y::Float64)
     f = bicube._f
@@ -144,12 +145,51 @@ function bicube_eval!(bicube::BicubicSpline, x::Float64, y::Float64)
     return f
 end
 
+"""
+    bicube_deriv1!(bicube::BicubicSpline, x::Float64, y::Float64)
+
+Evaluate the bicubic spline and its first derivatives at a single point using in-place operations.
+
+## Arguments:
+
+  - `bicube`: A `BicubicSpline` object.
+  - `x`: A Float64 value representing the x-coordinate to evaluate the bicubic spline at.
+  - `y`: A Float64 value representing the y-coordinate to evaluate the bicubic spline at.
+
+## Returns:
+
+  - `f`: A vector of Float64 values representing the function values at the (x,y) coordinate.
+  - `fx`: A vector of Float64 values representing the first derivative with respect to x at the (x,y) coordinate.
+  - `fy`: A vector of Float64 values representing the first derivative with respect to y at the (x,y) coordinate.
+    Results are stored in and returned from the spline's internal work arrays.
+"""
 function bicube_deriv1!(bicube::BicubicSpline, x::Float64, y::Float64)
     f, fx, fy = bicube._f, bicube._fx, bicube._fy
     call_bicube_c_eval(bicube, x, y, f, fx, fy)
     return f, fx, fy
 end
 
+"""
+    bicube_deriv2!(bicube::BicubicSpline, x::Float64, y::Float64)
+
+Evaluate the bicubic spline and its first and second derivatives at a single point using in-place operations.
+
+## Arguments:
+
+  - `bicube`: A `BicubicSpline` object.
+  - `x`: A Float64 value representing the x-coordinate to evaluate the bicubic spline at.
+  - `y`: A Float64 value representing the y-coordinate to evaluate the bicubic spline at.
+
+## Returns:
+
+  - `f`: A vector of Float64 values representing the function values at the (x,y) coordinate.
+  - `fx`: A vector of Float64 values representing the first derivative with respect to x at the (x,y) coordinate.
+  - `fy`: A vector of Float64 values representing the first derivative with respect to y at the (x,y) coordinate.
+  - `fxx`: A vector of Float64 values representing the second derivative with respect to x at the (x,y) coordinate.
+  - `fxy`: A vector of Float64 values representing the mixed second derivative at the (x,y) coordinate.
+  - `fyy`: A vector of Float64 values representing the second derivative with respect to y at the (x,y) coordinate.
+    Results are stored in and returned from the spline's internal work arrays.
+"""
 function bicube_deriv2!(bicube::BicubicSpline, x::Float64, y::Float64)
     f, fx, fy, fxx, fxy, fyy = bicube._f, bicube._fx, bicube._fy, bicube._fxx, bicube._fxy, bicube._fyy
     call_bicube_c_eval(bicube, x, y, f, fx, fy, fxx, fxy, fyy)
