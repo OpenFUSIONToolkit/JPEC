@@ -132,28 +132,28 @@ spline_eval(spline::CubicSpline{T}, x, derivs::Int=0) where {T<:Union{Float64, C
 the respective x-coordinate in `x`.
 - Depending on the derivatives requested, it may return additional vectors for the first, second, or third derivatives.
 """
-function spline_eval!(spline::CubicSpline{T}, x::Float64, derivs::Int=0) where {T<:Union{Float64,ComplexF64}}
-    # x -> Float64
-    # Returns a vector of T (nqty)
-    @assert (derivs in 0:3) "Invalid number of derivatives requested: $derivs. Must be 0, 1, 2, or 3."
+function spline_eval!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64,ComplexF64}}
+    f = spline._f
+    call_spline_c_eval(T, spline, x, f)
+    return f
+end
 
-    if derivs == 0
-        f = spline._f
-        call_spline_c_eval(T, spline, x, f)
-        return f
-    elseif derivs == 1
-        f, f1 = spline._f, spline._f1
-        call_spline_c_eval(T, spline, x, f, f1)
-        return f, f1
-    elseif derivs == 2
-        f, f1, f2 = spline._f, spline._f1, spline._f2
-        call_spline_c_eval(T, spline, x, f, f1, f2)
-        return f, f1, f2
-    elseif derivs == 3
-        f, f1, f2, f3 = spline._f, spline._f1, spline._f2, spline._f3
-        call_spline_c_eval(T, spline, x, f, f1, f2, f3)
-        return f, f1, f2, f3
-    end
+function spline_deriv1!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64,ComplexF64}}
+    f, f1 = spline._f, spline._f1
+    call_spline_c_eval(T, spline, x, f, f1)
+    return f, f1
+end
+
+function spline_deriv2!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64,ComplexF64}}
+    f, f1, f2 = spline._f, spline._f1, spline._f2
+    call_spline_c_eval(T, spline, x, f, f1, f2)
+    return f, f1, f2
+end
+
+function spline_deriv3!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64,ComplexF64}}
+    f, f1, f2, f3 = spline._f, spline._f1, spline._f2, spline._f3
+    call_spline_c_eval(T, spline, x, f, f1, f2, f3)
+    return f, f1, f2, f3
 end
 
 function spline_eval(spline::CubicSpline{T}, xs::Vector{Float64}, derivs::Int=0) where {T<:Union{Float64,ComplexF64}}

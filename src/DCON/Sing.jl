@@ -42,7 +42,7 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             while it < itmax
                 it += 1
                 psifac = (psi0 + psi1) / 2
-                singfac = (m - ctrl.nn * Spl.spline_eval!(equil.sq, psifac, 0)[4]) * dm
+                singfac = (m - ctrl.nn * Spl.spline_eval!(equil.sq, psifac)[4]) * dm
                 if abs(singfac) <= 1e-8
                     break
                 elseif singfac > 0
@@ -60,7 +60,7 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
                     psifac=psifac,
                     rho=sqrt(psifac),
                     q=m / ctrl.nn,
-                    q1=Spl.spline_eval!(equil.sq, psifac, 1)[2][4]
+                    q1=Spl.spline_deriv1!(equil.sq, psifac)[2][4]
                 ))
                 intr.msing += 1
             end
@@ -114,8 +114,8 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
         jpsi = min(jpsi, equil.config.control.mpsi - 1)
 
         # Shorthand to evaluate q/q1 inside newton iteration
-        qval(ψ) = Spl.spline_eval!(equil.sq, ψ, 0)[4]
-        q1val(ψ) = Spl.spline_eval!(equil.sq, ψ, 1)[2][4]
+        qval(ψ) = Spl.spline_eval!(equil.sq, ψ)[4]
+        q1val(ψ) = Spl.spline_deriv1!(equil.sq, ψ)[2][4]
 
         intr.psilim = equil.sq.xs[jpsi]
         for _ in 1:itmax
@@ -172,7 +172,7 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     psifac = singp.psifac
     q = singp.q
-    di0 = Spl.spline_eval!(intr.locstab, singp.psifac, 0)[1] / singp.psifac
+    di0 = Spl.spline_eval!(intr.locstab, singp.psifac)[1] / singp.psifac
     q1 = singp.q1
     rho = singp.rho
 
@@ -257,10 +257,10 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     # TODO: third derivative has some error, but only included via sing_fac[ipert0] for sing_order < 3. Tests with solovev ideal indicate little sensitivity
     # TODO: this is an annoying way to have to take apart this tuple of vectors, I think
     # this is a planned fix already (i.e. separating cubic splines)
-    q .= getindex.(Spl.spline_eval!(equil.sq, singp.psifac, 3), 4)
-    f_lower_interp[:, :, 1], f_lower_interp[:, :, 2], f_lower_interp[:, :, 3], f_lower_interp[:, :, 4] = Spl.spline_eval!(ffit.fmats_lower, singp.psifac, 3)
-    g_interp[:, :, 1], g_interp[:, :, 2], g_interp[:, :, 3], g_interp[:, :, 4] = Spl.spline_eval!(ffit.gmats, singp.psifac, 3)
-    k_interp[:, :, 1], k_interp[:, :, 2], k_interp[:, :, 3], k_interp[:, :, 4] = Spl.spline_eval!(ffit.kmats, singp.psifac, 3)
+    q .= getindex.(Spl.spline_deriv3!(equil.sq, singp.psifac), 4)
+    f_lower_interp[:, :, 1], f_lower_interp[:, :, 2], f_lower_interp[:, :, 3], f_lower_interp[:, :, 4] = Spl.spline_deriv3!(ffit.fmats_lower, singp.psifac)
+    g_interp[:, :, 1], g_interp[:, :, 2], g_interp[:, :, 3], g_interp[:, :, 4] = Spl.spline_deriv3!(ffit.gmats, singp.psifac)
+    k_interp[:, :, 1], k_interp[:, :, 2], k_interp[:, :, 3], k_interp[:, :, 4] = Spl.spline_deriv3!(ffit.kmats, singp.psifac)
 
     # Evaluate singfac and its derivatives
     ipert0 = singp.m - intr.mlow + 1
@@ -630,7 +630,7 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
     ctrl, equil, ffit, intr, odet, _ = params
 
     # Spline evaluation
-    odet.q = Spl.spline_eval!(equil.sq, psieval, 0)[4]
+    odet.q = Spl.spline_eval!(equil.sq, psieval)[4]
     odet.singfac_vec .= 1.0 ./ (intr.mlow .- ctrl.nn * odet.q .+ (0:intr.mpert-1))
     chi1 = 2π * equil.psio
 
@@ -640,17 +640,17 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
     else
         # Evaluate splines at psieval and reshape avoiding new allocations
         # TODO: is this actually more efficient?
-        Spl.spline_eval!(odet.amat, ffit.amats, psieval; derivs=0)
+        Spl.spline_eval!(odet.amat, ffit.amats, psieval)
         amat = reshape(odet.amat, intr.mpert, intr.mpert)
-        Spl.spline_eval!(odet.bmat, ffit.bmats, psieval; derivs=0)
+        Spl.spline_eval!(odet.bmat, ffit.bmats, psieval)
         bmat = reshape(odet.bmat, intr.mpert, intr.mpert)
-        Spl.spline_eval!(odet.cmat, ffit.cmats, psieval; derivs=0)
+        Spl.spline_eval!(odet.cmat, ffit.cmats, psieval)
         cmat = reshape(odet.cmat, intr.mpert, intr.mpert)
-        Spl.spline_eval!(odet.fmat_lower, ffit.fmats_lower, psieval; derivs=0)
+        Spl.spline_eval!(odet.fmat_lower, ffit.fmats_lower, psieval)
         fmat_lower = reshape(odet.fmat_lower, intr.mpert, intr.mpert)
-        Spl.spline_eval!(odet.kmat, ffit.kmats, psieval; derivs=0)
+        Spl.spline_eval!(odet.kmat, ffit.kmats, psieval)
         kmat = reshape(odet.kmat, intr.mpert, intr.mpert)
-        Spl.spline_eval!(odet.gmat, ffit.gmats, psieval; derivs=0)
+        Spl.spline_eval!(odet.gmat, ffit.gmats, psieval)
         gmat = reshape(odet.gmat, intr.mpert, intr.mpert)
 
         # ldiv!(A,B): Compute A \ B in-place and overwriting B to store the result,
