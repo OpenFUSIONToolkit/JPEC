@@ -122,15 +122,17 @@ function CubicSpline(xs::Vector{Float64}, fs::Union{Vector{T},Matrix{T}};
 end
 
 """
-spline_eval(spline::CubicSpline{T}, x, derivs::Int=0) where {T<:Union{Float64, ComplexF64}}
+    spline_eval!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64, ComplexF64}}
+
+Evaluate the cubic spline at a single point using in-place operations.
+
 ## Arguments:
-- `spline`: A `Spline` object created by `CubicSpline`.
-- `x`: A Float64 value or a vector of Float64 values representing the x-coordinates to evaluate the spline at.
+- `spline`: A `CubicSpline` object created by `CubicSpline`.
+- `x`: A Float64 value representing the x-coordinate to evaluate the spline at.
+
 ## Returns:
-- If `x` is a single Float64 value, returns a vector of Float64 values representing the function values at that x-coordinate.
-- If `x` is a vector of Float64 values, returns a matrix of Float64 values where each row corresponds to the function values at
-the respective x-coordinate in `x`.
-- Depending on the derivatives requested, it may return additional vectors for the first, second, or third derivatives.
+- A vector of Float64/ComplexF64 values representing the function values at the x-coordinate.
+  The result is stored in and returned from the spline's internal work array.
 """
 function spline_eval!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64,ComplexF64}}
     f = spline._f
@@ -138,18 +140,63 @@ function spline_eval!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float6
     return f
 end
 
+"""
+    spline_deriv1!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64, ComplexF64}}
+
+Evaluate the cubic spline and its first derivative at a single point using in-place operations.
+
+## Arguments:
+- `spline`: A `CubicSpline` object created by `CubicSpline`.
+- `x`: A Float64 value representing the x-coordinate to evaluate the spline at.
+
+## Returns:
+- `f`: A vector of Float64/ComplexF64 values representing the function values at the x-coordinate.
+- `f1`: A vector of Float64/ComplexF64 values representing the first derivative values at the x-coordinate.
+  Results are stored in and returned from the spline's internal work arrays.
+"""
 function spline_deriv1!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64,ComplexF64}}
     f, f1 = spline._f, spline._f1
     call_spline_c_eval(T, spline, x, f, f1)
     return f, f1
 end
 
+"""
+    spline_deriv2!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64, ComplexF64}}
+
+Evaluate the cubic spline and its first two derivatives at a single point using in-place operations.
+
+## Arguments:
+- `spline`: A `CubicSpline` object created by `CubicSpline`.
+- `x`: A Float64 value representing the x-coordinate to evaluate the spline at.
+
+## Returns:
+- `f`: A vector of Float64/ComplexF64 values representing the function values at the x-coordinate.
+- `f1`: A vector of Float64/ComplexF64 values representing the first derivative values at the x-coordinate.
+- `f2`: A vector of Float64/ComplexF64 values representing the second derivative values at the x-coordinate.
+  Results are stored in and returned from the spline's internal work arrays.
+"""
 function spline_deriv2!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64,ComplexF64}}
     f, f1, f2 = spline._f, spline._f1, spline._f2
     call_spline_c_eval(T, spline, x, f, f1, f2)
     return f, f1, f2
 end
 
+"""
+    spline_deriv3!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64, ComplexF64}}
+
+Evaluate the cubic spline and its first three derivatives at a single point using in-place operations.
+
+## Arguments:
+- `spline`: A `CubicSpline` object created by `CubicSpline`.
+- `x`: A Float64 value representing the x-coordinate to evaluate the spline at.
+
+## Returns:
+- `f`: A vector of Float64/ComplexF64 values representing the function values at the x-coordinate.
+- `f1`: A vector of Float64/ComplexF64 values representing the first derivative values at the x-coordinate.
+- `f2`: A vector of Float64/ComplexF64 values representing the second derivative values at the x-coordinate.
+- `f3`: A vector of Float64/ComplexF64 values representing the third derivative values at the x-coordinate.
+  Results are stored in and returned from the spline's internal work arrays.
+"""
 function spline_deriv3!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Float64,ComplexF64}}
     f, f1, f2, f3 = spline._f, spline._f1, spline._f2, spline._f3
     call_spline_c_eval(T, spline, x, f, f1, f2, f3)
