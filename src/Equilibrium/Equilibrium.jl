@@ -7,7 +7,6 @@ using Printf, OrdinaryDiffEq, DiffEqCallbacks, LinearAlgebra, HDF5
 using TOML
 import StaticArrays: @MMatrix
 
-
 # --- Internal Module Structure ---
 include("EquilibriumTypes.jl")
 include("ReadEquilibrium.jl")
@@ -16,12 +15,10 @@ include("InverseEquilibrium.jl")
 include("AnalyticEquilibrium.jl")
 
 # --- Expose types and functions to the user ---
-
 export setup_equilibrium, EquilibriumConfig, EquilibriumControl, EquilibriumOutput, PlasmaEquilibrium, EquilibriumParameters
 
 # --- Constants ---
 const mu0 = 4.0 * pi * 1e-7
-
 
 """
     setup_equilibrium(equil_input::EquilInput)
@@ -106,7 +103,6 @@ function setup_equilibrium(eq_config::EquilibriumConfig, additional_input=nothin
     println("--- Equilibrium Setup Complete ---")
     return plasma_equilibrium
 end
-
 
 """
     equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
@@ -197,7 +193,6 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
     pe.params.zext = zext
     return (rsep, zsep, rext, zext)
 end
-
 
 function equilibrium_global_parameters!(pe::PlasmaEquilibrium)
     rzphi = pe.rzphi
@@ -306,11 +301,6 @@ function equilibrium_global_parameters!(pe::PlasmaEquilibrium)
     return pe.params.li3 = li3
 end
 
-
-
-
-
-
 function equilibrium_qfind!(equil::PlasmaEquilibrium)
     println("Finding q profile...")
 
@@ -382,10 +372,6 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
     return equil
 end
 
-
-
-
-
 function equilibrium_gse!(equil::PlasmaEquilibrium)
     println("Diagnosing Grad-Shafranov solution...")
 
@@ -432,9 +418,6 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
             end
         end
     end
-
-
-
     flux = Spl.BicubicSpline(collect(rzphi.xs), collect(rzphi.ys), flux_fs; bctypex=2, bctypey=2)
 
     source = zeros(Float64, mpsi + 1, mtheta + 1)
@@ -527,11 +510,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
             return file["errlogi"] = Float32.(errlogi)
         end
     end
-
-
     return equil
-
 end
-
 
 end # module Equilibrium

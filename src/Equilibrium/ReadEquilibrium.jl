@@ -1,10 +1,3 @@
-#=
-This file contains functions for reading equilibrium files from diferent codes
-    that use different formating and collecting the inputs required to form
-    a complete PlasmaEquilibrium using either direct or inverse construction
-=#
-
-
 """
 _read_1d_gfile_format(lines_block, num_values)
 
@@ -284,7 +277,6 @@ them into a `InverseRunInput` object.
 ## Returns:
 - A `InverseRunInput` object ready for the inverse solver.
 """
-
 function read_chease(config::EquilibriumConfig)
     println("--> Reading CHEASE file: $(config.control.eq_filename)")
     diagnostics = false # Set to true to enable detailed print output
@@ -414,11 +406,8 @@ function read_chease(config::EquilibriumConfig)
                 println("  Last  5 entries: ", flat[n-4:n])
             end
         end
-
-
         println("--> Finished reading CHEASE equilibrium.")
         println("    Magnetic axis at (ro=$ro, zo=$zo), psio=$psio")
-
         return InverseRunInput(config, sq_in, rz_in, ro, zo, psio)
     end
 end

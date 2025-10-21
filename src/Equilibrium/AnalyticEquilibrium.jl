@@ -1,8 +1,3 @@
-#=
-Analytic equilibrium functions that prepare all the necessary equilibrium
-input information for a direct or inverse equilibrium construction
-=#
-
 """
     lar_init_conditions(rmin, sigma_type, params)
 
