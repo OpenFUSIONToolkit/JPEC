@@ -163,15 +163,18 @@ function spline_eval(spline::CubicSpline{T}, xs::Vector{Float64}, derivs::Int=0)
 
     n = length(xs)
     fs = Matrix{T}(undef, n, spline.nqty)
-    f = Vector{T}(undef, spline.nqty)
+    f = spline._f
     if derivs > 0
-        fs1, f1 = similar(fs), similar(f)
+        fs1 = similar(fs)
+        f1 = spline._f1
     end
     if derivs > 1
-        fs2, f2 = similar(fs), similar(f)
+        fs2 = similar(fs)
+        f2 = spline._f2
     end
     if derivs > 2
-        fs3, f3 = similar(fs), similar(f)
+        fs3 = similar(fs)
+        f3 = spline._f3
     end
     for (i, x) in enumerate(xs)
         if derivs == 0

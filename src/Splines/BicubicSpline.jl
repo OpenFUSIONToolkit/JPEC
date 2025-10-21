@@ -166,14 +166,14 @@ function bicube_eval(bicube::BicubicSpline, xs::Vector{Float64}, ys::Vector{Floa
     m = length(ys)
 
     fs = Array{Float64}(undef, n, m, bicube.nqty)
-    f = Vector{Float64}(undef, bicube.nqty)
+    f = bicube._f
     if derivs > 0
         fsx, fsy = similar(fs), similar(fs)
-        fx, fy = similar(f), similar(f)
+        fx, fy = bicube._fx, bicube._fy
     end
     if derivs > 1
         fsxx, fsxy, fsyy = similar(fs), similar(fs), similar(fs)
-        fxx, fxy, fyy = similar(f), similar(f), similar(f)
+        fxx, fxy, fyy = bicube._fxx, bicube._fxy, bicube._fyy
     end
     for (i, x) in enumerate(xs)
         for (j, y) in enumerate(ys)
