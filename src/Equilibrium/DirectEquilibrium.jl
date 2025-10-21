@@ -247,10 +247,11 @@ from 1:5 rather than 0:4 as in Fortran.
         - `y_out[:, 3]`: rfac (radial distance from magnetic axis)
         - `y_out[:, 4]`: ∫(dl/(R²Bp))
         - `y_out[:, 5]`: ∫(jac*dl/Bp)
+
   - `bfield`: A `DirectBField` object with values at the integration start point.
 """
 function direct_fieldline_int(psifac::Float64, raw_profile::DirectRunInput, ro::Float64, zo::Float64, rs2::Float64)
-    
+
     # Find the starting point on the flux surface (outboard midplane)
     psi0 = raw_profile.psio * (1.0 - psifac)
     r = ro + sqrt(psifac) * (rs2 - ro)
@@ -288,7 +289,7 @@ function direct_fieldline_int(psifac::Float64, raw_profile::DirectRunInput, ro::
     end
 
     # We save the solution at each step before refinement (before=true, after=false) to match Fortran
-    callback = DiscreteCallback((u, t, i) -> true, refine_affect!, save_positions=(true,false))
+    callback = DiscreteCallback((u, t, i) -> true, refine_affect!; save_positions=(true, false))
 
     prob = ODEProblem(direct_fieldline_der!, u0, (0.0, 2π), params)
     sol = solve(prob, Tsit5(); callback=callback, reltol=1e-6, abstol=1e-8, dt=2π / 200, adaptive=true)
@@ -365,7 +366,7 @@ iteration control and error handling.
   - The refined `rfac` value.
 """
 function direct_refine(rfac::Float64, eta::Float64, psi0::Float64, params::FieldLineDerivParams; max_iter::Int=50)::Float64
-    
+
     cos_eta, sin_eta = cos(eta), sin(eta)
     r = params.ro + rfac * cos_eta
     z = params.zo + rfac * sin_eta
@@ -415,7 +416,7 @@ robustness.
     the physics quantity spline (`eqfun`).
 """
 function equilibrium_solver(raw_profile::DirectRunInput)
-    
+
     # Shorthand
     equil_params = raw_profile.config.control
     sq_in = raw_profile.sq_in
@@ -546,6 +547,6 @@ function equilibrium_solver(raw_profile::DirectRunInput)
             end
         end
     end
-    eqfun = Spl.BicubicSpline(psi_nodes, collect(theta_nodes), eqfun_fs_nodes; bctypex="extrap", bctypey="periodic")    
+    eqfun = Spl.BicubicSpline(psi_nodes, collect(theta_nodes), eqfun_fs_nodes; bctypex="extrap", bctypey="periodic")
     return PlasmaEquilibrium(raw_profile.config, EquilibriumParameters(), sq, rzphi, eqfun, ro, zo, psio)
 end

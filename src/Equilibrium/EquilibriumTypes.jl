@@ -246,6 +246,7 @@ and preparing the initial splines.
 ## Fields:
 
   - `equil_input`: The original `EquilInput` object.
+
   - `sq_in`
 
     # x value: psin
@@ -363,54 +364,43 @@ end
 """
     PlasmaEquilibrium(...)
 
-The final, self-contained result of the equilibrium reconstruction. This object
-provides a complete representation of the processed plasma equilibrium in flux coordinates.
+The final, self-contained result of the equilibrium reconstruction.
+This object provides a complete representation of the processed plasma equilibrium in flux coordinates.
 
-## Fields:
+# Fields
 
-  - `equil_input`: The original `EquilInput` object used for the reconstruction.
-  - `sq`: The final 1D profile spline (`CubicSpline{Float64}`).
+  - `equil_input::EquilInput`:
+    The original `EquilInput` object used for the reconstruction.
 
-    # x value: normalized psi
+  - `sq::CubicSpline{Float64}`:
+    Final 1D profile spline.
 
-    # Quantity 1: Toroidal Field Function * 2π, `F * 2π` (where `F = R * B_toroidal`)
+      + **x value:** normalized ψ
+      + **Quantity 1:** Toroidal field function × 2π, `F * 2π` (where `F = R * B_toroidal`)
+      + **Quantity 2:** Pressure × μ₀, `P * μ₀`
+      + **Quantity 3:** dV/dψ
+      + **Quantity 4:** q
+  - `rzphi::BicubicSpline`:
+    Final 2D flux-coordinate mapping spline.
 
-    # Quantity 2: Pressure * μ₀, `P * μ₀`.
+      + **x value:** normalized ψ
+      + **y value:** SFL poloidal angle ∈ [0, 1]
+      + **Quantity 1:** r_coord² = (R - ro)² + (Z - zo)²
+      + **Quantity 2:** Offset between the geometric poloidal angle (η) and the new angle (θₙₑw), η / (2π) - θₙₑw
+      + **Quantity 3:** ν in ϕ = 2πζ + ν(ψ, θ)
+      + **Quantity 4:** Jacobian
+  - `eqfun::BicubicSpline`:
+    2D spline storing local physics and geometric quantities that vary across flux surfaces.
+    These are precomputed for efficient use in subsequent stability and transport codes.
 
-    # Quantity 3: dVdpsi
-
-    # Quantity 4: q
-  - `rzphi`: The final 2D flux-coordinate mapping spline (`BicubicSpline`).
-
-    # x value: normlized psi
-
-    # y value: SFL poloidal angle [0,1]
-
-    # Quantity 1: r_coord² = (R - ro)² + (Z - zo)²
-
-    # Quantity 2: Offset between the geometric poloidal angle (η) and the new angle (θ_new)
-
-    `η / (2π) - θ_new
-
-    # Quantity 3: ν in ϕ=2πζ+ν(ψ,θ)
-
-    # Quantity 4: Jacobian.
-  - `eqfun`: A 2D spline storing local physics and geometric quantities that vary across the flux surfaces.
-           # Parameters for the equilibrium
-    # These are pre-calculated for efficient use in subsequent stability and transport codes.                     # Final 1D profile spline
-            # Final 2D coordinate mapping spline
-    # x value: Normalized poloidal flux, ψ_norm ∈ [0, 1].
-
-    # y value: SFL poloidal angle, θ_new ∈ [0, 1].
-
-    # Quantity 1: Total magnetic field strength, B [T]
-
-    # Quantity 2: (e₁⋅e₂ + q⋅e₃⋅e₁) / (J⋅B²).
-
-    # Quantity 3: (e₂⋅e₃ + q⋅e₃⋅e₃) / (J⋅B²).
-  - `ro`: R-coordinate of the magnetic axis [m].
-  - `zo`: Z-coordinate of the magnetic axis [m].
-  - `psio`: Total flux difference `|Ψ_axis - Ψ_boundary|` [Weber / radian].
+      + **x value:** normalized ψ ∈ [0, 1]
+      + **y value:** SFL poloidal angle θₙₑw ∈ [0, 1]
+      + **Quantity 1:** Total magnetic field strength, B [T]
+      + **Quantity 2:** (e₁⋅e₂ + q⋅e₃⋅e₁) / (J⋅B²)
+      + **Quantity 3:** (e₂⋅e₃ + q⋅e₃⋅e₃) / (J⋅B²)
+  - `ro::Float64`: R-coordinate of the magnetic axis [m]
+  - `zo::Float64`: Z-coordinate of the magnetic axis [m]
+  - `psio::Float64`: Total flux difference |Ψ_axis - Ψ_boundary| [Weber/radian]
 """
 mutable struct PlasmaEquilibrium
     config::EquilibriumConfig
