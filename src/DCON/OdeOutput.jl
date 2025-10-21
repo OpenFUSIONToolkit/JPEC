@@ -13,7 +13,7 @@ Replace `println` statements with logging to appropriate output files
 Remove `mthsurf0` if deprecated
 Place outputs in a Julia do loop for automatic file closing
 """
-function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
+function ode_output_init(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutputParameters)
 
     # TODO: mess with this to condense the number of calls? Maybe allow it to pass in dicts
 
@@ -114,7 +114,7 @@ function ode_output_init(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
 end
 
 """
-    ode_output_step(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
+    ode_output_step(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutputParameters)
 
 Performs output and monitoring tasks at each integration step by calling
 `ode_output_monitor`. to track critical eigenvalue behavior. Unlike Fortran,
@@ -128,7 +128,7 @@ Determine if this function is even necessary of if we should just call `ode_outp
 """
 #TODO: depending on how we restructure our outputs, this function might be uncessary
 # (i.e. if we don't need an ode_output_get_evals or ode_output_sol, can just replace calls with ode_output_monitor)
-function ode_output_step(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
+function ode_output_step(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutputParameters)
 
     # Compute and print critical data for each time step
     ode_output_monitor(ctrl, equil, intr, odet, outp)
@@ -144,12 +144,12 @@ function ode_output_step(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium
 end
 
 # TODO: I don't think this function is essentially for the minimal working version - can convert later if needed
-# function ode_output_get_evals(intr::DconInternal, ctrl::DconControl, dout::DconOutput, fNames::DconFileNames, equil::Equilibrium.PlasmaEquilibrium, odet::OdeState)
+# function ode_output_get_evals(intr::DconInternal, ctrl::DconControlParameters, dout::DconOutputParameters, fNames::DconFileNames, equil::Equilibrium.PlasmaEquilibrium, odet::OdeState)
 #     return
 # end
 
 """
-    ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
+    ode_output_monitor(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutputParameters)
 
 Monitor the evolution of a critical eigenvalue (`crit`) during integration
 using `ode_output_get_crit` and detect zero crossings, which indicate instability.
@@ -164,7 +164,7 @@ Restore or redirect output to appropriate logging units.
 Replace `error(...)` with graceful shutdown if zero crossing is an intended exit condition.
 All the _prev variables can probably be removed and the logic can be simplified to just take the odet.step - 1 values when needed
 """
-function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutput)
+function ode_output_monitor(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal, odet::OdeState, outp::DconOutputParameters)
 
     # Compute new crit
     dpsi = odet.psifac - odet.psi_prev

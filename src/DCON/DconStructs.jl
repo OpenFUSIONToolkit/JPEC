@@ -83,7 +83,7 @@ end
     locstab::Union{Missing,Spl.CubicSpline{Float64}} = missing
 end
 
-@kwdef mutable struct DconControl
+@kwdef mutable struct DconControlParameters
     verbose::Bool = true
     bal_flag::Bool = false
     mat_flag::Bool = false
@@ -143,7 +143,7 @@ end
 
 # TODO: a lot of these will be deprecated, this will be a general data structure that handles output
 # Since file I/O in Julia will be very different than Fortran, this will likely be reworked significantly
-@kwdef mutable struct DconOutput
+@kwdef mutable struct DconOutputParameters
     # output switches
     write_crit_out::Bool = false
     write_dcon_out::Bool = false
@@ -225,3 +225,62 @@ end
 end
 
 FourFitVars(mpert::Int) = FourFitVars(; mpert)
+
+"""
+    MetricData
+
+A structure to hold the computed metric tensor components and their
+Fourier-spline representation. This is the Julia equivalent of the `fspline_type`
+named `metric` in the Fortran `fourfit_make_metric` subroutine.
+
+### Fields
+
+  - `mpsi::Int`: Number of radial grid points minus one.
+  - `mtheta::Int`: Number of poloidal grid points minus one.
+  - `xs::Vector{Float64}`: Radial coordinates (normalized poloidal flux `ψ_norm`).
+  - `ys::Vector{Float64}`: Poloidal angle coordinates `θ` in radians (0 to 2π).
+  - `fs::Array{Float64, 3}`: The raw metric data on the grid, size `(mpsi, mtheta, 8)`.
+    The 8 quantities are: `g¹¹`, `g²²`, `g³³`, `g²³`, `g³¹`, `g¹²`, `J`, `∂J/∂ψ`.
+  - `fspline::Spl.FourierSpline`: The fitted Fourier-cubic spline object.
+"""
+@kwdef mutable struct MetricData
+    mpsi::Int
+    mtheta::Int
+    xs::Vector{Float64} = zeros(mpsi)
+    ys::Vector{Float64} = zeros(mtheta)
+    fs::Array{Float64,3} = zeros(mpsi, mtheta, 8)
+    fspline::Union{Spl.FourierSpline,Nothing} = nothing
+end
+
+MetricData(mpsi::Int, mtheta::Int) = MetricData(; mpsi, mtheta)
+
+@kwdef struct EulerLagrangeBasis
+    npsi::Int
+    psi::Vector{ComplexF64}
+    xipsi::Array{ComplexF64, 3}
+    xi1psi::Array{ComplexF64, 3}
+    u::Array{ComplexF64, 4}
+end
+
+@kwdef struct VacuumData
+    grri::Array{ComplexF64, 2}
+    grre::Array{ComplexF64, 2}
+    griw::Array{ComplexF64, 2}
+    grrw::Array{ComplexF64, 2}
+    wv::Array{ComplexF64, 2}
+    xzpts::Array{Float64, 2}
+end
+
+@kwdef struct DconSolution
+    nn::Int
+    mlow::Int
+    mhigh::Int
+    mpert::Int
+    msol::Int
+    mband::Int
+    mfac::Vector{Int}
+    equil::Equilibrium.PlasmaEquilibrium
+    metric::MetricData
+    sol_basis::EulerLagrangeBasis
+    vacuum_sols::VacuumData
+end

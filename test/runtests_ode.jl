@@ -37,7 +37,7 @@ end
         odet.fixfac = zeros(ComplexF64, odet.msol, odet.msol, ifix)
         intr = JPEC.DCON.DconInternal()
         intr.mpert = msol
-        outp = JPEC.DCON.DconOutput(; write_crit_out=false, write_dcon_out=false, write_euler_h5=false, write_eqdata_h5=false)
+        outp = JPEC.DCON.DconOutputParameters(; write_crit_out=false, write_dcon_out=false, write_euler_h5=false, write_eqdata_h5=false)
 
         # Save copy of original u and run
         u_orig = copy(odet.u)
@@ -86,9 +86,9 @@ end
         odet = JPEC.DCON.OdeState(msol, msol, 10, 10, 10)
         intr = JPEC.DCON.DconInternal()
         intr.mpert = msol
-        ctrl = JPEC.DCON.DconControl()
+        ctrl = JPEC.DCON.DconControlParameters()
         ctrl.ucrit = 10.0
-        outp = JPEC.DCON.DconOutput(; write_crit_out=false, write_dcon_out=false, write_euler_h5=false, write_eqdata_h5=false)
+        outp = JPEC.DCON.DconOutputParameters(; write_crit_out=false, write_dcon_out=false, write_euler_h5=false, write_eqdata_h5=false)
 
         # Case 1: Basic norm computation
         odet.u = zeros(ComplexF64, 2, 2, 2)

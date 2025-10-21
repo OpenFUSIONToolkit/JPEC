@@ -1,5 +1,5 @@
 """
-    free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutput; op_netcdf_out::Bool=false)
+    free_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutputParameters; op_netcdf_out::Bool=false)
 
 Compute the free boundary energies using VACUUM. Performs the same function as `free_run` 
 in the Fortran code, except now all data is passed in memory instead of via files.
@@ -13,7 +13,7 @@ Remove ahg and ahb related logic
 Check if normalize is ever false, currently always true, and if not, remove related logic
 """
 
-function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutput; op_netcdf_out::Bool=false)
+function free_run(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutputParameters; op_netcdf_out::Bool=false)
 
     # TODO: it looks like vac_memory is always true - remove all ahg things and just assume true?
     vac_memory = true
@@ -66,6 +66,9 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
 
     # Compute vacuum response matrix.
     grri = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
+    grre = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
+    griw = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
+    grrw = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
     xzpts = Array{Float64}(undef, ctrl.mthvac + 5, 4)
 
     farwal_flag = true
@@ -83,9 +86,9 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
 
     kernelsignin = 1.0
     VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
-        wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
+        wall_flag, farwal_flag, grre, xzpts, ahg_file, intr.dir_path)
     # if bin_vac
-    #     write(vac_unit, grri)
+    #     write(vac_unit, grre)
     # end
     if ctrl.wv_farwall_flag
         temp .= wv
@@ -94,16 +97,16 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     farwal_flag = false
     kernelsignin = -1.0
     VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
-        wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
+        wall_flag, farwal_flag, griw, xzpts, ahg_file, intr.dir_path)
     # if bin_vac
-    #     write(vac_unit, grri)
+    #     write(vac_unit, griw)
     # end
 
     kernelsignin = 1.0
     VacuumMod.mscvac(wv, intr.mpert, mtheta, ctrl.mthvac, complex_flag, kernelsignin,
-        wall_flag, farwal_flag, grri, xzpts, ahg_file, intr.dir_path)
+        wall_flag, farwal_flag, grrw, xzpts, ahg_file, intr.dir_path)
     # if bin_vac
-    #     write(vac_unit, grri)
+    #     write(vac_unit, grrw)
     #     write(vac_unit, xzpts)
     #     bin_close(vac_unit)
     # end
@@ -111,6 +114,8 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     if ctrl.wv_farwall_flag
         wv .= temp
     end
+
+    vacuum_solutions = VacuumData(grri, grre, griw, grrw, wv, xzpts)
 
     # Scale vacuum matrix by singfac = (m - nn*qlim)
     singfac = (intr.mlow .- ctrl.nn .* intr.qlim) .+ collect(0:intr.mpert-1)
@@ -260,11 +265,11 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     #     dcon_netcdf_out(wp, wv, wt, wt0, ep, ev, et)
     # end
 
-    return plasma1, vacuum1, total1
+    return plasma1, vacuum1, total1, vacuum_solutions
 end
 
 """
-    free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; inmemory_op::Union{Bool,Nothing}=nothing,
+    free_write_msc(psifac::Float64, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; inmemory_op::Union{Bool,Nothing}=nothing,
     ahgstr_op::Union{String,Nothing}=nothing)
 
 Prepare and write the necessary parameters and boundary shape to VACUUM for computing the vacuum response matrix.
@@ -273,7 +278,7 @@ Performs the same function as `free_write_msc` in the Fortran code, except we wi
 ### Arguments
 
   - `psifac`: Flux surface value at the plasma boundary (Float64)
-  - `ctrl`: DCON control parameters (DconControl)
+  - `ctrl`: DCON control parameters (DconControlParameters)
   - `equil`: Plasma equilibrium data (Equilibrium.PlasmaEquilibrium)
   - `intr`: Internal DCON parameters (DconInternal)
   - `inmemory_op`: Whether to use in-memory communication with VACUUM (Bool, optional, default=false)
@@ -283,7 +288,7 @@ Performs the same function as `free_write_msc` in the Fortran code, except we wi
 
 Remove `inmemory_op` and `ahgstr_op` arguments and related logic, always use in-memory communication
 """
-function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; inmemory_op::Union{Bool,Nothing}=nothing,
+function free_write_msc(psifac::Float64, ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal; inmemory_op::Union{Bool,Nothing}=nothing,
     ahgstr_op::Union{String,Nothing}=nothing)
 
     # Defaults for optional arguments
@@ -329,13 +334,13 @@ function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.P
 end
 
 """
-    free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+    free_compute_wv_spline(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
 Compute a spline of vacuum response matrices over the range of psi from 'ctrl.psi_edge' to
 `intr.qlim`. This is used for fast evaluation of wt during `ode_record_edge`. Performs the
 same function as `free_wvmats` in the Fortran code.
 """
-function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
+function free_compute_wv_spline(ctrl::DconControlParameters, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
     # Number of psi grid points for the spline: 4 per q-window minimum
     # TODO: 4 spline points is arbitrary - is there a better way?

@@ -40,11 +40,11 @@ function load_u_matrix(filename)
 end
 
 """
-    init_files(out::DconOutput, path::String)
+    init_files(out::DconOutputParameters, path::String)
 
 Open requested output text files into `path` and store handles.
 """
-function init_files(out::DconOutput, path::String)
+function init_files(out::DconOutputParameters, path::String)
     for pname in propertynames(out)
         if startswith(String(pname), "write_") && getproperty(out, pname)
             base_str = String(pname)[7:end]          # remove write_ prefix
@@ -66,11 +66,11 @@ function init_files(out::DconOutput, path::String)
 end
 
 """
-    write_output(out::DconOutput, key::Symbol, data; dsetname=nothing, slice=:)
+    write_output(out::DconOutputParameters, key::Symbol, data; dsetname=nothing, slice=:)
 
 Writes `data` to the text file corresponding to `key`.
 """
-function write_output(out::DconOutput, key::Symbol, data)
+function write_output(out::DconOutputParameters, key::Symbol, data)
     handle = out.handles[key]
 
     if handle isa IOStream
@@ -81,11 +81,11 @@ function write_output(out::DconOutput, key::Symbol, data)
 end
 
 """
-    close_files(out::DconOutput)
+    close_files(out::DconOutputParameters)
 
 Closes all open text files.
 """
-function close_files(out::DconOutput)
+function close_files(out::DconOutputParameters)
     for (key, handle) in out.handles
         close(handle)
     end
