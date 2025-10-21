@@ -205,6 +205,7 @@ bicube_eval(bicube::BicubicSpline, xs::Vector{Float64}, ys::Vector{Float64}, der
 ## Returns:
 - Returns a 3D array of Float64 values where each slice corresponds to the function values at
 the respective (x,y) coordinates in `x` and `y`.
+- Depending on the derivatives requested, it may return additional arrays for the first, second, or third derivatives.
 """
 function bicube_eval(bicube::BicubicSpline, xs::Vector{Float64}, ys::Vector{Float64}, derivs::Int=0)
     # xs -> Float64 (any length)

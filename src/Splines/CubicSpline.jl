@@ -203,6 +203,17 @@ function spline_deriv3!(spline::CubicSpline{T}, x::Float64) where {T<:Union{Floa
     return f, f1, f2, f3
 end
 
+"""
+    spline_eval(spline::CubicSpline{T}, x, derivs::Int=0) where {T<:Union{Float64, ComplexF64}}
+
+## Arguments:
+- `spline`: A `Spline` object created by `CubicSpline`.
+- `x`: A vector of Float64 values representing the x-coordinates to evaluate the spline at.
+## Returns:
+- Returns a matrix of Float64 values where each row corresponds to the function values at
+the respective x-coordinate in `x`.
+- Depending on the derivatives requested, it may return additional matrices for the first, second, or third derivatives.
+"""
 function spline_eval(spline::CubicSpline{T}, xs::Vector{Float64}, derivs::Int=0) where {T<:Union{Float64,ComplexF64}}
     # xs -> Float64 (any length)
     # Returns a matrix of T (length(xs), nqty)
