@@ -86,10 +86,8 @@ function read_efit(config::EquilibriumConfig)
     qprof_data = parse_block(nw)
 
     psi_rz = reshape(psi_flat_vec, nw, nh)
-    println("--> All main data blocks parsed successfully.")
 
     # --- Create 1D Profile Spline (sq_in) ---
-    println("--> Creating 1D profile splines...")
     psi_norm_grid = range(0.0, 1.0; length=nw)
     sq_fs_nodes = hcat(
         abs.(fpol_data),
@@ -99,7 +97,6 @@ function read_efit(config::EquilibriumConfig)
     )
     # According to Spline_document.txt, bctype=4 is Not-a-Knot
     sq_in = Spl.CubicSpline(collect(psi_norm_grid), sq_fs_nodes; bctype=4)
-    println("--> 1D Spline fitting complete.")
 
     # --- Process and Normalize 2D Psi Data ---
     psio_signed = sibry - simag
@@ -111,7 +108,6 @@ function read_efit(config::EquilibriumConfig)
     end
 
     # --- Create 2D Psi Spline (psi_in) ---
-    println("--> Creating 2D psi spline...")
     r_grid = range(rleft, rleft + rdim; length=nw)
     z_grid = range(zmid - zdim / 2, zmid + zdim / 2; length=nh)
     rmin, rmax = extrema(r_grid)
@@ -119,7 +115,6 @@ function read_efit(config::EquilibriumConfig)
 
     psi_proc_3d = reshape(psi_proc, (nw, nh, 1))
     psi_in = Spl.BicubicSpline(collect(r_grid), collect(z_grid), psi_proc_3d; bctypex=4, bctypey=4)
-    println("--> 2D Spline fitting complete.")
 
     # --- Bundle everything for the solver ---
     return DirectRunInput(config, sq_in, psi_in, rmin, rmax, zmin, zmax, psio)
