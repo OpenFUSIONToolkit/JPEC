@@ -475,8 +475,10 @@ function ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.
         singp = intr.sing[odet.ising] # Update singp
         odet.psimax = singp.psifac - ctrl.singfac_min / abs(ctrl.nn * singp.q1)
         odet.m1 = round(Int, ctrl.nn * singp.q, RoundFromZero)
-        write_output(outp, :crit_out, @sprintf("   ising   psi         q          di      re alpha   im alpha\n"))
-        write_output(outp, :crit_out, @sprintf("%6d%11.3e%11.3e%11.3e%11.3e%11.3e\n", odet.ising, singp.psifac, singp.q, singp.di, real(singp.alpha), imag(singp.alpha)))
+        if outp.write_crit_out
+            write_output(outp, :crit_out, @sprintf("   ising   psi         q          di      re alpha   im alpha\n"))
+            write_output(outp, :crit_out, @sprintf("%6d%11.3e%11.3e%11.3e%11.3e%11.3e\n", odet.ising, singp.psifac, singp.q, singp.di, real(singp.alpha), imag(singp.alpha)))
+        end
     end
 
     # Restart ode solver
@@ -488,7 +490,9 @@ function ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.
     odet.psi_prev = odet.psifac
 
     # Write next header before continuing integration
-    write_output(outp, :crit_out, "    psifac      dpsi        q       singfac     eval1")
+    if outp.write_crit_out
+        write_output(outp, :crit_out, "    psifac      dpsi        q       singfac     eval1")
+    end
 end
 
 # Example stub for kinetic crossing
