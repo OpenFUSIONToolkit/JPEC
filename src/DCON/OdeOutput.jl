@@ -246,7 +246,7 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m
     indexi = sortperm(evalsi; by=abs)  # bubble in Fortran sorts in descending order of -|evalsi|, we just do ascending order of |evalsi|
 
     # Compute critical data for each time step
-    profiles = Spl.spline_eval(sq, psi, 0)
+    profiles = Spl.spline_eval!(sq, psi)
     q = profiles[4]
     singfac = abs(m1 - nn * profiles[4])
     logpsi1 = log10(psi)

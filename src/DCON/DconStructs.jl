@@ -134,7 +134,7 @@ end
     reform_eq_with_psilim::Bool = false
     psiedge::Float64 = 1.0
     nperq_edge::Int = 20
-    wv_farwall_flag::Bool = false
+    wv_farwall_flag::Bool = true
     dcon_kin_threads::Int = 1
     parallel_threads::Int = 1
     diagnose::Bool = false

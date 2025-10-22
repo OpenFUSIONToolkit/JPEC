@@ -70,15 +70,15 @@ function direct_get_bfield!(
 )
     # Evaluate 2D spline for psi(r,z) and its derivatives
     if derivs == 0
-        f_psi = Spl.bicube_eval(psi_in, r, z, 0)
+        f_psi = Spl.bicube_eval!(psi_in, r, z)
         bf_out.psi = f_psi[1]
     elseif derivs == 1
-        f_psi, fx_psi, fy_psi = Spl.bicube_eval(psi_in, r, z, 1)
+        f_psi, fx_psi, fy_psi = Spl.bicube_deriv1!(psi_in, r, z)
         bf_out.psi = f_psi[1]
         bf_out.psir = fx_psi[1]
         bf_out.psiz = fy_psi[1]
     else # derivs >= 2
-        f_psi, fx_psi, fy_psi, fxx_psi, fxy_psi, fyy_psi = Spl.bicube_eval(psi_in, r, z, 2)
+        f_psi, fx_psi, fy_psi, fxx_psi, fxy_psi, fyy_psi = Spl.bicube_deriv2!(psi_in, r, z)
         bf_out.psi = f_psi[1]
         bf_out.psir = fx_psi[1]
         bf_out.psiz = fy_psi[1]
@@ -90,7 +90,8 @@ function direct_get_bfield!(
     # Evaluate magnetic fields from equilibrium profiles
     psi_norm = (psio > 1e-12) ? (1.0 - bf_out.psi / psio) : 0.0
     psi_norm = clamp(psi_norm, 0.0, 1.0)
-    f_sq, f1_sq = Spl.spline_eval(sq_in, psi_norm, 1)
+
+    f_sq, f1_sq = Spl.spline_deriv1!(sq_in, psi_norm)
     bf_out.f = f_sq[1]  # F = R*Bt
     bf_out.f1 = f1_sq[1] # dF/dψ
     bf_out.p = f_sq[2]  # μ0*Pressure
@@ -291,7 +292,7 @@ function direct_fieldline_int(psifac::Float64, raw_profile::DirectRunInput, ro::
     # We save the solution at each step before refinement (before=true, after=false) to match Fortran
     callback = DiscreteCallback((u, t, i) -> true, refine_affect!; save_positions=(true, false))
 
-    prob = ODEProblem(direct_fieldline_der!, u0, (0.0, 2π), params)
+    prob = ODEProblem{true}(direct_fieldline_der!, u0, (0.0, 2π), params)
     sol = solve(prob, Tsit5(); callback=callback, reltol=1e-6, abstol=1e-8, dt=2π / 200, adaptive=true)
 
     if sol.retcode != :Success && sol.retcode != :Terminated
@@ -466,7 +467,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
 
         # Interpolate `ff` onto the uniform `theta` grid for `rzphi`
         for itheta in 1:(mtheta+1)
-            f, f1 = Spl.spline_eval(ff, theta_nodes[itheta], 1)
+            f, f1 = Spl.spline_deriv1!(ff, theta_nodes[itheta])
             @views rzphi_fs_nodes[ipsi, itheta, 1:3] = f[1:3]
             jac_term = (1.0 + f1[4]) * y_out[end, 2] * 2π * psio
             rzphi_fs_nodes[ipsi, itheta, 4] = jac_term
@@ -508,12 +509,12 @@ function equilibrium_solver(raw_profile::DirectRunInput)
     v = @MMatrix zeros(Float64, 2, 3)
     for ipsi in 1:(mpsi+1)
         psi_norm = psi_nodes[ipsi]
-        fsq = Spl.spline_eval(sq, psi_norm, 0)
+        fsq = Spl.spline_eval!(sq, psi_norm)
         q = fsq[4]
         f_val = fsq[1]
         for itheta in 1:(mtheta+1)
             theta_norm = theta_nodes[itheta]
-            f, fx, fy = Spl.bicube_eval(rzphi, psi_norm, theta_norm, 1)
+            f, fx, fy = Spl.bicube_deriv1!(rzphi, psi_norm, theta_norm)
             rfac = sqrt(max(0.0, f[1])) # add in protection just in case of small negative due to numerical error
             eta = 2π * (theta_norm + f[2])
             r = ro + rfac * cos(eta)

@@ -121,7 +121,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
     end
 
     if ctrl.verbose # mimicing output from ode_output_open
-        println("   ψ = $(odet.psifac), q = $(Spl.spline_eval(equil.sq, odet.psifac, 0)[4])")
+        println("   ψ = $(odet.psifac), q = $(Spl.spline_eval!(equil.sq, odet.psifac)[4])")
     end
 
     # Write header data to files
@@ -150,12 +150,12 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         odet.step = findmax(real.(odet.dW_edge))[2]
         trim_storage!(odet)
         if ctrl.verbose
-            println("Truncating integration at peak edge dW: ψ = $(odet.psi_store[odet.step]), q = $(Spl.spline_eval(equil.sq, odet.psi_store[odet.step], 0)[4])")
+            println("Truncating integration at peak edge dW: ψ = $(odet.psi_store[odet.step]), q = $(Spl.spline_eval!(equil.sq, odet.psi_store[odet.step])[4])")
         end
 
         # Update u, psilim, and qlim for usage in determining wp and wt
         intr.psilim = odet.psi_store[end]
-        intr.qlim = Spl.spline_eval(equil.sq, intr.psilim, 0)[4]
+        intr.qlim = Spl.spline_eval!(equil.sq, intr.psilim)[4]
         odet.u .= odet.u_store[:, :, :, end]
     else
         odet.step -= 1 # step was incremented one extra time in ode_step!
@@ -209,8 +209,8 @@ Remove while true logic
 function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
     # Shorthand to evaluate q/q1 inside newton iteration
-    qval = psi -> Spl.spline_eval(equil.sq, psi, 0)[4]
-    q1val = psi -> Spl.spline_eval(equil.sq, psi, 1)[2][4]
+    qval = psi -> Spl.spline_eval!(equil.sq, psi)[4]
+    q1val = psi -> Spl.spline_deriv1!(equil.sq, psi)[2][4]
 
     # Preliminary computations
     odet.psifac = equil.sq.xs[1]
@@ -603,8 +603,8 @@ function integrator_callback!(integrator)
     end
     # Save values
     odet.psi_store[odet.step] = odet.psifac
-    odet.u_store[:, :, :, odet.step] = odet.u
-    odet.ud_store[:, :, :, odet.step] = odet.ud
+    odet.u_store[:, :, :, odet.step] .= odet.u
+    odet.ud_store[:, :, :, odet.step] .= odet.ud
     # Advance stepper (just like in Fortran, a "step" starts with integration, does callback functions, then stores)
     odet.step += 1
 end
