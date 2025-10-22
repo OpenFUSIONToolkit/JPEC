@@ -122,7 +122,7 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
     # Allocate vector to store eta offset from rzphi
     vector = zeros(Float64, mtheta + 1)
     for it in 0:mtheta
-        f = Spl.bicube_eval(rzphi, rzphi.xs[mpsi+1], rzphi.ys[it+1], 0)
+        f = Spl.bicube_eval!(rzphi, rzphi.xs[mpsi+1], rzphi.ys[it+1])
         vector[it+1] = rzphi.ys[it+1] + f[2]
     end
 
@@ -136,7 +136,7 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
         it = 0
         while true
             it += 1
-            f, _, fy = Spl.bicube_eval(rzphi, psifac, theta, 1)
+            f, _, fy = Spl.bicube_deriv1!(rzphi, psifac, theta)
             eta = theta + f[2] - eta0
             eta_theta = 1 + fy[2]
             dtheta = -eta / eta_theta
@@ -145,7 +145,7 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
                 break
             end
         end
-        f = Spl.bicube_eval(rzphi, psifac, theta, 0)
+        f = Spl.bicube_eval!(rzphi, psifac, theta)
         rsep[iside] = pe.ro + sqrt(f[1]) * cos(twopi * (theta + f[2]))
         eta0 = 0.5
         idx = findmin(abs.(vector .- eta0))[2]
@@ -165,7 +165,7 @@ function equilibrium_separatrix_find!(pe::PlasmaEquilibrium)
         cosfac = 0.0
         z = 0.0
         while true
-            f, fx, fy, fxx, fxy, fyy = Spl.bicube_eval(rzphi, psifac, theta, 2)
+            f, fx, fy, fxx, fxy, fyy = Spl.bicube_deriv2!(rzphi, psifac, theta)
             r2, r2y, r2yy = f[1], fy[1], fyy[1]
             eta, eta1, eta2 = f[2], fy[2], fyy[2]
 
@@ -232,7 +232,7 @@ function equilibrium_global_parameters!(pe::PlasmaEquilibrium)
     gs2 = zeros(Float64, mtheta + 1)
 
     for itheta in 0:mtheta
-        f, _, fy = Spl.bicube_eval(rzphi, rzphi.xs[mpsi+1], rzphi.ys[itheta+1], 1)
+        f, _, fy = Spl.bicube_deriv1!(rzphi, rzphi.xs[mpsi+1], rzphi.ys[itheta+1])
         jac = f[4]
         chi1 = twopi * psio / jac
         jacfac = π / jac
@@ -329,7 +329,7 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
         x1 = sq.xs[ipsi+1]
         xmax = x1 - x0
 
-        f, f1, f2, f3 = Spl.spline_eval(sq, x0, 3)
+        f, f1, f2, f3 = Spl.spline_deriv3!(sq, x0)
         a, b, c, d = f[4], f1[4], f2[4], f3[4]
 
         if d != 0.0
@@ -341,7 +341,7 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
                     x = xcrit - delta
                     if 0 ≤ x < xmax
                         ψ = x0 + x
-                        fψ, = Spl.spline_eval(sq, ψ, 0)
+                        fψ = Spl.spline_eval!(sq, ψ)
                         push!(psiexl, ψ)
                         push!(qexl, fψ[4])
                     end
@@ -364,7 +364,7 @@ function equilibrium_qfind!(equil::PlasmaEquilibrium)
     qmax = max(maximum(qexl), qmax_edge)
     qa = sq.fs[end, 4] + sq.fs1[end, 4] * (1.0 - sq.xs[end])
 
-    f95 = Spl.spline_eval(sq, 0.95, 0)
+    f95 = Spl.spline_eval!(sq, 0.95)
     q95 = f95[4]
 
 
@@ -405,7 +405,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
 
     for ipsi in 0:mpsi
         for itheta in 0:mtheta
-            rz_eval = Spl.bicube_eval(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1], 0)
+            rz_eval = Spl.bicube_eval!(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1])
             rfac[itheta+1] = sqrt(rz_eval[1])
             angle[itheta+1] = 2π * (rzphi.ys[itheta+1] + rz_eval[2])
         end
@@ -416,7 +416,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
     flux_fs = zeros(Float64, mpsi + 1, mtheta + 1, 2)
     for ipsi in 0:mpsi
         for itheta in 0:mtheta
-            f, fx, fy = Spl.bicube_eval(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1], 1)
+            f, fx, fy = Spl.bicube_deriv1!(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1])
             f1, f2, f4 = f[1], f[2], f[4]
 
             fy1 = rzphi._fsy[ipsi+1, itheta+1, 1]
@@ -440,7 +440,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
     source = zeros(Float64, mpsi + 1, mtheta + 1)
     for ipsi in 0:mpsi
         for itheta in 0:mtheta
-            rz_eval = Spl.bicube_eval(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1], 0)
+            rz_eval = Spl.bicube_eval!(rzphi, rzphi.xs[ipsi+1], rzphi.ys[itheta+1])
             f4 = rz_eval[4]
             s1 = sq.fs[ipsi+1, 1]
             s1p = sq.fs1[ipsi+1, 1]

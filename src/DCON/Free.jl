@@ -1,7 +1,7 @@
 """
     free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutput; op_netcdf_out::Bool=false)
 
-Compute the free boundary energies using VACUUM. Performs the same function as `free_run` 
+Compute the free boundary energies using VACUUM. Performs the same function as `free_run`
 in the Fortran code, except now all data is passed in memory instead of via files.
 
 ### Arguments
@@ -39,7 +39,7 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     wvt = zeros(ComplexF64, intr.mpert, intr.mpert)
 
     # Evaluate dV/dpsi at the plasma edge
-    v1 = Spl.spline_eval(equil.sq, intr.psilim, 0)[3]
+    v1 = Spl.spline_eval!(equil.sq, intr.psilim)[3]
 
     # Compute plasma response matrix.
     if ctrl.ode_flag
@@ -303,9 +303,9 @@ function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.P
     rfac = zeros(Float64, mtheta + 1)
 
     # Compute output
-    qa = Spl.spline_eval(equil.sq, psifac, 0)[4] # TODO: this had a deriv = 1 in Fortran, but not used?
+    qa = Spl.spline_eval!(equil.sq, psifac)[4]
     for itheta in 1:equil.config.control.mtheta + 1
-        f = Spl.bicube_eval(equil.rzphi, psifac, theta_norm[itheta], 0)
+        f = Spl.bicube_eval!(equil.rzphi, psifac, theta_norm[itheta])
         rfac[itheta] = sqrt(f[1])
         angle[itheta] = 2π * (theta_norm[itheta] + f[2])
         delta[itheta] = -f[3] / qa
@@ -341,7 +341,7 @@ function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEqui
 
     # Number of psi grid points for the spline: 4 per q-window minimum
     # TODO: 4 spline points is arbitrary - is there a better way?
-    qedge = Spl.spline_eval(equil.sq, ctrl.psiedge, 0)[4]
+    qedge = Spl.spline_eval!(equil.sq, ctrl.psiedge)[4]
     npsi = max(4, ceil(Int, (intr.qlim - qedge) * ctrl.nn * 4))
     psii = ctrl.psiedge
     psi_array = zeros(Float64, npsi + 1)
@@ -352,8 +352,8 @@ function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEqui
         qi = qedge + (intr.qlim - qedge) * (i / npsi)
 
         # Shorthand to evaluate q/q1 inside newton iteration
-        qval(ψ) = Spl.spline_eval(equil.sq, ψ, 0)[4]
-        q1val(ψ) = Spl.spline_eval(equil.sq, ψ, 1)[2][4]
+        qval(ψ) = Spl.spline_eval!(equil.sq, ψ)[4]
+        q1val(ψ) = Spl.spline_deriv1!(equil.sq, ψ)[2][4]
 
         # Newton iteration to find psi at qi
         psii = ctrl.psiedge + (intr.psilim - ctrl.psiedge) * ((i - 1) / npsi)
@@ -421,7 +421,7 @@ function free_compute_total(equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitV
     et = zeros(ComplexF64, intr.mpert)
     wt = zeros(ComplexF64, intr.mpert, intr.mpert)
 
-    v1 = Spl.spline_eval(equil.sq, intr.psilim, 0)[3]
+    v1 = Spl.spline_eval!(equil.sq, intr.psilim)[3]
 
     # Compute plasma response matrix.
     temp = adjoint(odet.u[:, 1:intr.mpert, 1])
@@ -431,7 +431,7 @@ function free_compute_total(equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitV
     wp .= adjoint(wp) / equil.psio^2
 
     # Compute vacuum matrix from spline
-    wv = reshape(Spl.spline_eval(odet.wvmat_spline, odet.psifac, 0), intr.mpert, intr.mpert)
+    wv = reshape(Spl.spline_eval!(odet.wvmat_spline, odet.psifac), intr.mpert, intr.mpert)
 
     # Compute total energy matrix and eigen-decomposition
     wt .= wp .+ wv

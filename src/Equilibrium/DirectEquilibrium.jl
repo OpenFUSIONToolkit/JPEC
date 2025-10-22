@@ -87,15 +87,15 @@ function direct_get_bfield!(
 )
     # 1. Evaluate 2D spline for psi(r,z) and its derivatives
     if derivs == 0
-        f_psi = Spl.bicube_eval(psi_in, r, z, 0)
+        f_psi = Spl.bicube_eval!(psi_in, r, z)
         bf_out.psi = f_psi[1]
     elseif derivs == 1
-        f_psi, fx_psi, fy_psi = Spl.bicube_eval(psi_in, r, z, 1)
+        f_psi, fx_psi, fy_psi = Spl.bicube_deriv1!(psi_in, r, z)
         bf_out.psi = f_psi[1]
         bf_out.psir = fx_psi[1]
         bf_out.psiz = fy_psi[1]
     else # derivs >= 2
-        f_psi, fx_psi, fy_psi, fxx_psi, fxy_psi, fyy_psi = Spl.bicube_eval(psi_in, r, z, 2)
+        f_psi, fx_psi, fy_psi, fxx_psi, fxy_psi, fyy_psi = Spl.bicube_deriv2!(psi_in, r, z)
         bf_out.psi = f_psi[1]
         bf_out.psir = fx_psi[1]
         bf_out.psiz = fy_psi[1]
@@ -109,7 +109,7 @@ function direct_get_bfield!(
     psi_norm = (psio > 1e-12) ? (1.0 - bf_out.psi / psio) : 0.0
     psi_norm = clamp(psi_norm, 0.0, 1.0)
 
-    f_sq, f1_sq = Spl.spline_eval(sq_in, psi_norm, 1)
+    f_sq, f1_sq = Spl.spline_deriv1!(sq_in, psi_norm)
     bf_out.f = f_sq[1]  # F = R*Bt
     bf_out.f1 = f1_sq[1] # dF/d(psi_norm)
     bf_out.p = f_sq[2]  # mu0*Pressure
@@ -334,7 +334,7 @@ function direct_fl_int(
     # Add the initial state
     push!(saved_values, [0.0; u0])
 
-    prob = ODEProblem(direct_fl_der!, u0, tspan, params)
+    prob = ODEProblem{true}(direct_fl_der!, u0, tspan, params)
     sol = solve(prob, Tsit5(); callback=callback, reltol=1e-6, abstol=1e-8, dt=2 * pi / 200, adaptive=true)
 
     if sol.retcode != :Success && sol.retcode != :Terminated
@@ -549,7 +549,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
         rzphi_y_nodes = range(0.0, 1.0; length=mtheta + 1)
         for itheta in 1:(mtheta+1)
             theta_val = rzphi_y_nodes[itheta]
-            f, f1 = Spl.spline_eval(ff, theta_val, 1)
+            f, f1 = Spl.spline_deriv1!(ff, theta_val)
 
             @views rzphi_fs_nodes[ipsi, itheta, 1:3] = f[1:3]
             jac_term = (1.0 + f1[4]) * y_out[end, 2] * (2 * pi) * psio
@@ -569,7 +569,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
 
     if equil_params.newq0 != 0.0
         println("Revising q-profile for newq0 = $(equil_params.newq0)...")
-        f = Spl.spline_eval(sq, 0.0, 0)
+        f = Spl.spline_eval!(sq, 0.0)
         # q0_old = q(psi=0) = f[4] at x=0
         # f0_old = f[1] at x=0
         q0_old = f[4]
@@ -603,11 +603,11 @@ function equilibrium_solver(raw_profile::DirectRunInput)
         psi_norm = sq_x_nodes[ipsi]
         theta_new = rzphi_y_nodes[itheta]
 
-        f = Spl.spline_eval(sq, psi_norm, 0)
+        f = Spl.spline_eval!(sq, psi_norm)
         q = f[4]
         f_val = f[1]
 
-        f, fx, fy = Spl.bicube_eval(rzphi, psi_norm, theta_new, 1)
+        f, fx, fy = Spl.bicube_deriv1!(rzphi, psi_norm, theta_new)
         rfac_sq = max(0.0, f[1])
         rfac = sqrt(rfac_sq)
         eta = 2.0 * pi * (theta_new + f[2])
