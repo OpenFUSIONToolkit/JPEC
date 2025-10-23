@@ -420,8 +420,6 @@ function equilibrium_solver(raw_profile::DirectRunInput)
 
     # Shorthand
     equil_params = raw_profile.config.control
-    sq_in = raw_profile.sq_in
-    psi_in = raw_profile.psi_in
     psio = raw_profile.psio
     mtheta = equil_params.mtheta
     mpsi = equil_params.mpsi
@@ -449,8 +447,8 @@ function equilibrium_solver(raw_profile::DirectRunInput)
     ro, zo, rs1, rs2 = direct_position(raw_profile)
 
     # Loop over flux surfaces from outermost to innermost, integrating over field lines
-    sq_fs_nodes = zeros(Float64, mpsi + 1, 4)
-    rzphi_fs_nodes = zeros(Float64, mpsi + 1, mtheta + 1, 4)
+    sq_nodes = zeros(Float64, mpsi + 1, 4)
+    rzphi_nodes = zeros(Float64, mpsi + 1, mtheta + 1, 4)
     for ipsi in (mpsi+1):-1:1
         # Integrate along the field line for this surface
         y_out, bfield = direct_fieldline_int(psi_nodes[ipsi], raw_profile, ro, zo, rs2)
@@ -468,20 +466,20 @@ function equilibrium_solver(raw_profile::DirectRunInput)
         # Interpolate `ff` onto the uniform `theta` grid for `rzphi`
         for itheta in 1:(mtheta+1)
             f, f1 = Spl.spline_deriv1!(ff, theta_nodes[itheta])
-            @views rzphi_fs_nodes[ipsi, itheta, 1:3] = f[1:3]
+            @views rzphi_nodes[ipsi, itheta, 1:3] = f[1:3]
             jac_term = (1.0 + f1[4]) * y_out[end, 2] * 2π * psio
-            rzphi_fs_nodes[ipsi, itheta, 4] = jac_term
+            rzphi_nodes[ipsi, itheta, 4] = jac_term
         end
 
         # Store surface-averaged quantities for the `sq` spline
-        sq_fs_nodes[ipsi, 1] = bfield.f * 2π
-        sq_fs_nodes[ipsi, 2] = bfield.p
-        sq_fs_nodes[ipsi, 3] = y_out[end, 2] * 2π * psio
-        sq_fs_nodes[ipsi, 4] = y_out[end, 4] * bfield.f / (2π)
+        sq_nodes[ipsi, 1] = bfield.f * 2π
+        sq_nodes[ipsi, 2] = bfield.p
+        sq_nodes[ipsi, 3] = y_out[end, 2] * 2π * psio
+        sq_nodes[ipsi, 4] = y_out[end, 4] * bfield.f / (2π)
     end
 
     # Fit 1D profile spline `sq` and perform q-profile revision if needed
-    sq = Spl.CubicSpline(psi_nodes, sq_fs_nodes; bctype="extrap")
+    sq = Spl.CubicSpline(psi_nodes, sq_nodes; bctype="extrap")
     q0 = sq.fs[1, 4] - sq.fs1[1, 4] * sq.xs[1]
     if equil_params.newq0 == -1
         equil_params.newq0 = -q0
@@ -492,16 +490,16 @@ function equilibrium_solver(raw_profile::DirectRunInput)
         f0fac = f0^2 * ((equil_params.newq0 / q0)^2 - 1.0)
         for i in 1:(mpsi+1)
             ffac = sqrt(1.0 + f0fac / sq.fs[i, 1]^2) * sign(equil_params.newq0)
-            sq_fs_nodes[i, 1] *= ffac
-            sq_fs_nodes[i, 4] *= ffac
-            rzphi_fs_nodes[i, :, 3] .*= ffac
+            sq_nodes[i, 1] *= ffac
+            sq_nodes[i, 4] *= ffac
+            rzphi_nodes[i, :, 3] .*= ffac
         end
         # Re-create the spline with the revised data
-        sq = Spl.CubicSpline(psi_nodes, sq_fs_nodes; bctype="extrap")
+        sq = Spl.CubicSpline(psi_nodes, sq_nodes; bctype="extrap")
     end
 
     # Fit the 2D geometric spline `rzphi`. Periodic in theta (y-dimension)
-    rzphi = Spl.BicubicSpline(psi_nodes, collect(theta_nodes), rzphi_fs_nodes; bctypex="extrap", bctypey="periodic")
+    rzphi = Spl.BicubicSpline(psi_nodes, collect(theta_nodes), rzphi_nodes; bctypex="extrap", bctypey="periodic")
 
     # Calculate physics quantities (B-field, metric components, etc.) in 2D spline `eqfun`
     # for use in stability and transport codes
@@ -545,6 +543,46 @@ function equilibrium_solver(raw_profile::DirectRunInput)
             else
                 eqfun_fs_nodes[ipsi, itheta, 2] = 0.0
                 eqfun_fs_nodes[ipsi, itheta, 3] = 0.0
+            end
+        end
+    end
+
+    # Dump sq_nodes and rzphi_nodes to files for inspection
+    open("sq_nodes.txt", "w") do io
+        for ipsi in 1:size(sq_nodes, 1)
+            println(io, join(sq_nodes[ipsi, :], ","))
+        end
+    end
+    open("sq_fs1_nodes.txt", "w") do io
+        for ipsi in 1:size(sq_nodes, 1)
+            println(io, join(sq.fs1[ipsi, :], ","))
+        end
+    end
+    open("rzphi_nodes.txt", "w") do io
+        for ipsi in 1:size(rzphi_nodes, 1)
+            for itheta in 1:size(rzphi_nodes, 2)
+                println(io, join(rzphi_nodes[ipsi, itheta, :], ","))
+            end
+        end
+    end
+    open("rzphi_fsx_nodes.txt", "w") do io
+        for ipsi in 1:size(rzphi_nodes, 1)
+            for itheta in 1:size(rzphi_nodes, 2)
+                println(io, join(rzphi.fsx[ipsi, itheta, :], ","))
+            end
+        end
+    end
+    open("rzphi_fsy_nodes.txt", "w") do io
+        for ipsi in 1:size(rzphi_nodes, 1)
+            for itheta in 1:size(rzphi_nodes, 2)
+                println(io, join(rzphi.fsy[ipsi, itheta, :], ","))
+            end
+        end
+    end
+    open("eqfun_nodes.txt", "w") do io
+        for ipsi in 1:size(eqfun_fs_nodes, 1)
+            for itheta in 1:size(eqfun_fs_nodes, 2)
+                println(io, join(eqfun_fs_nodes[ipsi, itheta, :], ","))
             end
         end
     end
