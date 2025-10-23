@@ -187,11 +187,13 @@
     @testset " Test sing_der " begin
         msol = 32
         mpert = 32
-        equil = Equilibrium.setup_equilibrium(joinpath(@__DIR__,"../notebooks/soloviev_ideal/equil.toml"));
-        odet = JPEC.DconMod.OdeState(mpert=32, msol=32)
-        intr = JPEC.DconMod.DconInternal()
+        #sc = JPEC.Equilibrium.SolevevConfig() #TODO: set this up instead
+        equil = Equilibrium.setup_equilibrium(joinpath(@__DIR__,"../examples/Solovev_ideal_example/equil.toml"));
+        ctrl = JPEC.DCON.DconControl()
+        intr = JPEC.DCON.DconInternal()
         intr.mpert = msol
-        ctrl = JPEC.DconMod.DconControl()
+        odet = JPEC.DCON.OdeState(intr.mpert, intr.mpert, ctrl.numsteps_init, ctrl.numunorms_init, intr.msing)
+        dout = JPEC.DCON.DconOutput()
 
         #=
         # Spline evaluation
@@ -241,7 +243,8 @@
         println("nn = $(ctrl.nn), mlow = $(intr.mlow)")
         
         # Initialize structs with relevant data
-        ffit = JPEC.DconMod.FourFitVars()
+        #ffit = JPEC.DCON.FourFitVars()
+        ffit = JPEC.DCON.FourFitVars(; mpert=intr.mpert, mband=intr.mband)
         ffit.amats = SplinesMod.CubicSpline(psifac_dummy, reshape(amats, points, :); bctype="extrap")
         println(size(reshape(amats, points, :)))
         println(typeof(reshape(amats, points, :)))
@@ -249,7 +252,8 @@
         println(typeof(ffit.amats))
         ffit.bmats = SplinesMod.CubicSpline(psifac_dummy, reshape(bmats, points, :); bctype="extrap")
         ffit.cmats = SplinesMod.CubicSpline(psifac_dummy, reshape(cmats, points, :); bctype="extrap")
-        ffit.fmats = SplinesMod.CubicSpline(psifac_dummy, reshape(fmats, points, :); bctype="extrap")
+        #TODO: is fmats (what I had previously) actually the same as fmats_lower
+        ffit.fmats_lower = SplinesMod.CubicSpline(psifac_dummy, reshape(fmats, points, :); bctype="extrap")
         ffit.kmats = SplinesMod.CubicSpline(psifac_dummy, reshape(kmats, points, :); bctype="extrap")
         ffit.gmats = SplinesMod.CubicSpline(psifac_dummy, reshape(gmats, points, :); bctype="extrap")
 
@@ -264,8 +268,8 @@
         # if using one psi values causes issues, can make a psi array and just fill it all with amat
         # repeat for other matrices, equil data, other relevant constants, etc.
         
-        params = (ctrl, equil, intr, odet, ffit)
-        JPEC.DconMod.sing_der!(du, odet.u, params, odet.psifac)
+        params = (ctrl, equil,ffit, intr, odet, dout)
+        JPEC.DCON.sing_der!(du, odet.u, params, odet.psifac)
 
         # load in du from fortran
         # @test du == expected_du (to within some error)
