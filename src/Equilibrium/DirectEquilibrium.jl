@@ -559,7 +559,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
         # e. Store surface-averaged quantities for the `sq` spline
         sq_fs_nodes[ipsi, 1] = bf_start.f * (2pi) # 2pi*F
         sq_fs_nodes[ipsi, 2] = bf_start.p
-        sq_fs_nodes[ipsi, 3] = y_out[end, 5] * (2pi) * psio # dV/d(psi)
+        sq_fs_nodes[ipsi, 3] = y_out[end, 2] * (2pi) * psio # dV/d(psi)
         sq_fs_nodes[ipsi, 4] = y_out[end, 4] * bf_start.f / (2pi) # q-profile
     end
     println("...Loop over flux surfaces finished.")
