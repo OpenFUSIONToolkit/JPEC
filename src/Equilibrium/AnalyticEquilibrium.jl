@@ -207,7 +207,7 @@ function lar_run(equil_input::EquilibriumConfig, lar_input::LargeAspectRatioConf
 end
 
 """
-This function handles the Soloviev analytical equilibrium model, transforming the input parameters
+This function handles the Solovev analytical equilibrium model, transforming the input parameters
 into the necessary splines and scalar values for equilibrium construction. This is a Julia version
 of the Fortran code in sol.f, with no major differences except for arrays going from 0:n to 1:n+1.
 
@@ -228,7 +228,7 @@ of the Fortran code in sol.f, with no major differences except for arrays going 
 
   - `DirectRunInput` object
 """
-function sol_run(equil_inputs::EquilibriumConfig, sol_inputs::SolevevConfig)
+function sol_run(equil_inputs::EquilibriumConfig, sol_inputs::SolovevConfig)
 
     mr = sol_inputs.mr
     mz = sol_inputs.mz
@@ -278,7 +278,7 @@ function sol_run(equil_inputs::EquilibriumConfig, sol_inputs::SolevevConfig)
     psi_in = Spl.BicubicSpline(r, z, psifs; bctypex=3, bctypey=3)
 
     # Print out equilibrium info
-    println("Generating Soloviev equilibrium inputs with:")
+    println("Generating Solovev equilibrium inputs with:")
     println("   mr=$mr, mz=$mz, ma=$ma")
     println("   e=$e, a=$a, r0=$r0")
     println("   q0=$q0, p0fac=$p0fac, b0fac=$b0fac, f0fac=$f0fac")

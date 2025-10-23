@@ -63,7 +63,7 @@ function setup_equilibrium(eq_config::EquilibriumConfig, additional_input=nothin
     elseif eq_type == "sol"
 
         if additional_input === nothing
-            additional_input = SolevevConfig(eq_config.control.eq_filename)
+            additional_input = SolovevConfig(eq_config.control.eq_filename)
         end
 
         eq_input = sol_run(eq_config, additional_input)
