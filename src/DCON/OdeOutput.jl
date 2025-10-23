@@ -251,7 +251,7 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m
     singfac = abs(m1 - nn * profiles[4])
     logpsi1 = log10(psi)
     logsingfac = log10(singfac)
-    crit = evalsi[indexi[1]] # * profiles[3]^2 # TODO: appears to be a bug in profiles[3]
+    crit = evalsi[indexi[1]]* profiles[3]^2
 
     return q, singfac, logpsi1, logsingfac, crit
 end
