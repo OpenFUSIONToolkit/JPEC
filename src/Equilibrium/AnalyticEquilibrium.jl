@@ -265,7 +265,7 @@ function sol_run(equil_inputs::EquilibriumConfig, sol_inputs::SolevevConfig)
     sqfs[:, 2] .= pfac .* (1 .* p0fac .- psis)
     sqfs[:, 3] .= 0.0
     sq_in = Spl.CubicSpline(psis, sqfs; bctype=3)
-    
+
     # Compute 2D data and spline
     r = [rmin + i * (rmax - rmin) / mr for i in 0:mr]
     z = [zmin + j * (zmax - zmin) / mz for j in 0:mz]
