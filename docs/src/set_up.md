@@ -82,25 +82,13 @@
         jupyter --version
         ```
 
-5. Clone or move JPEC into WSL home folder.
-It’s recommended to avoid OneDrive for builds (slower, permission issues):
-    ```shell
-    cp -r /mnt/c/Users/<Username>/<Path>/JPEC ~/JPEC
-    cd ~/JPEC
-    ```
-
-    Where `<Username>/<Path>` is replaced with the path to the JPEC file you cloned to your local machine.
-
-    **OR**
-
-    Alternatively you can clone it from GitHub directly to your virtual machine.
+5. Clone JPEC into your WSL home folder.
+Clone it from GitHub directly to your virtual machine.
 
     ```shell
     git clone https://github.com/OpenFUSIONToolkit/JPEC.git
     cd JPEC
     ```
-
-    Technically, you can use the don't have to copy it from your local installation and you can just `cd mnt/c/Users/<Username>/<Path>/JPEC`, but this in not recommended.
 
 6. Build Fortran dependencies (libspline.so)
     1. Go to the spline source folder:
@@ -108,46 +96,22 @@ It’s recommended to avoid OneDrive for builds (slower, permission issues):
         cd ~/JPEC/src/Splines/fortran
         ```
 
-    2. Edit Makefile for Linux/WSL compatibility. SInce many of the current developers use macOS systems, the Makefile is set up for macOS. In the makefile (`JPEC/src/Splines/fortran/makefile`), set
-        ``` Makefile
-        LIBS ?=
-        ```
-
-        instead of 
-        ``` Makefile
-        LIBS ?=
-        ```
-
-        which only works for macOS. Additionally `.dylib` is a file type that is not recognized on Linux, instead Linux uses `.so` files. So, add 
-        ``` Makefile
-        LIBSUFFIX ?= .so
-        ```
-
-        to the makefile in place of 
-        ``` Makefile
-        LIBSUFFIX ?= .dylib
-        ```
-        the Mac version.
-
-        ⚠ Important: Be careful **not to commit** changes to the makefile as most developers use macOS.
-
-
-    3. Back in the shell, clean previous builds using
+    2. Clean previous builds using
         ```shell
         make clean
         ```
 
-    4. Build
+    3. Build
         ```shell
         make
         ```
 
-    5. Verify the library exists using
+    4. Verify the library exists using
         ```shell
         ls ../../../deps/libspline.so
         ```
 
-   6. Export library path so Julia can find it
+    5. Export library path so Julia can find it
         ```shell
         export LD_LIBRARY_PATH=~/JPEC/deps:$LD_LIBRARY_PATH
         ```
