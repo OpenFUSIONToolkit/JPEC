@@ -217,7 +217,7 @@ function direct_position(
     new_psi_fs = psi_in.fs * fac
     x_coords = Vector(psi_in.xs)
     y_coords = Vector(psi_in.ys)
-    psi_in_new = Spl.BicubicSpline(x_coords, y_coords, new_psi_fs; bctypex=4, bctypey=4)
+    psi_in_new = Spl.BicubicSpline(x_coords, y_coords, new_psi_fs; bctypex="extrap", bctypey="extrap")
 
     if abs(psi_at_axis - psio) / psio > 1e-3
         @warn "Psi at located axis (O-point) differs from expected psio. " *
@@ -565,7 +565,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
     println("...Loop over flux surfaces finished.")
 
     # 5. Finalize splines and perform q-profile revision if needed
-    sq = Spl.CubicSpline(sq_x_nodes, sq_fs_nodes; bctype=4)
+    sq = Spl.CubicSpline(sq_x_nodes, sq_fs_nodes; bctype="extrap")
 
     if equil_params.newq0 != 0.0
         println("Revising q-profile for newq0 = $(equil_params.newq0)...")
@@ -585,13 +585,13 @@ function equilibrium_solver(raw_profile::DirectRunInput)
             rzphi_fs_nodes[i, :, 3] .*= ffac # Toroidal stream function
         end
         # Re-create the spline with the revised data
-        sq = Spl.CubicSpline(sq_x_nodes, sq_fs_nodes; bctype=4)
+        sq = Spl.CubicSpline(sq_x_nodes, sq_fs_nodes; bctype="extrap")
         println("...q-profile revision complete.")
     end
 
     # Create the final geometric spline `rzphi`. Periodic in theta (y-dimension)
     rzphi_y_nodes = range(0.0, 1.0; length=mtheta + 1)
-    rzphi = Spl.BicubicSpline(sq_x_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes; bctypex=4, bctypey=2)
+    rzphi = Spl.BicubicSpline(sq_x_nodes, collect(rzphi_y_nodes), rzphi_fs_nodes; bctypex="extrap", bctypey="periodic")
     println("Final geometric spline 'rzphi' is fitted.")
 
     # 6. Calculate final physics quantities (B-field, metric components, etc.)
@@ -647,7 +647,7 @@ function equilibrium_solver(raw_profile::DirectRunInput)
     end
     println("...done.")
 
-    eqfun = Spl.BicubicSpline(sq_x_nodes, collect(rzphi_y_nodes), eqfun_fs_nodes; bctypex=4, bctypey=2)
+    eqfun = Spl.BicubicSpline(sq_x_nodes, collect(rzphi_y_nodes), eqfun_fs_nodes; bctypex="extrap", bctypey="periodic")
 
     println("--- Direct Equilibrium Processing Finished ---")
 
