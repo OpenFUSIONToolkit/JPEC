@@ -22,51 +22,62 @@ Performs the same function as `sing_find` in the Fortran code.
 """
 function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
 
-    # Loop over extrema of q, find all rational values in between
-    for iex in 2:equil.params.mextrema
-        dq = equil.params.qextrema_q[iex] - equil.params.qextrema_q[iex-1]
-        m = trunc(Int, ctrl.nn * equil.params.qextrema_q[iex-1])
-        if dq > 0
-            m += 1
-        end
-        dm = Int(sign(dq * ctrl.nn))
+    # loop over all toroidal mode numbers
+    for n in intr.nlow:intr.nhigh
+        # Loop over extrema of q, find all rational values in between
+        for iex in 2:equil.params.mextrema
+            dq = equil.params.qextrema_q[iex] - equil.params.qextrema_q[iex-1]
+            m = trunc(Int, n * equil.params.qextrema_q[iex-1])
+            if dq > 0
+                m += 1
+            end
+            dm = Int(sign(dq * n))
 
-        # Loop over possible m's in interval
-        while (m - ctrl.nn * equil.params.qextrema_q[iex-1]) * (m - ctrl.nn * equil.params.qextrema_q[iex]) <= 0
-            it = 0
-            psi0 = equil.params.qextrema_psi[iex-1]
-            psi1 = equil.params.qextrema_psi[iex]
-            psifac = (psi0 + psi1) / 2 # initial guess for bisection
+            # Loop over possible m's in interval
+            while (m - n * equil.params.qextrema_q[iex-1]) * (m - n * equil.params.qextrema_q[iex]) <= 0
+                it = 0
+                psi0 = equil.params.qextrema_psi[iex-1]
+                psi1 = equil.params.qextrema_psi[iex]
+                psifac = (psi0 + psi1) / 2 # initial guess for bisection
 
-            # Bisection method to find singular surface
-            while it < itmax
-                it += 1
-                psifac = (psi0 + psi1) / 2
-                singfac = (m - ctrl.nn * Spl.spline_eval!(equil.sq, psifac)[4]) * dm
-                if abs(singfac) <= 1e-8
-                    break
-                elseif singfac > 0
-                    psi0 = psifac
-                else
-                    psi1 = psifac
+                # Bisection method to find singular surface
+                while it < itmax
+                    it += 1
+                    psifac = (psi0 + psi1) / 2
+                    singfac = (m - n * Spl.spline_eval!(equil.sq, psifac)[4]) * dm
+                    if abs(singfac) <= 1e-8
+                        break
+                    elseif singfac > 0
+                        psi0 = psifac
+                    else
+                        psi1 = psifac
+                    end
                 end
-            end
 
-            if it == itmax
-                error("Bisection did not converge for m = $m")
-            else
-                push!(intr.sing, SingType(;
-                    m=m,
-                    psifac=psifac,
-                    rho=sqrt(psifac),
-                    q=m / ctrl.nn,
-                    q1=Spl.spline_deriv1!(equil.sq, psifac)[2][4]
-                ))
-                intr.msing += 1
+                if it == itmax
+                    error("Bisection did not converge for m = $m")
+                else
+                    push!(intr.sing, SingType(;
+                        m=m,
+                        psifac=psifac,
+                        rho=sqrt(psifac),
+                        q=m / n,
+                        q1=Spl.spline_deriv1!(equil.sq, psifac)[2][4]
+                    ))
+                    intr.msing += 1
+                end
+                m += dm
             end
-            m += dm
         end
     end
+
+    # Sort singular surfaces by increasing psifac
+    intr.sing = sort(intr.sing, by = s -> s.psifac)
+
+    display(intr.sing)
+
+    error("DEbug")
+
 end
 
 """
@@ -97,6 +108,10 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
 
     # Optionally override qlim based on dmlim
     if ctrl.set_psilim_via_dmlim
+        if ctrl.nn_low != ctrl.nn_high
+            @warn "When setting psilim via dmlim, only single n is currently supported. Setting nn_low = nn_high = $(ctrl.nn)."
+            ctrl.nn_low = ctrl.nn_high = ctrl.nn
+        end
         # Normalize dmlim ∈ [0,1)
         ctrl.dmlim = mod(ctrl.dmlim, 1.0)
         intr.qlim = (trunc(Int, ctrl.nn * intr.qlim) + ctrl.dmlim) / ctrl.nn

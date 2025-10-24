@@ -87,6 +87,23 @@ function Main(path::String)
         write_output(outp, :dcon_out, @sprintf("%4s %12s %12s %12s %12s %12s %12s %12s %12s", "ipsi", "psifac", "f", "mu0 p", "dvdpsi", "q", "di", "dr", "ca1"))
     end
 
+    # Determine toroidal mode numbers
+    if ctrl.nn == 0 && ctrl.nn_low == ctrl.nn_high # single n mode
+        if ctrl.nn_low == 0
+            error("Need to specify at least one of nn, or nn_low/nn_high != 0 in dcon.toml")
+        else
+            @warn "nn_low and nn_high specified but equal, running with a single nn = nn_low = nn_high = $(ctrl.nn_low)"
+            intr.nlow = ctrl.nn_low
+            intr.nhigh = ctrl.nn_low
+        end
+    elseif ctrl.nn != 0
+        intr.nlow = intr.nhigh = ctrl.nn
+    else
+        intr.nlow = ctrl.nn_low
+        intr.nhigh = ctrl.nn_high
+    end
+    intr.npert = intr.nhigh - intr.nlow + 1
+
     # Find all singular surfaces in the equilibrium
     sing_find!(intr, ctrl, equil)
 
@@ -119,7 +136,8 @@ function Main(path::String)
             println("     q0 = $(equil.params.q0), qmin = $(equil.params.qmin), qmax = $(equil.params.qmax), q95 = $(equil.params.q95)")
             println("     set_psilim_via_dmlim = $(ctrl.set_psilim_via_dmlim), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
             println("     betat = $(equil.params.betat), betan = $(equil.params.betan), betap1 = $(equil.params.betap1)")
-            println("     nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
+            println("     mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
+            println("     nlow = $(intr.nlow), nhigh = $(intr.nhigh), npert = $(intr.npert)")
             println(" Fourier analysis of metric tensor components")
         end
 
