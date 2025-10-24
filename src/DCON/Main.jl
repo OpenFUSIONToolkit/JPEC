@@ -95,9 +95,13 @@ function Main(path::String)
             @warn "nn_low and nn_high specified but equal, running with a single nn = nn_low = nn_high = $(ctrl.nn_low)"
             intr.nlow = ctrl.nn_low
             intr.nhigh = ctrl.nn_low
+            ctrl.nn = ctrl.nn_low # TODO: DEBUG ONLY UNTIL ALL CTRL.NNs HAVE BEEN REPLACED
         end
     elseif ctrl.nn != 0
         intr.nlow = intr.nhigh = ctrl.nn
+        if ctrl.nn_low != 0 || ctrl.nn_high != 0
+            @warn "Both nn and nn_low/nn_high specified, proceeding with nn = $(ctrl.nn) only."
+        end
     else
         intr.nlow = ctrl.nn_low
         intr.nhigh = ctrl.nn_high

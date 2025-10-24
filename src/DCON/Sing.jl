@@ -70,14 +70,8 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             end
         end
     end
-
     # Sort singular surfaces by increasing psifac
     intr.sing = sort(intr.sing, by = s -> s.psifac)
-
-    display(intr.sing)
-
-    error("DEbug")
-
 end
 
 """
@@ -415,6 +409,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
         @views x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
     end
     # f is prefactorized so can just use this calculation to get F⁻¹x
+    display(f0_lower)
     @views x[:, :, 1, 1] = UpperTriangular(f0_lower') \ (LowerTriangular(f0_lower) \ x[:, :, 1, 1])
 
     # Compute higher-order x1

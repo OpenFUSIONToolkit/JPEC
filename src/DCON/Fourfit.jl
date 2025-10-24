@@ -186,20 +186,26 @@ function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, in
     mpsi = metric.mpsi
 
     if ctrl.verbose
-        println("   Toroidal mode n=$(ctrl.nn), Poloidal modes m=$(intr.mlow):$(intr.mhigh) ($(intr.mpert) modes)")
+        nstring = intr.nlow == intr.nhigh ? "n=$(intr.nlow)" : "n=$(intr.nlow):$(intr.nhigh)"
+        println("   Toroidal modes $nstring ($(intr.npert) modes), Poloidal modes m=$(intr.mlow):$(intr.mhigh) ($(intr.mpert) modes)")
         println("   Matrix bandwidth: $(intr.mband)")
     end
 
-    # Allocations
-    amats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    bmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    cmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    dmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    emats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    hmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    fmats_lower = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    gmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
-    kmats = zeros(ComplexF64, mpsi, intr.mpert, intr.mpert)
+    # Allocations (use flat storage for all matrices to fill splines)
+    # TODO: 3D arrays will require (mpert * npert)^2 flat storage
+    if !intr.equil_is_3D
+        # We only store the diagonal blocks for 2D equilibria without toroidal mode coupling
+        # Size of blocks is mpert x mpert, # of blocks is npert
+        amats_flat = zeros(ComplexF64, mpsi, intr.mpert^2 * intr.npert)
+        bmats_flat = zeros(ComplexF64, mpsi, intr.mpert^2 * intr.npert)
+        cmats_flat = zeros(ComplexF64, mpsi, intr.mpert^2 * intr.npert)
+        dmats_flat = zeros(ComplexF64, mpsi, intr.mpert^2 * intr.npert)
+        emats_flat = zeros(ComplexF64, mpsi, intr.mpert^2 * intr.npert)
+        hmats_flat = zeros(ComplexF64, mpsi, intr.mpert^2 * intr.npert)
+        fmats_lower_flat = zeros(ComplexF64, mpsi, intr.mpert^2 * intr.npert)
+        gmats_flat = zeros(ComplexF64, mpsi, intr.mpert^2 * intr.npert)
+        kmats_flat = zeros(ComplexF64, mpsi, intr.mpert^2 * intr.npert)
+    end
     g11 = zeros(ComplexF64, 2 * intr.mband + 1)
     g22 = zeros(ComplexF64, 2 * intr.mband + 1)
     g33 = zeros(ComplexF64, 2 * intr.mband + 1)
@@ -216,24 +222,12 @@ function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, in
     imat[mid] = 1 + 0im
 
     for ipsi in 1:mpsi
-        # --- Create views for this surface ---
-        amat = @view amats[ipsi, :, :]
-        bmat = @view bmats[ipsi, :, :]
-        cmat = @view cmats[ipsi, :, :]
-        dmat = @view dmats[ipsi, :, :]
-        emat = @view emats[ipsi, :, :]
-        hmat = @view hmats[ipsi, :, :]
-        fmat = @view fmats_lower[ipsi, :, :]
-        gmat = @view gmats[ipsi, :, :]
-        kmat = @view kmats[ipsi, :, :]
-
         # --- Profiles ---
         p1 = sq.fs1[ipsi, 2]
         q = sq.fs[ipsi, 4]
         q1 = sq.fs1[ipsi, 4]
         jtheta = -sq.fs1[ipsi, 1]
         chi1 = 2π * equil.psio
-        nq = ctrl.nn * q
 
         # Fill lower half (0, -1, …, -mband)
         g11[mid:-1:1] .= metric.fspline.cs.fs[ipsi, 1:intr.mband+1]
@@ -257,66 +251,83 @@ function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, in
             jmat1[mid+k] = conj(jmat1[mid-k])
         end
 
-        # Construct primitive matrices via m1/dm loops
-        ipert = 0
-        for m1 in intr.mlow:intr.mhigh
-            ipert += 1
-            sing1 = m1 - nq
-            for dm in max(1 - ipert, -intr.mband):min(intr.mpert - ipert, intr.mband)
-                m2 = m1 + dm
-                sing2 = m2 - nq
-                jpert = ipert + dm
-                dmidx = dm + mid
+        # TODO: for 3D, would need an additional nlow:nhigh loop here for n/n' coupling
+        for n in intr.nlow:intr.nhigh
+            # Compute offset index for this block in flat arrays
+            idx_offset = (n - intr.nlow) * intr.mpert^2
+            # Create 2D mpert x mpert views into the full flat arrays for this (n) block
+            @views amat = reshape(amats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
+            @views bmat = reshape(bmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
+            @views cmat = reshape(cmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
+            @views dmat = reshape(dmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
+            @views emat = reshape(emats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
+            @views hmat = reshape(hmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
+            @views fmat = reshape(fmats_lower_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
+            @views gmat = reshape(gmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
+            @views kmat = reshape(kmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
 
-                amat[ipert, jpert] = (2π)^2 * (ctrl.nn^2 * g22[dmidx] + ctrl.nn * (m1 + m2) * g23[dmidx] + m1 * m2 * g33[dmidx])
-                bmat[ipert, jpert] = -2π * im * chi1 * (ctrl.nn * g22[dmidx] + (m1 + nq) * g23[dmidx] + m1 * q * g33[dmidx])
-                cmat[ipert, jpert] =
-                    2π * im * ((2π * im * chi1 * sing2 * (ctrl.nn * g12[dmidx] + m1 * g31[dmidx])) -
-                               (q1 * chi1 * (ctrl.nn * g23[dmidx] + m1 * g33[dmidx]))) -
-                    2π * im * (jtheta * sing1 * imat[dmidx] + ctrl.nn * p1 / chi1 * jmat[dmidx])
-                dmat[ipert, jpert] = 2π * chi1 * (g23[dmidx] + g33[dmidx] * m1 / ctrl.nn)
-                emat[ipert, jpert] = -chi1 / ctrl.nn * (q1 * chi1 * g33[dmidx] - 2π * im * chi1 * g31[dmidx] * sing2 + jtheta * imat[dmidx])
-                hmat[ipert, jpert] =
-                    (q1 * chi1)^2 * g33[dmidx] +
-                    (2π * chi1)^2 * sing1 * sing2 * g11[dmidx] -
-                    2π * im * chi1 * dm * q1 * chi1 * g31[dmidx] +
-                    jtheta * q1 * chi1 * imat[dmidx] +
-                    p1 * jmat1[dmidx]
-                fmat[ipert, jpert] = (chi1 / ctrl.nn)^2 * g33[dmidx]
-                kmat[ipert, jpert] = 2π * im * chi1 * (g23[dmidx] + g33[dmidx] * m1 / ctrl.nn)
+            # Construct primitive matrices via m1/dm loops
+            nq = n * q
+            ipert = 0
+            for m1 in intr.mlow:intr.mhigh
+                ipert += 1
+                sing1 = m1 - nq
+                for dm in max(1 - ipert, -intr.mband):min(intr.mpert - ipert, intr.mband)
+                    m2 = m1 + dm
+                    sing2 = m2 - nq
+                    jpert = ipert + dm
+                    dmidx = dm + mid
+
+                    amat[ipert, jpert] = (2π)^2 * (n^2 * g22[dmidx] + n * (m1 + m2) * g23[dmidx] + m1 * m2 * g33[dmidx])
+                    bmat[ipert, jpert] = -2π * im * chi1 * (n * g22[dmidx] + (m1 + nq) * g23[dmidx] + m1 * q * g33[dmidx])
+                    cmat[ipert, jpert] =
+                        2π * im * ((2π * im * chi1 * sing2 * (n * g12[dmidx] + m1 * g31[dmidx])) -
+                                (q1 * chi1 * (n * g23[dmidx] + m1 * g33[dmidx]))) -
+                        2π * im * (jtheta * sing1 * imat[dmidx] + n * p1 / chi1 * jmat[dmidx])
+                    dmat[ipert, jpert] = 2π * chi1 * (g23[dmidx] + g33[dmidx] * m1 / n)
+                    emat[ipert, jpert] = -chi1 / n * (q1 * chi1 * g33[dmidx] - 2π * im * chi1 * g31[dmidx] * sing2 + jtheta * imat[dmidx])
+                    hmat[ipert, jpert] =
+                        (q1 * chi1)^2 * g33[dmidx] +
+                        (2π * chi1)^2 * sing1 * sing2 * g11[dmidx] -
+                        2π * im * chi1 * dm * q1 * chi1 * g31[dmidx] +
+                        jtheta * q1 * chi1 * imat[dmidx] +
+                        p1 * jmat1[dmidx]
+                    fmat[ipert, jpert] = (chi1 / n)^2 * g33[dmidx]
+                    kmat[ipert, jpert] = 2π * im * chi1 * (g23[dmidx] + g33[dmidx] * m1 / n)
+                end
             end
+
+            # Factorize and build composites
+            # TODO: Fortran threw an error if the factorization fails for a/fmat due to small matrix bandwidth,
+            # (i.e. we cut off too many terms and matrix no longer positive definite). Should add this back in
+            # if we implement banded matrices.
+            amat_fact = cholesky(Hermitian(amat, :L))
+            temp1 = amat_fact \ dmat
+            temp2 = amat_fact \ cmat
+            # Use * for matrix multiplication (instead of .* for element-wise)
+            fmat .-= adjoint(dmat) * temp1
+            kmat .= emat .- (adjoint(kmat) * temp2)
+            gmat .= hmat .- (adjoint(cmat) * temp2)
+
+            # Store factorized F matrix (lower triangular only) since we always will need F⁻¹ later
+            # and this make computation more efficient via combined forward and back substitution
+            fmat .= cholesky(Hermitian(fmat)).L
+
+            # TODO: add kinetic matrices here
         end
-
-        # Factorize and build composites
-        # TODO: Fortran threw an error if the factorization fails for a/fmat due to small matrix bandwidth,
-        # (i.e. we cut off too many terms and matrix no longer positive definite). Should add this back in
-        # if we implement banded matrices.
-        amat_fact = cholesky(Hermitian(amat, :L))
-        temp1 = amat_fact \ dmat
-        temp2 = amat_fact \ cmat
-        # Use * for matrix multiplication (instead of .* for element-wise)
-        fmat .-= adjoint(dmat) * temp1
-        kmat .= emat .- (adjoint(kmat) * temp2)
-        gmat .= hmat .- (adjoint(cmat) * temp2)
-
-        # Store factorized F matrix (lower triangular only) since we always will need F⁻¹ later
-        # and this make computation more efficient via combined forward and back substitution
-        fmat .= cholesky(Hermitian(fmat)).L
-
-        # TODO: add kinetic matrices here
     end
 
-    # --- Fit splines (reshape 3D to 2D: (mpsi) × (mpert^2)) ---
+    # --- Fit splines ---
     ffit = FourFitVars(; mpert=intr.mpert, mband=intr.mband)
-    ffit.amats = Spl.CubicSpline(metric.xs, reshape(amats, mpsi, :); bctype=3)
-    ffit.bmats = Spl.CubicSpline(metric.xs, reshape(bmats, mpsi, :); bctype=3)
-    ffit.cmats = Spl.CubicSpline(metric.xs, reshape(cmats, mpsi, :); bctype=3)
-    ffit.dmats = Spl.CubicSpline(metric.xs, reshape(dmats, mpsi, :); bctype=3)
-    ffit.emats = Spl.CubicSpline(metric.xs, reshape(emats, mpsi, :); bctype=3)
-    ffit.hmats = Spl.CubicSpline(metric.xs, reshape(hmats, mpsi, :); bctype=3)
-    ffit.fmats_lower = Spl.CubicSpline(metric.xs, reshape(fmats_lower, mpsi, :); bctype=3)
-    ffit.gmats = Spl.CubicSpline(metric.xs, reshape(gmats, mpsi, :); bctype=3)
-    ffit.kmats = Spl.CubicSpline(metric.xs, reshape(kmats, mpsi, :); bctype=3)
+    ffit.amats = Spl.CubicSpline(metric.xs, amats_flat; bctype="extrap")
+    ffit.bmats = Spl.CubicSpline(metric.xs, bmats_flat; bctype="extrap")
+    ffit.cmats = Spl.CubicSpline(metric.xs, cmats_flat; bctype="extrap")
+    ffit.dmats = Spl.CubicSpline(metric.xs, dmats_flat; bctype="extrap")
+    ffit.emats = Spl.CubicSpline(metric.xs, emats_flat; bctype="extrap")
+    ffit.hmats = Spl.CubicSpline(metric.xs, hmats_flat; bctype="extrap")
+    ffit.fmats_lower = Spl.CubicSpline(metric.xs, fmats_lower_flat; bctype="extrap")
+    ffit.gmats = Spl.CubicSpline(metric.xs, gmats_flat; bctype="extrap")
+    ffit.kmats = Spl.CubicSpline(metric.xs, kmats_flat; bctype="extrap")
 
     # TODO: set powers
     # Do we need this yet? Only called if power_flag = true
