@@ -5,12 +5,16 @@ Scan all singular surfaces and calculate asymptotic vmat and mmat matrices
 and Mericer criterion. Performs the same function as `sing_scan` in the Fortran code.
 """
 function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, outp::DconOutput)
-    write_output(outp, :dcon_out, "\n Singular Surfaces:")
-    write_output(outp, :dcon_out, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
+    if outp.write_dcon_out
+        write_output(outp, :dcon_out, "\n Singular Surfaces:")
+        write_output(outp, :dcon_out, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
+    end
     for ising in 1:intr.msing
         sing_vmat!(intr, ctrl, equil, ffit, outp, ising)
     end
-    write_output(outp, :dcon_out, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
+    if outp.write_dcon_out
+        write_output(outp, :dcon_out, @sprintf("%3s %11s %11s %11s %11s %11s %11s %11s", "i", "psi", "rho", "q", "q1", "di0", "di", "err"))
+    end
 end
 
 """
@@ -188,7 +192,9 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     singp.power[ipert0] = -singp.alpha
     singp.power[ipert0+intr.mpert] = singp.alpha
 
-    write_output(outp, :dcon_out, @sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e", ising, psifac, rho, q, q1, di0, singp.di, singp.di / di0 - 1))
+    if outp.write_dcon_out
+        write_output(outp, :dcon_out, @sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e", ising, psifac, rho, q, q1, di0, singp.di, singp.di / di0 - 1))
+    end
 
     # Zeroth-order non-resonant solutions
     singp.vmat .= 0
