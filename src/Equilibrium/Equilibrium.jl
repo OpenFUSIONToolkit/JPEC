@@ -63,7 +63,7 @@ function setup_equilibrium(eq_config::EquilibriumConfig, additional_input=nothin
     elseif eq_type == "sol"
 
         if additional_input === nothing
-            additional_input = SolevevConfig(eq_config.control.eq_filename)
+            additional_input = SolovevConfig(eq_config.control.eq_filename)
         end
 
         eq_input = sol_run(eq_config, additional_input)
@@ -435,7 +435,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
 
 
 
-    flux = Spl.BicubicSpline(collect(rzphi.xs), collect(rzphi.ys), flux_fs; bctypex=2, bctypey=2)
+    flux = Spl.BicubicSpline(collect(rzphi.xs), collect(rzphi.ys), flux_fs; bctypex="extrap", bctypey="periodic")
 
     source = zeros(Float64, mpsi + 1, mtheta + 1)
     for ipsi in 0:mpsi
@@ -473,7 +473,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
         fs_matrix[:, 1] = flux.fsx[ipsi+1, :, 1]
         fs_matrix[:, 2] = source[ipsi+1, :]
 
-        spline = Spl.CubicSpline(Vector(flux.ys), fs_matrix; bctype=2)
+        spline = Spl.CubicSpline(Vector(flux.ys), fs_matrix; bctype="periodic")
         Spl.spline_integrate!(spline)
 
         term[ipsi+1, :] .= spline.fsi[end, :]

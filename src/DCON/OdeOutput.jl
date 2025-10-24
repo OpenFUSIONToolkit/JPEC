@@ -224,7 +224,6 @@ A tuple `(q, singfac, logpsi1, logsingfac, crit)` of critical data for the time 
 
 ### TODOs
 
-Add dVdpsi multiplication back once equilibrium bug is fixed
 Decide if we want to just pass in the relevant quantities instead of structs for functions like this
 """
 function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m1::Int, nn::Int, sq::Spl.CubicSpline)
@@ -251,7 +250,7 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m
     singfac = abs(m1 - nn * profiles[4])
     logpsi1 = log10(psi)
     logsingfac = log10(singfac)
-    crit = evalsi[indexi[1]] # * profiles[3]^2 # TODO: appears to be a bug in profiles[3]
+    crit = evalsi[indexi[1]]* profiles[3]^2
 
     return q, singfac, logpsi1, logsingfac, crit
 end
