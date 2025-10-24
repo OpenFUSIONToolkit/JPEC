@@ -435,7 +435,7 @@ function equilibrium_gse!(equil::PlasmaEquilibrium)
 
 
 
-    flux = Spl.BicubicSpline(collect(rzphi.xs), collect(rzphi.ys), flux_fs; bctypex="periodic", bctypey="periodic")
+    flux = Spl.BicubicSpline(collect(rzphi.xs), collect(rzphi.ys), flux_fs; bctypex="extrap", bctypey="periodic")
 
     source = zeros(Float64, mpsi + 1, mtheta + 1)
     for ipsi in 0:mpsi

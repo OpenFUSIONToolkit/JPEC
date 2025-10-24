@@ -266,7 +266,7 @@ function read_chease2(config::EquilibriumConfig)
 
 
     # Setup bicubic spline with periodic boundary conditions
-    rz_in = Spl.BicubicSpline(xs, ys, fs; bctypex="periodic", bctypey="periodic")
+    rz_in = Spl.BicubicSpline(xs, ys, fs; bctypex="extrap", bctypey="periodic")
     println("--> Finished reading CHEASE equilibrium.")
     println("    Magnetic axis at (ro=$ro, zo=$zo), psio=$psio")
     return InverseRunInput(config, sq_in, rz_in, ro, zo, psio)
@@ -401,7 +401,7 @@ function read_chease(config::EquilibriumConfig)
         ys = range(0, 2π; length=mtau) |> collect
 
         # Setup bicubic spline with periodic boundary conditions
-        rz_in = Spl.bicube_setup(xs, ys, fs; bctypex="periodic", bctypey="periodic")
+        rz_in = Spl.bicube_setup(xs, ys, fs; bctypex="extrap", bctypey="periodic")
 
         if diagnostics
             # --- Print first 5 and last 5 entries of each slice ---
