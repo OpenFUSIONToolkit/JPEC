@@ -357,18 +357,17 @@ function free_compute_wv_spline(ctrl::DconControl, equil::Equilibrium.PlasmaEqui
 
         # Newton iteration to find psi at qi
         psii = ctrl.psiedge + (intr.psilim - ctrl.psiedge) * ((i - 1) / npsi)
-        it = 0
+        converged = false
         for _ in 1:itmax
             dpsi = (qi - qval(psii)) / q1val(psii)
             psii += dpsi
-            it += 1
-            abs(dpsi) < eps * abs(psii) && break
+            abs(dpsi) < eps * abs(psii) && (converged = true; break)
         end
 
-        if it == itmax
-            error("Can't find psilim after $itmax iterations.")
-        else
+        if converged
             psi_array[i] = psii
+        else
+            error("Newton iteration for psilim did not converge after $itmax iterations.")
         end
 
         # Prepare vacuum matrices

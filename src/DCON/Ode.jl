@@ -217,19 +217,20 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Use Newton iteration to find starting psi if qlow is above q0
     if ctrl.qlow > equil.sq.fs[1, 4]
-        # Start check from the edge for robustness in reverse shear cores
-        for jpsi in equil.sq.mx:-1:2  # avoid starting iteration on endpoints
-            if equil.sq.fs[jpsi-1, 4] < ctrl.qlow
-                odet.psifac = equil.sq.xs[jpsi]
-                break
-            end
+        # Find last index where q < qlow 
+        idx = findlast(jpsi -> equil.sq.fs[jpsi-1, 4] < ctrl.qlow, 2:equil.sq.mx)
+        if idx !== nothing
+            odet.psifac = equil.sq.xs[idx]
         end
-        it = 0
-        dpsi = Inf
-        while abs(dpsi) > eps * abs(odet.psifac) && it ≤ itmax
-            it += 1
+        # Refine psifac using Newton iteration
+        converged = false
+        for _ in 1:itmax
             dpsi = (ctrl.qlow - qval(odet.psifac)) / q1val(odet.psifac)
             odet.psifac += dpsi
+            abs(dpsi) < eps * abs(odet.psifac) && (converged = true; break)
+        end
+        if !converged
+            error("Newton iteration for psifac did not converge after $itmax iterations.")
         end
     end
 

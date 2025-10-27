@@ -41,16 +41,16 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
                 psifac = (psi0 + psi1) / 2 # initial guess for bisection
 
                 # Bisection method to find singular surface
-                singfac = Inf
-                while abs(singfac) > 1e-8 && it < itmax
-                    it += 1
+                converged = false
+                for _ in 1:itmax
                     psifac = (psi0 + psi1) / 2
                     singfac = (m - n * Spl.spline_eval!(equil.sq, psifac)[4]) * dm
+                    abs(singfac) < 1e-8 && (converged = true; break)
                     singfac > 0 ? (psi0 = psifac) : (psi1 = psifac)
                 end
 
-                if it == itmax
-                    error("Bisection did not converge for m = $m")
+                if !converged
+                    error("Bisection did not converge for m = $m after $itmax iterations.")
                 elseif any(s -> isapprox(s.q, m / n; atol=1e-8), intr.sing)
                     # Already found this surface (i.e. rational surface with multiplicity > 1)
                     # Add this m to the resonant mode numbers
@@ -126,15 +126,18 @@ function sing_lim!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pla
         q1val(ψ) = Spl.spline_deriv1!(equil.sq, ψ)[2][4]
 
         intr.psilim = equil.sq.xs[jpsi]
+        converged = false
         for _ in 1:itmax
             dpsi = (intr.qlim - qval(intr.psilim)) / q1val(intr.psilim)
             intr.psilim += dpsi
-            abs(dpsi) < eps * abs(intr.psilim) && return intr.q1lim = q1val(intr.psilim)
+            abs(dpsi) < eps * abs(intr.psilim) && (converged = true; break)
         end
-        error("Can't find psilim after $itmax iterations.")
-    else
-        # Just use the equilibrium values for psilim, qlim, and q1lim
-        return
+
+        if converged
+            intr.q1lim = q1val(intr.psilim)
+        else
+            error("Can't find psilim after $itmax iterations.")
+        end
     end
 end
 
