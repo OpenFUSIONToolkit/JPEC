@@ -225,17 +225,15 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
             end
         end
         it = 0
-        while it ≤ itmax
+        dpsi = Inf
+        while abs(dpsi) > eps * abs(odet.psifac) && it ≤ itmax
             it += 1
             dpsi = (ctrl.qlow - qval(odet.psifac)) / q1val(odet.psifac)
             odet.psifac += dpsi
-            if abs(dpsi) < eps * abs(odet.psifac)
-                break
-            end
         end
     end
 
-    # Find inner singular surface
+    # Find inner singular surface (where sing.psifac > psi(qlow/q0))
     if false #(TODO: kin_flag)
     # for ising = 1:kmsing
     #     if kinsing[ising].psifac > psifac
@@ -243,13 +241,7 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
     #     end
     # end
     else
-        odet.ising = 0
-        for i in 1:intr.msing
-            if intr.sing[i].psifac > odet.psifac
-                odet.ising = max(0, i - 1)
-                break
-            end
-        end
+        odet.ising = searchsortedfirst(getfield.(intr.sing, :psifac), odet.psifac) - 1  
     end
 
     # Find next singular surface
@@ -278,23 +270,36 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
     #     next = "cross"
     # end
     else
-        while true
-            odet.ising += 1
-            if odet.ising > intr.msing || intr.psilim < intr.sing[min(odet.ising, intr.msing)].psifac
+        # Find the next singular surface (either the next one in the list or outside of integration limits)
+        # TODO: (ask Nik) this is tricky, did I generalize the logic correctly? (shorten this comment later)
+        # Basically, want to choose the next singular surface based on being within our integration limits
+        # and also being resonant with our included poloidal mode numbers. When there are mulitple toroidal
+        # mode numbers, we need to check if any of them are resonant with the singular surface. This is equivalent
+        # to checking if any of the m values in that singular surface are within the range of mlow and mhigh,
+        # Will this ever not be true? I thought we set mlow and mhigh to be wide enough to include all resonant surfaces?
+        # single n: in_q_range = intr.mlow <= ctrl.nn * sing.q <= intr.mhigh
+        # multi n: in_q_range = check if any n*q is resonant, equivalent to checking singp m-vector
+        for i in (odet.ising + 1):intr.msing
+            odet.ising = i
+            singp = intr.sing[odet.ising]
+            if intr.psilim < singp.psifac || any(m -> intr.mlow <= m <= intr.mhigh, singp.m)
                 break
             end
-            if intr.mlow <= ctrl.nn * intr.sing[odet.ising].q && intr.mhigh >= ctrl.nn * intr.sing[odet.ising].q
-                break
-            end
-        end
-        if odet.ising > intr.msing || intr.psilim < intr.sing[min(odet.ising, intr.msing)].psifac || ctrl.singfac_min == 0
+        end 
+        # Determine psimax and classify next integration limit type
+        if odet.ising > intr.msing || intr.psilim < singp.psifac || ctrl.singfac_min == 0
             odet.psimax = intr.psilim * (1 - eps)
             odet.next = "finish"
         else
-            odet.psimax = intr.sing[odet.ising].psifac - ctrl.singfac_min / abs(ctrl.nn * intr.sing[odet.ising].q1)
+            # TODO: (ask Nik) where does singfac_min / n * q' come from? How does it generalize to multi-n?
+            # Safest choice for now is to use the smallest resonant n for maximum separation
+            nmax_res = maximum(singp.m) / singp.q # maximum resonant n for this singular surface, since m = n*q
+            odet.psimax = singp.psifac - ctrl.singfac_min / abs(nmax_res * singp.q1)
             odet.next = "cross"
         end
     end
+
+    ## CONTINUE FROM HERE ON MONDAY
 
     # Allocate and sort solutions by increasing value of |m-ms1|
     m = intr.mlow - 1 .+ collect(1:intr.mpert)

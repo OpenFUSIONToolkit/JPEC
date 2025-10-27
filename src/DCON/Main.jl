@@ -116,15 +116,15 @@ function Main(path::String)
         intr.mlow = ctrl.delta_mlow
         intr.mhigh = ctrl.delta_mhigh
     elseif ctrl.sing_start == 0
-        intr.mlow = min(ctrl.nn * equil.params.qmin, 0) - 4 - ctrl.delta_mlow
-        intr.mhigh = trunc(Int, ctrl.nn * equil.params.qmax) + ctrl.delta_mhigh
+        intr.mlow = min(intr.nlow * equil.params.qmin, 0) - 4 - ctrl.delta_mlow
+        intr.mhigh = trunc(Int, intr.nhigh * equil.params.qmax) + ctrl.delta_mhigh
     else
         intr.mmin = Inf # HUGE in Fortran
         for ising in Int(ctrl.sing_start):intr.msing
             intr.mmin = min(intr.mmin, sing[ising].m)
         end
         intr.mlow = intr.mmin - ctrl.delta_mlow
-        intr.mhigh = trunc(Int, intr.nn * equil.qmax) + ctrl.delta_mhigh
+        intr.mhigh = trunc(Int, intr.nhigh * equil.params.qmax) + ctrl.delta_mhigh
     end
     intr.mpert = intr.mhigh - intr.mlow + 1
     if ctrl.delta_mband >= intr.mpert
@@ -146,12 +146,12 @@ function Main(path::String)
         end
 
         if outp.write_dcon_out
-            write_output(outp, :dcon_out, @sprintf("\n   mlow   mhigh   mpert   mband   nn   lim_fl   dmlim      qlim      psilim"))
+            write_output(outp, :dcon_out, @sprintf("\n   mlow   mhigh   mpert   mband   nlow   nhigh   npert   lim_fl   dmlim      qlim      psilim"))
             write_output(
                 outp,
                 :dcon_out,
-                @sprintf("%6d %6d %6d %6d %6d %6s %11.3e %11.3e %11.3e",
-                    intr.mlow, intr.mhigh, intr.mpert, intr.mband, ctrl.nn,
+                @sprintf("%6d %6d %6d %6d %6d %6d %6d %6s %11.3e %11.3e %11.3e",
+                    intr.mlow, intr.mhigh, intr.mpert, intr.mband, intr.nlow, intr.nhigh, intr.npert,
                     string(ctrl.set_psilim_via_dmlim), ctrl.dmlim, intr.qlim, intr.psilim)
             )
         end

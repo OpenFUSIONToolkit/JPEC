@@ -41,24 +41,23 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
                 psifac = (psi0 + psi1) / 2 # initial guess for bisection
 
                 # Bisection method to find singular surface
-                while it < itmax
+                singfac = Inf
+                while abs(singfac) > 1e-8 && it < itmax
                     it += 1
                     psifac = (psi0 + psi1) / 2
                     singfac = (m - n * Spl.spline_eval!(equil.sq, psifac)[4]) * dm
-                    if abs(singfac) <= 1e-8
-                        break
-                    elseif singfac > 0
-                        psi0 = psifac
-                    else
-                        psi1 = psifac
-                    end
+                    singfac > 0 ? (psi0 = psifac) : (psi1 = psifac)
                 end
 
                 if it == itmax
                     error("Bisection did not converge for m = $m")
+                elseif any(s -> isapprox(s.q, m / n; atol=1e-8), intr.sing)
+                    # Already found this surface (i.e. rational surface with multiplicity > 1)
+                    # Add this m to the resonant mode numbers
+                    push!(intr.sing[findfirst(s -> isapprox(s.q, m / n; atol=1e-8), intr.sing)].m, m)
                 else
                     push!(intr.sing, SingType(;
-                        m=m,
+                        m=[m],
                         psifac=psifac,
                         rho=sqrt(psifac),
                         q=m / n,
@@ -409,7 +408,6 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
         @views x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
     end
     # f is prefactorized so can just use this calculation to get F⁻¹x
-    display(f0_lower)
     @views x[:, :, 1, 1] = UpperTriangular(f0_lower') \ (LowerTriangular(f0_lower) \ x[:, :, 1, 1])
 
     # Compute higher-order x1
