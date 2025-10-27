@@ -56,12 +56,6 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     # TODO: actually, can probably remove this function entirely and just call set_dcon_params directly
     free_write_msc(intr.psilim, ctrl, equil, intr; inmemory_op=vac_memory, ahgstr_op=ahg_file)
 
-    # TODO: there is some ahb_flag logic here that has a comment "must be false if using GPEC"
-    # I am assuming this means we don't have to implement any of it
-    # if ahb_flag
-    #     free_ahb_prep(wp, nmat, smat, asmat, bsmat, csmat, ipiva)
-    # end
-
     # Compute vacuum response matrix.
     grri = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
     xzpts = Array{Float64}(undef, ctrl.mthvac + 5, 4)
@@ -174,13 +168,6 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     plasma1 = ComplexF64(real(ep[1]), 0.0)
     vacuum1 = ComplexF64(real(ev[1]), 0.0)
     total1 = ComplexF64(real(et[1]), 0.0)
-
-    # Write data for ahb and deallocate.
-    # if ahb_flag
-    #     free_ahb_write(nmat, smat, wt, et)
-    #     # Fortran did DEALLOCATE(r,z,theta,dphi,thetas,project) - we assume they are module arrays
-    #     # and will be GC'd or freed by dcon_dealloc below
-    # end
 
     if vac_memory
         VacuumMod.unset_dcon_params()
