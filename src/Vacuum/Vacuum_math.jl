@@ -62,12 +62,18 @@ This function performs Lagrange interpolation and optionally computes its deriva
 - `m::Int`: Number of interpolation points.
 - `nl::Int`: Number of points to use for the local interpolation (degree of polynomial + 1).
 - `x::Float64`: The x-value at which to evaluate the interpolated function and/or its derivative.
+-  `iop::Float64`: Flag (0 = value only, 1 = value and derivative)
 
 # Returns
 - `f::Float64`: The interpolated function value at `x`
 - `df::Float64`: The interpolated function derivative at `x` 
+
 """
-function lagrange1d!(ax::Vector{Float64}, af::Vector{Float64}, m::Int, nl::Int, x::Float64, f::Float64, df::Float64)
+function lagrange1d(ax::Vector{Float64}, af::Vector{Float64}, m::Int, nl::Int, x::Float64, iop::Int)
+
+    # --- Error fix: Initialize f and df internally to 0.0 ---
+    f::Float64 = 0.0
+    df::Float64 = 0.0
 
     jn = findfirst(i -> ax[i] >= x, 1:m)
     jn = (jn === nothing) ? m : jn
@@ -83,10 +89,10 @@ function lagrange1d!(ax::Vector{Float64}, af::Vector{Float64}, m::Int, nl::Int, 
     nll = jn - jnmm
     nlr = jn + jnpp
 
-    # Adjust for even nl when ax[jn] > x
+    # Adjust for even nl when ax[jn] > x (Window shift)
     if (nl % 2 == 0) && (ax[jn] > x)
         nll -= 1
-        nlr += 1
+        nlr -= 1 # <--- Shifting the window (was nlr += 1)
     end
 
     # Clamp indices to valid array bounds
@@ -109,8 +115,10 @@ function lagrange1d!(ax::Vector{Float64}, af::Vector{Float64}, m::Int, nl::Int, 
         end
         f += alag * af[i]
     end
+
+    # --- Error fix: Use the 'iop' argument ---
     if iop == 0
-        return f, df # df is 0.0 as initialized
+        return f, df # df is returned as 0.0
     end
 
     # Compute derivative df
@@ -135,6 +143,8 @@ function lagrange1d!(ax::Vector{Float64}, af::Vector{Float64}, m::Int, nl::Int, 
         end
         df += slag * af[i]
     end
+
+    return f, df # Return value and derivative
 end
 
 #############################################################
@@ -364,7 +374,7 @@ Compute the Green's function and related quantities for axisymmetric geometry.
 
 # Returns
 - `aval`:   𝒥 ∇'𝒢ⁿ∇'ℒ — Coupling term for mode n
-- `aval0`:  1/(2√π) 𝒥 ∇'𝒢⁰∇'ℒ — Coupling term for mode 0
+- `aval0`:  1/(2π) 𝒥 ∇'𝒢⁰∇'ℒ — Coupling term for mode 0
 - `bval`:   2π𝒢ⁿ(θ,θ′) — Green's function value
 """
 function green(xs, zs, xt, zt, xtp, ztp, n)
@@ -401,9 +411,6 @@ function green(xs, zs, xt, zt, xtp, ztp, n)
     pp = legendre[end]
     pn = legendre[end-1]
 
-    pn = -0.11428891147663127
-    pp = 0.14546414388934609
-
     # Chance eq.(40) 2π𝒢ⁿ = G
     gg = 2 * sqrt(π) * gamma(0.5 - n) / R
     G = gg * pn
@@ -426,10 +433,10 @@ function green(xs, zs, xt, zt, xtp, ztp, n)
     # ∂X'/∂θ = xtp, ∂Z'/∂θ = ztp
     aval = -xt * (ztp * dG_dX - xtp * dG_dZ)
 
-    # bval. bval = 2π𝒢ⁿ
+    # bval. 2π𝒢ⁿ = bval
     bval = G
 
-    # for 𝓃⩵0,  aval0 = 1/(2√π) 𝒥 ∇'𝒢⁰∇'ℒ 
+    # for 𝓃⩵0,  aval0 = 1/(2π) 𝒥 ∇'𝒢⁰∇'ℒ 
     dG_dX0 = 1/(R5*xt) * ((2.0 * xt * xs * (xs2-xt2+ζ2)) * p1 - xt2*(xt2-xs2+ζ2) * p0 ) 
     dG_dZ0 = 1/(R5)* ζ * ((xs2 + xt2 + ζ2) * p0 + 4.0 * x_multiple * p1) 
     aval0 = -xt * (ztp * dG_dX0 - xtp * dG_dZ0)
@@ -475,7 +482,6 @@ end
 const architecture = Sys.ARCH;
 const cpu_name = Sys.CPU_NAME;
 const threads = Sys.CPU_THREADS;
-const kernel = Sys.KERNEL;
 const username = Sys.username();
 
 
