@@ -168,7 +168,7 @@ function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibr
 
     # Compute new crit
     dpsi = odet.psifac - odet.psi_prev
-    q, singfac, logpsi1, logsingfac, crit = ode_output_get_crit(odet.psifac, odet.u, intr.mpert, odet.m1, ctrl.nn, equil.sq)
+    q, logpsi, crit = ode_output_get_crit(odet.psifac, odet.u, intr.mpert, ctrl.nn, equil.sq)
 
     # Check for zero crossing
     if crit * odet.crit_prev < 0 # if crit changes sign, zero crossing has occurred
@@ -176,14 +176,14 @@ function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibr
         psi_med = odet.psifac - fac * (odet.psifac - odet.psi_prev)
         dpsi = psi_med - odet.psi_prev
         u_med = odet.u .- fac .* (odet.u .- odet.u_prev)
-        q_med, singfac_med, logpsi1_med, logsingfac_med, crit_med = ode_output_get_crit(psi_med, u_med, intr.mpert, odet.m1, ctrl.nn, equil.sq)
+        q_med, logpsi_med, crit_med = ode_output_get_crit(psi_med, u_med, intr.mpert, ctrl.nn, equil.sq)
 
         if (crit_med - crit) * (crit_med - odet.crit_prev) < 0 &&
            abs(crit_med) < 0.5 * min(abs(crit), abs(odet.crit_prev))
             println("Zero crossing detected at psi = $psi_med, q = $q_med")
             write_output(outp, :dcon_out, @sprintf("Zero crossing at psi = %10.3e, q = %10.3e", psi_med, q_med))
             write_output(outp, :crit_out, @sprintf("Zero crossing at psi = %10.3e, q = %10.3e", psi_med, q_med))
-            write_output(outp, :crit_out, @sprintf("%11.3e%11.3e%11.3e%11.3e%11.3e", psi_med, dpsi, q_med, singfac_med, crit_med))
+            write_output(outp, :crit_out, @sprintf("%11.3e%11.3e%11.3e%11.3e%11.3e", psi_med, dpsi, q_med, crit_med))
             odet.nzero += 1
         end
         if ctrl.termbycross_flag
@@ -203,7 +203,7 @@ function ode_output_monitor(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibr
 end
 
 """
-    ode_output_get_crit(psi, u, mpert, m1, nn, sq) -> (q, singfac, logpsi1, logsingfac, crit)
+    ode_output_get_crit(psi, u, mpert, nn, sq) -> (q, logpsi, crit)
 
 Compute critical quantities at a given flux surface and using the smallest (in magnitude)
 inverse eigenvalue in combination with the equilibrium profiles to form `crit`.
@@ -214,19 +214,18 @@ Performs the same function as `ode_output_get_crit` in the Fortran code.
   - `psi::Float64`: The flux surface at which to evaluate.
   - `u::Array{ComplexF64, 3}`: Solution matrix at `psi`.
   - `mpert::Int`: Number of poloidal modes considered.
-  - `m1::Int`: Poloidal mode number of the perturbation.
   - `nn::Int`: Toroidal mode number of the perturbation.
   - `sq::Spl.CubicSpline`: Spline object containing equilibrium profiles.
 
 ### Returns
 
-A tuple `(q, singfac, logpsi1, logsingfac, crit)` of critical data for the time step.
+A tuple `(q, logpsi, crit)` of critical data for the time step.
 
 ### TODOs
 
 Decide if we want to just pass in the relevant quantities instead of structs for functions like this
 """
-function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m1::Int, nn::Int, sq::Spl.CubicSpline)
+function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, nn::Int, sq::Spl.CubicSpline)
 
     # Compute inverse plasma response matrix
     wp = adjoint(u[:, 1:mpert, 1])         # adjoint = conjugate transpose
@@ -247,10 +246,8 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, m
     # Compute critical data for each time step
     profiles = Spl.spline_eval!(sq, psi)
     q = profiles[4]
-    singfac = abs(m1 - nn * profiles[4])
-    logpsi1 = log10(psi)
-    logsingfac = log10(singfac)
+    logpsi = log10(psi)
     crit = evalsi[indexi[1]]* profiles[3]^2
 
-    return q, singfac, logpsi1, logsingfac, crit
+    return q, logpsi, crit
 end

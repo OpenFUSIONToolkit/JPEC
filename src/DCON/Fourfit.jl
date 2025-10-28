@@ -253,18 +253,19 @@ function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, in
 
         # TODO: for 3D, would need an additional nlow:nhigh loop here for n/n' coupling
         for n in intr.nlow:intr.nhigh
-            # Compute offset index for this block in flat arrays
+            # Compute offset index for this block in flat arrays and the resulting index range
             idx_offset = (n - intr.nlow) * intr.mpert^2
+            idx_range = idx_offset + 1 : idx_offset + intr.mpert^2
             # Create 2D mpert x mpert views into the full flat arrays for this (n) block
-            @views amat = reshape(amats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
-            @views bmat = reshape(bmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
-            @views cmat = reshape(cmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
-            @views dmat = reshape(dmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
-            @views emat = reshape(emats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
-            @views hmat = reshape(hmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
-            @views fmat = reshape(fmats_lower_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
-            @views gmat = reshape(gmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
-            @views kmat = reshape(kmats_flat[ipsi, idx_offset+1 : idx_offset + intr.mpert^2], intr.mpert, intr.mpert)
+            @views amat = reshape(amats_flat[ipsi, idx_range], intr.mpert, intr.mpert)
+            @views bmat = reshape(bmats_flat[ipsi, idx_range], intr.mpert, intr.mpert)
+            @views cmat = reshape(cmats_flat[ipsi, idx_range], intr.mpert, intr.mpert)
+            @views dmat = reshape(dmats_flat[ipsi, idx_range], intr.mpert, intr.mpert)
+            @views emat = reshape(emats_flat[ipsi, idx_range], intr.mpert, intr.mpert)
+            @views hmat = reshape(hmats_flat[ipsi, idx_range], intr.mpert, intr.mpert)
+            @views fmat = reshape(fmats_lower_flat[ipsi, idx_range], intr.mpert, intr.mpert)
+            @views gmat = reshape(gmats_flat[ipsi, idx_range], intr.mpert, intr.mpert)
+            @views kmat = reshape(kmats_flat[ipsi, idx_range], intr.mpert, intr.mpert)
 
             # Construct primitive matrices via m1/dm loops
             nq = n * q

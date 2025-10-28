@@ -682,7 +682,6 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
     else
         # See equation 23 in Glasser 2016 DCON paper for derivation
         # du[1] = - K * u[1] + u[2]
-
         du[:, :, 1] .= u2 .* odet.singfac_vec
         mul!(odet.tmp, kmat, u1)
         @views du[:, :, 1] .-= odet.tmp

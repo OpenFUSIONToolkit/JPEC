@@ -11,6 +11,7 @@ including solution vectors, tolerances, and flags for the integration process.
     # Initialization parameters
     mpert::Int                  # poloidal mode number count
     msol::Int                   # number of solutions
+    npert::Int                  # toroidal mode number count
     numunorms_init::Int             # initial storage size for unorm data
     msing::Int                   # number of singular surfaces
     numsteps_init::Int             # initial size of data store
@@ -18,13 +19,13 @@ including solution vectors, tolerances, and flags for the integration process.
     # Saved data throughout integration
     step::Int = 1                    # current step of integration (this is like istep in Fortran)
     psi_store::Vector{Float64} = Vector{Float64}(undef, numsteps_init)  # psi at each step of integration
-    u_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, mpert, 2, numsteps_init) # store of u at each step of integration
-    ud_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, mpert, 2, numsteps_init) # store of ud at each step of integration
+    u_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert * npert, mpert * npert, 2, numsteps_init) # store of u at each step of integration
+    ud_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert * npert, mpert * npert, 2, numsteps_init) # store of ud at each step of integration
     ca_r::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, msing) # asymptotic coefficients just right of singular surface
     ca_l::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, msing) # asymptotic coefficients just left of singular surface
-    index::Array{Int,2} = zeros(Int, mpert, numunorms_init)                                   # indices for sorting solutions
+    index::Array{Int,2} = zeros(Int, mpert * npert, numunorms_init)                                   # indices for sorting solutions
     sing_flag::Vector{Bool} = falses(numunorms_init)                     # flags for singular solutions
-    fixfac::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, numunorms_init)             # fixup factors for Gaussian reduction
+    fixfac::Array{ComplexF64,3} = zeros(ComplexF64, mpert * npert, mpert * npert, numunorms_init)             # fixup factors for Gaussian reduction
     fixstep::Vector{Int64} = zeros(Int64, numunorms_init)               # psi values at which unorms were performed
 
     # Used for to find peak dW in the edge
@@ -35,34 +36,32 @@ including solution vectors, tolerances, and flags for the integration process.
     # Data for integrator
     psifac::Float64 = 0.0       # normalized flux coordinate
     q::Float64 = 0.0            # q value at psifac
-    u::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, 2)            # solution vectors
-    ud::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, 2)           # derivative of solution vectors used in GPEC
+    u::Array{ComplexF64,3} = zeros(ComplexF64, mpert * npert, mpert * npert, 2)            # solution vectors
+    ud::Array{ComplexF64,3} = zeros(ComplexF64, mpert * npert, mpert * npert, 2)           # derivative of solution vectors used in GPEC
     ising::Int = 0               # index of next singular surface
-    m1::Int = 0                 # poloidal mode number for the next singular surface (?)
     psimax::Float64 = 0.0         # maximum psi value for the integrator
-    singfac::Float64 = 0.0      # separation from singular surface in terms of m - nq
     next::String = ""           # next integration action ("cross" or "finish")
     psi_prev::Float64 = 0.0     # previous psi value
     crit_prev::Float64 = 0.0    # previous crit value
-    u_prev::Array{ComplexF64,3} = zeros(ComplexF64, mpert, mpert, 2) # previous solution array
+    u_prev::Array{ComplexF64,3} = zeros(ComplexF64, mpert * npert, mpert * npert, 2) # previous solution array
     nzero::Int = 0              # count of zero crossings detected
 
     # Used for Gaussian reduction
     new::Bool = true            # flag for computing new unorm0 after a fixup
-    unorm::Vector{Float64} = zeros(Float64, 2 * mpert)                        # norms of solution vectors
-    unorm0::Vector{Float64} = zeros(Float64, 2 * mpert)                       # initial norms of solution vectors
+    unorm::Vector{Float64} = zeros(Float64, 2 * mpert * npert)                        # norms of solution vectors
+    unorm0::Vector{Float64} = zeros(Float64, 2 * mpert * npert)                       # initial norms of solution vectors
     ifix::Int = 0                # index for number of unorms performed
 
     # Temporary matrices for sing_der calculations
-    amat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
-    bmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
-    cmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
-    fmat_lower::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
-    kmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
-    gmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2)
-    tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
+    amat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
+    bmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
+    cmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
+    fmat_lower::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
+    kmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
+    gmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
+    tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert * npert, mpert * npert)
     Afact::Union{Cholesky{ComplexF64,Matrix{ComplexF64}},Nothing} = nothing
-    singfac_vec::Vector{Float64} = Vector{Float64}(undef, mpert)
+    singfac_vec::Vector{Float64} = Vector{Float64}(undef, mpert * npert)
 
     flag_count::Int = 0         # count of flags raised # TODO: remove this? Only used in ode_test if res_flag = true
 end
@@ -104,7 +103,7 @@ An OdeState struct containing the final state of the ODE solver after integratio
 function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
 
     # Initialization
-    odet = OdeState(intr.mpert, intr.mpert, ctrl.numsteps_init, ctrl.numunorms_init, intr.msing)
+    odet = OdeState(intr.mpert, intr.mpert, intr.npert, ctrl.numsteps_init, ctrl.numunorms_init, intr.msing)
 
     if ctrl.sing_start <= 0
         ode_axis_init!(odet, ctrl, equil, intr)
@@ -194,17 +193,15 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
     return odet
 end
 
-
 """
     ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
 Initialize the OdeState struct for the case of sing_start = 0 (axis initialization). This includes
-determining `psifac`, `psimax`, `ising`, `m1`, `singfac`, and initializing `u`.
+determining `psifac`, `psimax`, `ising`, `singfac`, and initializing `u`.
 
 ### TODOs
 
 Support for `kin_flag`
-Remove while true logic
 """
 function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)
 
@@ -283,10 +280,8 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
         for i in (odet.ising + 1):intr.msing
             odet.ising = i
             singp = intr.sing[odet.ising]
-            if intr.psilim < singp.psifac || any(m -> intr.mlow <= m <= intr.mhigh, singp.m)
-                break
-            end
-        end 
+            (intr.psilim < singp.psifac || any(m -> intr.mlow <= m <= intr.mhigh, singp.m)) && break
+        end
         # Determine psimax and classify next integration limit type
         if odet.ising > intr.msing || intr.psilim < singp.psifac || ctrl.singfac_min == 0
             odet.psimax = intr.psilim * (1 - eps)
@@ -294,15 +289,13 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
         else
             # TODO: (ask Nik) where does singfac_min / n * q' come from? How does it generalize to multi-n?
             # Safest choice for now is to use the smallest resonant n for maximum separation
-            nmax_res = maximum(singp.m) / singp.q # maximum resonant n for this singular surface, since m = n*q
-            odet.psimax = singp.psifac - ctrl.singfac_min / abs(nmax_res * singp.q1)
+            nmin_res = minimum(singp.m) / singp.q # maximum resonant n for this singular surface, since m = n*q
+            odet.psimax = singp.psifac - ctrl.singfac_min / abs(nmin_res * singp.q1)
             odet.next = "cross"
         end
     end
 
-    ## CONTINUE FROM HERE ON MONDAY
-
-    # Allocate and sort solutions by increasing value of |m-ms1|
+    # Allocate and sort solutions for increasing |m|
     m = intr.mlow - 1 .+ collect(1:intr.mpert)
     if ctrl.sort_type == "absm"
         key = abs.(m)
@@ -318,29 +311,14 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
     index = sortperm(key; rev=true) # in original Fortran: bubble(key, index, 1, mpert)
 
     # Initialize solutions
-    for ipert in 1:intr.mpert
-        odet.u[index[ipert], ipert, 2] = 1
+    for jpert in 1:intr.npert
+        for ipert in 1:intr.mpert
+            odet.u[index[ipert] * jpert, ipert * jpert, 2] = 1
+        end
     end
     odet.msol = intr.mpert
     odet.u_prev .= odet.u
     odet.psi_prev = odet.psifac
-
-    # Compute conditions at next singular surface
-    if false #TODO: (kin_flag)
-    # if kmsing > 0
-    #     m1 = round(Int, nn * kinsing[ising].q)
-    # else
-    #     m1 = round(Int, nn * qlim) + sign(one, nn * sq.fs1[mpsi, 5])
-    # end
-    else
-        # note: Julia's default round does Banker's rounding, to match NINT in fortran we need to specify RoundFromZero
-        if intr.msing > 0
-            odet.m1 = round(Int, ctrl.nn * intr.sing[odet.ising].q, RoundFromZero)
-        else
-            odet.m1 = round(Int, ctrl.nn * intr.qlim, RoundFromZero) + sign(ctrl.nn * equil.sq.fs1[end, 4])
-        end
-    end
-    odet.singfac = abs(odet.m1 - ctrl.nn * equil.sq.fs[1, 4]) # Fortran: q=sq%fs(0,4)
 end
 
 # TODO: NOT IMPLEMENTED YET! (low priority, just make sure sing_start = 0 in dcon.toml)
@@ -397,11 +375,9 @@ end
 #     end
 # This needs to be fixed up
 #     if ising > msing || psilim < sing[ising ≤ msing ? ising : msing].psifac
-#         m1 = round(Int, ctrl.nn*intr.qlim) + round(Int, sign(one, ctrl.nn*equil.sq.fs1[mpsi, 4]))
 #         psimax = psilim * (1-eps)
 #         next_ = "finish"
 #     else
-#         m1 = round(Int, nn*sing[ising].q)
 #         psimax = sing[ising].psifac - singfac_min/abs(nn*sing[ising].q1)
 #         next_ = "cross"
 #     end
@@ -475,12 +451,10 @@ function ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.
     # Compute conditions at next singular surface
     if odet.ising > intr.msing || intr.psilim < intr.sing[min(odet.ising, intr.msing)].psifac
         odet.psimax = intr.psilim * (1 - eps)
-        odet.m1 = round(Int, ctrl.nn * intr.qlim, RoundFromZero) + sign(ctrl.nn * equil.sq.fs1[end, 4])
         odet.next = "finish"
     else
         singp = intr.sing[odet.ising] # Update singp
         odet.psimax = singp.psifac - ctrl.singfac_min / abs(ctrl.nn * singp.q1)
-        odet.m1 = round(Int, ctrl.nn * singp.q, RoundFromZero)
         write_output(outp, :crit_out, @sprintf("   ising   psi         q          di      re alpha   im alpha\n"))
         write_output(outp, :crit_out, @sprintf("%6d%11.3e%11.3e%11.3e%11.3e%11.3e\n", odet.ising, singp.psifac, singp.q, singp.di, real(singp.alpha), imag(singp.alpha)))
     end
@@ -870,7 +844,7 @@ function ode_test(ctrl::DconControl, intr::DconInternal, odet::OdeState)::Bool
     flag = odet.psifac == odet.psimax
 
     # if not running with res_flag = true this function will exit and return flag here)
-    if !ctrl.res_flag || flag || odet.ising > intr.msing || odet.singfac > ctrl.singfac_max
+    if !ctrl.res_flag || flag || odet.ising > intr.msing
         return flag
     end
 
