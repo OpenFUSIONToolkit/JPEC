@@ -114,7 +114,6 @@ end
     set_psilim_via_dmlim::Bool = false # previously sas_flag, if true, determines psilim using outermost rational + dmlim
     dmlim::Float64 = 0.2 # % outside the last rational surface to go out to determine dW if set_psilim_via_dmlim is true
     sing_order::Int = 2
-    sort_type::String = "absm"
     termbycross_flag::Bool = false
     qhigh::Float64 = 1e3
     kin_flag::Bool = false

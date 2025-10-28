@@ -296,24 +296,9 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
         end
     end
 
-    # Allocate and sort solutions by increasing value of |m-ms1|
-    m = intr.mlow - 1 .+ collect(1:intr.mpert)
-    if ctrl.sort_type == "absm"
-        key = abs.(m)
-    elseif ctrl.sort_type == "sing"
-        key = m
-        if intr.msing > 0
-            key .-= intr.sing[1].m
-        end
-        @. key = -abs(key)
-    else
-        error("Cannot recognize sort_type = $(ctrl.sort_type)")
-    end
-    index = sortperm(key; rev=true) # in original Fortran: bubble(key, index, 1, mpert)
-
     # Initialize solutions
     for ipert in 1:intr.mpert
-        odet.u[index[ipert], ipert, 2] = 1
+        odet.u[ipert, ipert, 2] = 1
     end
     odet.msol = intr.mpert
     odet.u_prev .= odet.u
