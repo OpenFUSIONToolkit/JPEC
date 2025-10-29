@@ -293,7 +293,7 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
         end
     end
 
-    # Initialize solutions
+    # Initialize solutions with the identity matrix for U_22 as described in [Glasser PoP 2016] Section VI
     for ipert in 1:intr.mpert
         odet.u[ipert, ipert, 2] = 1
     end
