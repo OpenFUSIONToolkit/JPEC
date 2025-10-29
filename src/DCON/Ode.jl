@@ -298,7 +298,7 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Initialize solutions
     for ipert in 1:intr.mpert
-        odet.u[ipert, ipert, 2] = 1
+        odet.u[index[ipert], ipert, 2] = 1
     end
     odet.msol = intr.mpert
     odet.u_prev .= odet.u
@@ -1008,7 +1008,8 @@ function build_ureal(intr::DconInternal, odet::OdeState)
     ureal = Array{ComplexF64}(undef, odet.step, intr.mpert, intr.mpert)
     jfix = 1
     for ifix in 1:odet.ifix+1
-        kfix = odet.fixstep[ifix]
+        # If after the last fixup, go to the end of integration
+        kfix = ifix != odet.ifix + 1 ? odet.fixstep[ifix] : odet.step
         for istep in jfix:kfix
             ureal[istep, :, :] .= odet.u_store[:, :, 1, istep] * transforms[:, :, ifix]
         end
