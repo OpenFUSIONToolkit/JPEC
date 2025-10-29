@@ -56,12 +56,6 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     # TODO: actually, can probably remove this function entirely and just call set_dcon_params directly
     free_write_msc(intr.psilim, ctrl, equil, intr; inmemory_op=vac_memory, ahgstr_op=ahg_file)
 
-    # TODO: there is some ahb_flag logic here that has a comment "must be false if using GPEC"
-    # I am assuming this means we don't have to implement any of it
-    # if ahb_flag
-    #     free_ahb_prep(wp, nmat, smat, asmat, bsmat, csmat, ipiva)
-    # end
-
     # Compute vacuum response matrix.
     grri = Array{Float64}(undef, 2 * (ctrl.mthvac + 5), intr.mpert * 2)
     xzpts = Array{Float64}(undef, ctrl.mthvac + 5, 4)
@@ -175,13 +169,6 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     vacuum1 = ComplexF64(real(ev[1]), 0.0)
     total1 = ComplexF64(real(et[1]), 0.0)
 
-    # Write data for ahb and deallocate.
-    # if ahb_flag
-    #     free_ahb_write(nmat, smat, wt, et)
-    #     # Fortran did DEALLOCATE(r,z,theta,dphi,thetas,project) - we assume they are module arrays
-    #     # and will be GC'd or freed by dcon_dealloc below
-    # end
-
     if vac_memory
         VacuumMod.unset_dcon_params()
     end
@@ -205,41 +192,43 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
             ", real = ", real(et[1]), ", imaginary = ", imag(et[1]))
     end
 
-    # Write eigenvalues to file
-    write_output(outp, :dcon_out, "\nTotal Energy Eigenvalues:")
-    write_output(outp, :dcon_out, "\n   isol   plasma      vacuum   re total   im total\n")
-    for isol in 1:intr.mpert
-        write_output(outp, :dcon_out, @sprintf("%6d %11.3e %11.3e %11.3e %11.3e",
-            isol, real(ep[isol]), real(ev[isol]), real(et[isol]), imag(et[isol])))
-    end
-    write_output(outp, :dcon_out, "\n   isol   plasma      vacuum   re total   im total\n")
-
-    # Write eigenvectors to file
-    write_output(outp, :dcon_out, "Total Energy Eigenvectors:")
-    m = intr.mlow .+ collect(0:intr.mpert-1)
-    for isol in 1:intr.mpert
-        write_output(outp, :dcon_out, "\n   isol   imax   plasma      vacuum   re total   im total\n")
-        write_output(outp, :dcon_out, @sprintf("%6d %6d %11.3e %11.3e %11.3e %11.3e",
-            isol, imax, real(ep[isol]), real(ev[isol]), real(et[isol]), imag(et[isol])))
-        write_output(outp, :dcon_out, "\n  ipert     m      re wt      im wt      abs wt\n")
-        for ipert in 1:intr.mpert
-            write_output(outp, :dcon_out,
-                @sprintf("%6d %6d %11.3e %11.3e %11.3e %s",
-                    ipert, m[ipert], real(wt[ipert, isol]), imag(wt[ipert, isol]), abs(wt[ipert, isol]), star[ipert, isol]))
+    if outp.write_dcon_out
+        # Write eigenvalues to file
+        write_output(outp, :dcon_out, "\nTotal Energy Eigenvalues:")
+        write_output(outp, :dcon_out, "\n   isol   plasma      vacuum   re total   im total\n")
+        for isol in 1:intr.mpert
+            write_output(outp, :dcon_out, @sprintf("%6d %11.3e %11.3e %11.3e %11.3e",
+                isol, real(ep[isol]), real(ev[isol]), real(et[isol]), imag(et[isol])))
         end
-        write_output(outp, :dcon_out, "\n  ipert     m      re wt      im wt      abs wt\n")
-    end
+        write_output(outp, :dcon_out, "\n   isol   plasma      vacuum   re total   im total\n")
 
-    # Write the plasma matrix.
-    write_output(outp, :dcon_out, "Plasma Energy Matrix:\n")
-    for isol in 1:intr.mpert
-        write_output(outp, :dcon_out, "isol = $(isol), m = $(m[isol])")
-        write_output(outp, :dcon_out, "\n  i     re wp        im wp        abs wp\n")
-        for ipert in 1:intr.mpert
-            write_output(outp, :dcon_out, @sprintf("%3d%13.5e%13.5e%13.5e",
-                ipert, real(wp[ipert, isol]), imag(wp[ipert, isol]), abs(wp[ipert, isol])))
+        # Write eigenvectors to file
+        write_output(outp, :dcon_out, "Total Energy Eigenvectors:")
+        m = intr.mlow .+ collect(0:intr.mpert-1)
+        for isol in 1:intr.mpert
+            write_output(outp, :dcon_out, "\n   isol   imax   plasma      vacuum   re total   im total\n")
+            write_output(outp, :dcon_out, @sprintf("%6d %6d %11.3e %11.3e %11.3e %11.3e",
+                isol, imax, real(ep[isol]), real(ev[isol]), real(et[isol]), imag(et[isol])))
+            write_output(outp, :dcon_out, "\n  ipert     m      re wt      im wt      abs wt\n")
+            for ipert in 1:intr.mpert
+                write_output(outp, :dcon_out,
+                    @sprintf("%6d %6d %11.3e %11.3e %11.3e %s",
+                        ipert, m[ipert], real(wt[ipert, isol]), imag(wt[ipert, isol]), abs(wt[ipert, isol]), star[ipert, isol]))
+            end
+            write_output(outp, :dcon_out, "\n  ipert     m      re wt      im wt      abs wt\n")
         end
-        write_output(outp, :dcon_out, "\n  i     re wp        im wp        abs wp\n")
+
+        # Write the plasma matrix to file
+        write_output(outp, :dcon_out, "Plasma Energy Matrix:\n")
+        for isol in 1:intr.mpert
+            write_output(outp, :dcon_out, "isol = $(isol), m = $(m[isol])")
+            write_output(outp, :dcon_out, "\n  i     re wp        im wp        abs wp\n")
+            for ipert in 1:intr.mpert
+                write_output(outp, :dcon_out, @sprintf("%3d%13.5e%13.5e%13.5e",
+                    ipert, real(wp[ipert, isol]), imag(wp[ipert, isol]), abs(wp[ipert, isol])))
+            end
+            write_output(outp, :dcon_out, "\n  i     re wp        im wp        abs wp\n")
+        end
     end
 
     # Compute separate plasma and vacuum eigenvalues.
