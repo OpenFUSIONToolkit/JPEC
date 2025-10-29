@@ -187,7 +187,6 @@ end
     bin_euler::Bool = false
     euler_stride::Int = 1
     bin_vac::Bool = false # TODO: deprecated
-    ahb_flag::Bool = false # TODO: deprecated
     mthsurf0::Float64 = 1.0 # TODO: deprecated
     msol_ahb::Int = 0 # TODO: deprecated
     netcdf_out::Bool = true # TODO: might be deprecated
@@ -214,11 +213,6 @@ end
 
     # Used in Free.jl
     jmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, 2 * mband + 1)
-
-    # TODO: these might be deprecated? They're used with a ahb_flag in free
-    asmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
-    bsmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
-    csmat::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
 
     parallel_threads::Int = 0
     dcon_kin_threads::Int = 0
