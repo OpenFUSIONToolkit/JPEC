@@ -162,6 +162,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         trim_storage!(odet)
     end
 
+    # form the true solution vectors, undoing the Gaussian reduction applied during fixups throughout the integration
     transform_u!(odet, intr)
 
     if outp.write_euler_h5
