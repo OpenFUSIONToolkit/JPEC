@@ -162,7 +162,7 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
         trim_storage!(odet)
     end
 
-    ureal = build_ureal(intr, odet)
+    transform_u!(odet, intr)
 
     if outp.write_euler_h5
         if ctrl.verbose
@@ -179,9 +179,6 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
             euler_h5["integration/q"] = Spl.spline_eval(equil.sq, odet.psi_store, 0)[4]
             euler_h5["integration/u"] = odet.u_store
             euler_h5["integration/ud"] = odet.ud_store
-            # TODO: for GPEC, should add u1, u2, u3, u4? I think this would just be a
-            # matter of adding u[:, :, 2] and ud to the build ureal function, yes?
-            euler_h5["integration/ureal"] = ureal
             euler_h5["singular/msing"] = intr.msing
             euler_h5["singular/psi"] = [intr.sing[ising].psifac for ising in 1:intr.msing]
             euler_h5["singular/q"] = [intr.sing[ising].q for ising in 1:intr.msing]
@@ -298,7 +295,7 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Initialize solutions
     for ipert in 1:intr.mpert
-        odet.u[index[ipert], ipert, 2] = 1
+        odet.u[ipert, ipert, 2] = 1
     end
     odet.msol = intr.mpert
     odet.u_prev .= odet.u
@@ -957,14 +954,16 @@ function get_psi_saves!(odet::OdeState, ctrl::DconControl, intr::DconInternal)
 end
 
 """
-    build_ureal(intr::DconInternal, odet::OdeState)
+    transform_u!(odet::OdeState, intr::DconInternal)
 
-Constructs the transformation matrices to convert the complex solution vectors
-to real-valued vectors in each region between fixups. Effectively "undoes" the
-Gaussian reduction applied during fixups throughout the integration, such that
-we have the true solution vectors for use in GPEC.
+Constructs the transformation matrices to form the true solution vectors. Effectively 
+"undoes" the Gaussian reduction applied during fixups throughout the integration, such that
+we have the true solution vectors for use in GPEC. Modifies the store arrays in `odet` in-place.
+Performs a similar function as `idcon_transform` + `idcon_build` in the Fortran code, 
+except we separate the building of the transformation matrices and determining the coefficients
+for a chosen force-free solution, which can be done in postprocessing.
 """
-function build_ureal(intr::DconInternal, odet::OdeState)
+function transform_u!(odet::OdeState, intr::DconInternal)
 
     # Gaussian reduction matrices for each fixup
     gauss = Array{ComplexF64,3}(undef, intr.mpert, intr.mpert, odet.ifix)
@@ -1005,16 +1004,17 @@ function build_ureal(intr::DconInternal, odet::OdeState)
 
     # Now that we have the transform matrices, we can apply them to the solution vectors
     # "undoing" the Gaussian reductions to get the true solution vectors
-    ureal = Array{ComplexF64}(undef, odet.step, intr.mpert, intr.mpert)
     jfix = 1
     for ifix in 1:odet.ifix+1
         # If after the last fixup, go to the end of integration
         kfix = ifix != odet.ifix + 1 ? odet.fixstep[ifix] : odet.step
         for istep in jfix:kfix
-            ureal[istep, :, :] .= odet.u_store[:, :, 1, istep] * transforms[:, :, ifix]
+            # This is u1->u4 in Fortran
+            odet.u_store[:, :, 1, istep] .= odet.u_store[:, :, 1, istep] * transforms[:, :, ifix]
+            odet.u_store[:, :, 2, istep] .= odet.u_store[:, :, 2, istep] * transforms[:, :, ifix]
+            odet.ud_store[:, :, 1, istep] .= odet.ud_store[:, :, 1, istep] * transforms[:, :, ifix]
+            odet.ud_store[:, :, 2, istep] .= odet.ud_store[:, :, 2, istep] * transforms[:, :, ifix]
         end
         jfix = kfix + 1
     end
-
-    return ureal
 end
