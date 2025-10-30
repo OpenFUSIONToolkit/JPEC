@@ -60,26 +60,14 @@ including solution vectors, tolerances, and flags for the integration process.
     kmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
     gmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
     tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert * npert, mpert * npert)
-    Afact::Union{Cholesky{ComplexF64,Matrix{ComplexF64}},Nothing} = nothing
+    Afact::Union{Cholesky{ComplexF64, Matrix{ComplexF64}}, Cholesky{ComplexF64, BlockDiagonals.BlockDiagonal{ComplexF64, Matrix{ComplexF64}}}, Nothing} = nothing
     singfac_vec::Vector{Float64} = Vector{Float64}(undef, mpert * npert)
 
     flag_count::Int = 0         # count of flags raised # TODO: remove this? Only used in ode_test if res_flag = true
 end
 
-# Base struct that handles storage of the ODE solution throughout integration
-mutable struct OdeDataStore
-    psi::Vector{Float64}
-    u::Vector{Array{ComplexF64,3}}
-    ud::Vector{Array{ComplexF64,3}}
-    step::Int
-end
-
-# Initialize function for data storage object of a given size, will resize as needed
-OdeDataStore(numsteps_init::Int) =
-    OdeDataStore(Vector{Float64}(undef, numsteps_init), Vector{Array{ComplexF64,3}}(undef, numsteps_init), Vector{Array{ComplexF64,3}}(undef, numsteps_init), 0)
-
 # Initialize function for OdeState with relevant parameters for array initialization
-OdeState(mpert::Int, msol::Int, numsteps_init::Int, numunorms_init::Int, msing::Int) = OdeState(; mpert, msol, numsteps_init, numunorms_init, msing)
+OdeState(mpert::Int, msol::Int, npert::Int, numsteps_init::Int, numunorms_init::Int, msing::Int) = OdeState(; mpert, msol, npert, numsteps_init, numunorms_init, msing)
 
 """
     `ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)`
@@ -104,7 +92,6 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
 
     # Initialization
     odet = OdeState(intr.mpert, intr.mpert, intr.npert, ctrl.numsteps_init, ctrl.numunorms_init, intr.msing)
-
     if ctrl.sing_start <= 0
         ode_axis_init!(odet, ctrl, equil, intr)
     elseif ctrl.sing_start <= intr.msing
@@ -128,6 +115,8 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
 
     # Always integrate once, even if no rational surfaces are crossed
     ode_step!(odet, ctrl, equil, ffit, intr, outp)
+    
+    error("at first rational")
 
     # If at a rational surface, do the appropriate crossing routine, then integrate again
     while odet.ising != ctrl.ksing && odet.next == "cross"
@@ -280,6 +269,7 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
             singp = intr.sing[odet.ising]
             (intr.psilim < singp.psifac || any(m -> intr.mlow <= m <= intr.mhigh, singp.m)) && break
         end
+        singp = intr.sing[odet.ising] # singp loses scope outside of loop
         # Determine psimax and classify next integration limit type
         if odet.ising > intr.msing || intr.psilim < singp.psifac || ctrl.singfac_min == 0
             odet.psimax = intr.psilim * (1 - eps)
@@ -287,8 +277,7 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
         else
             # TODO: (ask Nik) where does singfac_min / n * q' come from? How does it generalize to multi-n?
             # Safest choice for now is to use the smallest resonant n for maximum separation
-            nmin_res = minimum(singp.m) / singp.q # maximum resonant n for this singular surface, since m = n*q
-            odet.psimax = singp.psifac - ctrl.singfac_min / abs(nmin_res * singp.q1)
+            odet.psimax = singp.psifac - ctrl.singfac_min / abs(minimum(singp.n) * singp.q1)
             odet.next = "cross"
         end
     end
@@ -296,7 +285,7 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
     # Initialize solutions with the identity matrix for U_22 as described in [Glasser PoP 2016] Section VI
     for jpert in 1:intr.npert
         for ipert in 1:intr.mpert
-            odet.u[index[ipert] * jpert, ipert * jpert, 2] = 1
+            odet.u[ipert + (jpert - 1) * intr.mpert, ipert + (jpert - 1) * intr.mpert, 2] = 1
         end
     end
     odet.msol = intr.mpert
@@ -390,8 +379,7 @@ function ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.
     ode_unorm!(odet, ctrl, intr, outp, true)
 
     # Get asymptotic coefficients before crossing rational surface
-    ca = sing_get_ca(ctrl, intr, odet)
-    odet.ca_l[:, :, :, odet.ising] .= ca
+    odet.ca_l[:, :, :, odet.ising] .= sing_get_ca(ctrl, intr, odet)
 
     # Re-initialize on opposite side of rational surface
     psi_old = odet.psifac
@@ -417,8 +405,7 @@ function ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.
     end
 
     # Get asymptotic coefficients after crossing rational surface
-    ca = sing_get_ca(ctrl, intr, odet)
-    odet.ca_r[:, :, :, odet.ising] .= ca
+    odet.ca_r[:, :, :, odet.ising] .= sing_get_ca(ctrl, intr, odet)
 
     # Find next ising
     while true
@@ -454,7 +441,7 @@ function ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.
 
     # Write next header before continuing integration
     if outp.write_crit_out
-        write_output(outp, :crit_out, "    psifac      dpsi        q       singfac     eval1")
+        write_output(outp, :crit_out, "    psifac      dpsi        q     eval1")
     end
 end
 
@@ -497,11 +484,8 @@ function ode_step!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaE
 
     # Choose integration bounds
     if ctrl.node_flag # TODO: I can't find any mention of what this flag is for, can we get rid of it?
-        while odet.psifac >= equil.sq.xs[ix]
-            ix += 1
-        end
-        psiout = equil.sq.xs[ix]
-        psiout = min(psiout, odet.psimax)
+        ix = findfirst(x -> x > odet.psifac, equil.sq.xs)
+        psiout = min(equil.sq.xs[ix], odet.psimax)
     else
         psiout = odet.psimax
     end
@@ -601,13 +585,16 @@ function compute_tols(ctrl, intr, odet)
     if false  # kin_flag (not implemented)
     # Insert kin_flag branch if needed
     else
+        # TODO: some of this tolerance logic might not even be needed, but for now
+        # I'll generalize it to multi-n, preserving as much of the original logic as possible
+        # singfac = m-nq = n(m/n - q) = n (q_res - q), use smallest n to be conservative
         # Note: odet.q is updated within the derivative calculation
         if odet.ising <= intr.msing
-            singfac_local = abs(intr.sing[odet.ising].m - ctrl.nn * odet.q)
+            singfac_local = abs(minimum(intr.sing[odet.ising].n) * (intr.sing[odet.ising].q * odet.q))
         end
         # If in between singular surfaces, check distance to both
         if odet.ising > 1
-            singfac_local = min(singfac_local, abs(intr.sing[odet.ising-1].m - ctrl.nn * odet.q))
+            singfac_local = min(singfac_local, abs(minimum(intr.sing[odet.ising-1].n) * (intr.sing[odet.ising-1].q * odet.q)))
         end
     end
     rtol = tol = singfac_local < ctrl.crossover ? ctrl.tol_r : ctrl.tol_nr
@@ -736,10 +723,10 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
 
     # Write to output
     if outp.write_crit_out
-        write_output(outp, :crit_out, "\n   psifac      dpsi        q       singfac     eval1")
+        write_output(outp, :crit_out, "\n   psifac      dpsi        q     eval1")
         write_output(outp, :crit_out, @sprintf("\nGaussian Reduction at psi = %10.3e, q = %6.3f\n", odet.psifac, odet.q))
         if !sing_flag
-            write_output(outp, :crit_out, "   psifac      dpsi        q       singfac     eval1\n")
+            write_output(outp, :crit_out, "   psifac      dpsi        q     eval1\n")
         end
     end
     odet.flag_count = 0 # TODO: is this used anywhere?

@@ -18,13 +18,13 @@ function sing_scan!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 end
 
 """
-    sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
+    sing_find!(intr::DconInternal, equil::Equilibrium.PlasmaEquilibrium)
 
 Locate singular rational q-surfaces (q = m/nn) using a bisection method
 between extrema of the q-profile, and store their properties in `intr.sing`.
 Performs the same function as `sing_find` in the Fortran code.
 """
-function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium)
+function sing_find!(intr::DconInternal, equil::Equilibrium.PlasmaEquilibrium)
 
     # loop over all toroidal mode numbers
     for n in intr.nlow:intr.nhigh
@@ -56,12 +56,14 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
                 if !converged
                     error("Bisection did not converge for m = $m after $itmax iterations.")
                 elseif any(s -> isapprox(s.q, m / n; atol=1e-8), intr.sing)
-                    # Already found this surface (i.e. rational surface with multiplicity > 1)
-                    # Add this m to the resonant mode numbers
+                    # Rational surface with multiplicity > 1, add this m,n to the resonant mode numbers
+                    # Technically only need one, but simplifies some later code and cheap to store both
                     push!(intr.sing[findfirst(s -> isapprox(s.q, m / n; atol=1e-8), intr.sing)].m, m)
+                    push!(intr.sing[findfirst(s -> isapprox(s.q, m / n; atol=1e-8), intr.sing)].n, n)
                 else
                     push!(intr.sing, SingType(;
                         m=[m],
+                        n=[n],
                         psifac=psifac,
                         rho=sqrt(psifac),
                         q=m / n,
@@ -73,8 +75,6 @@ function sing_find!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
             end
         end
     end
-    # Sort singular surfaces by increasing psifac
-    intr.sing = sort(intr.sing, by = s -> s.psifac)
 end
 
 """
@@ -643,32 +643,37 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
         FourFitVars,DconInternal,OdeState,DconOutput},
     psieval::Float64)
 
-    # Unpack structs
+    # Unpack structs and initialize
     ctrl, equil, ffit, intr, odet, _ = params
+    fill!(odet.tmp, 0)
+    u1 = @view(u[:, :, 1])
+    u2 = @view(u[:, :, 2])
+    du1 = @view(du[:, :, 1])
+    du2 = @view(du[:, :, 2])
 
-    # Spline evaluation
+    # Compute singfac = 1 / (m - nq)
     odet.q = Spl.spline_eval!(equil.sq, psieval)[4]
-    odet.singfac_vec .= 1.0 ./ (intr.mlow .- ctrl.nn * odet.q .+ (0:intr.mpert-1))
-    chi1 = 2π * equil.psio
+    odet.singfac_vec .= vec(1.0 ./ ((intr.mlow:intr.mhigh) .- odet.q .* (intr.nlow:intr.nhigh)'))
 
     # kinetic stuff - skip for now
     if false #(TODO: kin_flag)
         error("kin_flag not implemented yet")
     else
-        # Evaluate splines at psieval and reshape avoiding new allocations
-        # TODO: is this actually more efficient?
+        # Evaluate matrix splines at the current psi value
         Spl.spline_eval!(odet.amat, ffit.amats, psieval)
-        amat = reshape(odet.amat, intr.mpert, intr.mpert)
         Spl.spline_eval!(odet.bmat, ffit.bmats, psieval)
-        bmat = reshape(odet.bmat, intr.mpert, intr.mpert)
         Spl.spline_eval!(odet.cmat, ffit.cmats, psieval)
-        cmat = reshape(odet.cmat, intr.mpert, intr.mpert)
         Spl.spline_eval!(odet.fmat_lower, ffit.fmats_lower, psieval)
-        fmat_lower = reshape(odet.fmat_lower, intr.mpert, intr.mpert)
         Spl.spline_eval!(odet.kmat, ffit.kmats, psieval)
-        kmat = reshape(odet.kmat, intr.mpert, intr.mpert)
         Spl.spline_eval!(odet.gmat, ffit.gmats, psieval)
-        gmat = reshape(odet.gmat, intr.mpert, intr.mpert)
+        
+        # Form full matrices from flat representations, either block-diagonal or full
+        amat = reconstruct_matrix_from_flat(odet.amat, intr.mpert, intr.npert, intr.equil_is_3D)
+        bmat = reconstruct_matrix_from_flat(odet.bmat, intr.mpert, intr.npert, intr.equil_is_3D)
+        cmat = reconstruct_matrix_from_flat(odet.cmat, intr.mpert, intr.npert, intr.equil_is_3D)
+        fmat_lower = reconstruct_matrix_from_flat(odet.fmat_lower, intr.mpert, intr.npert, intr.equil_is_3D)
+        kmat = reconstruct_matrix_from_flat(odet.kmat, intr.mpert, intr.npert, intr.equil_is_3D)
+        gmat = reconstruct_matrix_from_flat(odet.gmat, intr.mpert, intr.npert, intr.equil_is_3D)
 
         # ldiv!(A,B): Compute A \ B in-place and overwriting B to store the result,
         # where A is a factorization object.
@@ -679,35 +684,58 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
         ldiv!(odet.Afact, cmat)
     end
 
-    odet.tmp .= 0
-    u1 = @view(u[:, :, 1])
-    u2 = @view(u[:, :, 2])
     # Compute du
     if false #(TODO: kin_flag)
         error("kin_flag not implemented yet")
     else
-        # See equation 23 in Glasser 2016 DCON paper for derivation
+        # See equations 22-24 in Glasser 2016 DCON paper for derivation
         # du[1] = - K * u[1] + u[2]
-        du[:, :, 1] .= u2 .* odet.singfac_vec
+        du1 .= u2 .* odet.singfac_vec
         mul!(odet.tmp, kmat, u1)
-        @views du[:, :, 1] .-= odet.tmp
+        du1 .-= odet.tmp
 
         # du[1] = - F⁻¹ * K * u[1] + F⁻¹ * u[2] (remember F is already stored in factored form)
-        @views ldiv!(LowerTriangular(fmat_lower), du[:, :, 1])
-        @views ldiv!(UpperTriangular(fmat_lower'), du[:, :, 1])
+        ldiv!(LowerTriangular(fmat_lower), du1)
+        ldiv!(UpperTriangular(fmat_lower'), du1)
 
         # du[2] = G * u[1] + K' * du[1] = G * u[1] - K^† * F⁻¹ * K * u[1] + K^† * F⁻¹ * u[2]
         mul!(odet.tmp, gmat, u1)
-        @views du[:, :, 2] .= odet.tmp
-        @views mul!(odet.tmp, adjoint(kmat), du[:, :, 1])
-        @views du[:, :, 2] .+= odet.tmp
-        @views du[:, :, 1] .*= odet.singfac_vec
+        du2 .= odet.tmp
+        mul!(odet.tmp, adjoint(kmat), du1)
+        du2 .+= odet.tmp
+        du1 .*= odet.singfac_vec
     end
 
-    # u-derivative used in GPEC
-    @views odet.ud[:, :, 1] .= du[:, :, 1]
-    @views mul!(odet.tmp, bmat, du[:, :, 1])
+    # ud[1] = Ξ'_Ψ
+    @views odet.ud[:, :, 1] .= du1
+    # ud[2] = - A⁻¹(B * Ξ'_Ψ - C * Ξ_Ψ), equation 18 of Glasser 2016
+    mul!(odet.tmp, bmat, du1)
     odet.ud[:, :, 2] .= .-odet.tmp
-    @views mul!(odet.tmp, cmat, u[:, :, 1])
+    mul!(odet.tmp, cmat, u1)
     @views odet.ud[:, :, 2] .-= odet.tmp
+end
+
+"""
+Helper: view the i-th diagonal block of a block-diagonal matrix A
+"""
+@inline function block_view(A::Matrix{ComplexF64}, i::Int, mpert::Int)
+    r = (i-1)*mpert + 1 : i*mpert
+    view(A, r, r)
+end
+
+"""
+    reconstruct_matrix_from_flat(flat::Matrix, mpert::Int, npert::Int, equil_is_3D::Bool)
+
+Rebuild the full matrix from its vectorized (flat) form. If the equilibrium is 3D and there is
+toroidal mode coupling, the full matrix is reconstructed. If the equilibrium is axisymmetric,
+the block-diagonal structure is restored.
+"""
+function reconstruct_matrix_from_flat(flat::Vector{ComplexF64}, mpert::Int, npert::Int, equil_is_3D::Bool)
+    if equil_is_3D
+        # assume flat has (mpsi × (mpert^2 * npert^2))
+        return reshape(flat, mpert*npert, mpert*npert)
+    else
+        # assume flat has (mpsi × (mpert^2 * npert))
+        return BlockDiagonal([reshape(flat[1+(i-1)*mpert^2:i*mpert^2], mpert, mpert) for i in 1:npert])
+    end
 end

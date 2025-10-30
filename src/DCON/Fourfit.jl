@@ -64,10 +64,6 @@ function make_metric(equil::Equilibrium.PlasmaEquilibrium; mband::Int, fft_flag:
     rzphi = equil.rzphi
     mpsi = length(rzphi.xs)
     mtheta = length(rzphi.ys)
-
-    println("   Equilibrium grid: $mpsi (ψ) × $mtheta (θ)")
-    println("   Fourier fit modes (mband): $mband")
-
     metric = MetricData(mpsi, mtheta)
 
     # Set coordinate grids based on the input equilibrium
@@ -184,12 +180,6 @@ function make_matrix(equil::Equilibrium.PlasmaEquilibrium, ctrl::DconControl, in
     # --- Extract inputs ---
     sq = equil.sq
     mpsi = metric.mpsi
-
-    if ctrl.verbose
-        nstring = intr.nlow == intr.nhigh ? "n=$(intr.nlow)" : "n=$(intr.nlow):$(intr.nhigh)"
-        println("   Toroidal modes $nstring ($(intr.npert) modes), Poloidal modes m=$(intr.mlow):$(intr.mhigh) ($(intr.mpert) modes)")
-        println("   Matrix bandwidth: $(intr.mband)")
-    end
 
     # Allocations (use flat storage for all matrices to fill splines)
     # TODO: 3D arrays will require (mpert * npert)^2 flat storage

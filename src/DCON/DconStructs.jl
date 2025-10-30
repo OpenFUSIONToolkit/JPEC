@@ -21,6 +21,7 @@ end
 # This wouldn't be as clean, but would allow preallocation. Does this greatly impact performance?
 @kwdef mutable struct SingType
     m::Vector{Int} = Int[]
+    n::Vector{Int} = Int[]
     r1::Vector{Int} = [0]
     r2::Vector{Int} = [0, 0]
     psifac::Float64 = 0.0
