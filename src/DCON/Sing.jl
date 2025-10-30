@@ -173,16 +173,16 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
         return
     end
 
-    ipert0 = round(Int, ctrl.nn * singp.q, RoundFromZero) - intr.mlow + 1 # resonant perturbation
-    if ipert0 <= 0 || intr.mlow > ctrl.nn * singp.q || intr.mhigh < ctrl.nn * singp.q
+    ipert_res = round(Int, ctrl.nn * singp.q, RoundFromZero) - intr.mlow + 1 # resonant perturbation index
+    if ipert_res <= 0 || intr.mlow > ctrl.nn * singp.q || intr.mhigh < ctrl.nn * singp.q
         singp.di = 0
         return
     end
 
     # Compute ranges
-    singp.r1 = [ipert0]
-    singp.r2 = [ipert0, ipert0 + intr.mpert]
-    singp.n1 = [i for i in 1:intr.mpert if i != ipert0]
+    singp.r1 = [ipert_res]
+    singp.r2 = [ipert_res, ipert_res + intr.mpert]
+    singp.n1 = [i for i in 1:intr.mpert if i != ipert_res]
     singp.n2 = vcat(singp.n1, [i + intr.mpert for i in singp.n1])
 
     psifac = singp.psifac
@@ -200,8 +200,8 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     di = singp.m0mat[1, 1] * singp.m0mat[2, 2] - singp.m0mat[2, 1] * singp.m0mat[1, 2]
     singp.di = real(di)
     singp.alpha = sqrt(-complex(singp.di))
-    singp.power[ipert0] = -singp.alpha
-    singp.power[ipert0+intr.mpert] = singp.alpha
+    singp.power[ipert_res] = -singp.alpha
+    singp.power[ipert_res+intr.mpert] = singp.alpha
 
     if outp.write_dcon_out
         write_output(outp, :dcon_out, @sprintf("%3d %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e %11.3e", ising, psifac, rho, q, q1, di0, singp.di, singp.di / di0 - 1))
@@ -215,14 +215,14 @@ function sing_vmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     end
 
     # Zeroth-order resonant solutions
-    singp.vmat[ipert0, ipert0, 1, 1] = 1
-    singp.vmat[ipert0, ipert0+intr.mpert, 1, 1] = 1
-    singp.vmat[ipert0, ipert0, 2, 1] = -(singp.m0mat[1, 1] + singp.alpha) / singp.m0mat[1, 2]
-    singp.vmat[ipert0, ipert0+intr.mpert, 2, 1] = -(singp.m0mat[1, 1] - singp.alpha) / singp.m0mat[1, 2]
+    singp.vmat[ipert_res, ipert_res, 1, 1] = 1
+    singp.vmat[ipert_res, ipert_res+intr.mpert, 1, 1] = 1
+    singp.vmat[ipert_res, ipert_res, 2, 1] = -(singp.m0mat[1, 1] + singp.alpha) / singp.m0mat[1, 2]
+    singp.vmat[ipert_res, ipert_res+intr.mpert, 2, 1] = -(singp.m0mat[1, 1] - singp.alpha) / singp.m0mat[1, 2]
     det =
-        conj(singp.vmat[ipert0, ipert0, 1, 1]) * singp.vmat[ipert0, ipert0+intr.mpert, 2, 1] -
-        conj(singp.vmat[ipert0, ipert0+intr.mpert, 1, 1]) * singp.vmat[ipert0, ipert0, 2, 1]
-    singp.vmat[ipert0, :, :, 1] ./= sqrt(det)
+        conj(singp.vmat[ipert_res, ipert_res, 1, 1]) * singp.vmat[ipert_res, ipert_res+intr.mpert, 2, 1] -
+        conj(singp.vmat[ipert_res, ipert_res+intr.mpert, 1, 1]) * singp.vmat[ipert_res, ipert_res, 2, 1]
+    singp.vmat[ipert_res, :, :, 1] ./= sqrt(det)
 
     # Higher order solutions
     for k in 1:2*ctrl.sing_order
@@ -254,24 +254,23 @@ Better way to unpack the cubic splines
 function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, ising::Int)
 
     # Initial allocations
-    msol = 2 * intr.mpert # TODO: make sure this doesn't get updated as a global elsewhere in the Fortran
     q = @MVector zeros(Float64, 4)
-    singfac = zeros(Float64, intr.mpert, 4)
-    f_lower_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
-    g_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
-    k_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
-    f_lower = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
-    f0_lower = zeros(ComplexF64, intr.mpert, intr.mpert)
-    ff_lower = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
-    g_lower = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
-    k = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
-    v = zeros(ComplexF64, intr.mpert, msol, 2)
-    x = zeros(ComplexF64, intr.mpert, msol, 2, ctrl.sing_order + 1)
+    singfac = zeros(Float64, intr.numpert_total, 4)
+    f_lower_interp = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, 4)
+    g_interp = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, 4)
+    k_interp = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, 4)
+    f_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
+    f0_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total)
+    ff_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
+    g_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
+    k = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
+    v = zeros(ComplexF64, intr.numpert_total, 2 * intr.numpert_total, 2)
+    x = zeros(ComplexF64, intr.numpert_total, 2 * intr.numpert_total, 2, ctrl.sing_order + 1)
 
     singp = intr.sing[ising]
 
     # Evaluate cubic splines
-    # TODO: third derivative has some error, but only included via sing_fac[ipert0] for sing_order < 3. Tests with solovev ideal indicate little sensitivity
+    # TODO: third derivative has some error, but only included via sing_fac[ipert_res] for sing_order < 3. Tests with solovev ideal indicate little sensitivity
     # TODO: this is an annoying way to have to take apart this tuple of vectors, I think
     # this is a planned fix already (i.e. separating cubic splines)
     q .= getindex.(Spl.spline_deriv3!(equil.sq, singp.psifac), 4)
@@ -280,50 +279,57 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     k_interp[:, :, 1], k_interp[:, :, 2], k_interp[:, :, 3], k_interp[:, :, 4] = Spl.spline_deriv3!(ffit.kmats, singp.psifac)
 
     # Evaluate singfac and its derivatives
-    ipert0 = singp.m - intr.mlow + 1
-    mvec = intr.mlow:intr.mhigh
-    singfac[:, 1] .= mvec .- ctrl.nn * q[1]
-    singfac[:, 2] .= -ctrl.nn * q[2]
-    singfac[:, 3] .= -ctrl.nn * q[3]
-    singfac[:, 4] .= -ctrl.nn * q[4]
-    singfac[ipert0, 1] = -ctrl.nn * q[2]
-    singfac[ipert0, 2] = -ctrl.nn * q[3] / 2
-    singfac[ipert0, 3] = -ctrl.nn * q[4] / 3
-    singfac[ipert0, 4] = 0
+    singfac[:, 1] .= vec((intr.mlow:intr.mhigh) .- q[1] .* (intr.nlow:intr.nhigh)')
+    singfac[:, 2] .= repeat(-(intr.nlow:intr.nhigh) .* q[2], inner=intr.mpert)
+    singfac[:, 3] .= repeat(-(intr.nlow:intr.nhigh) .* q[3], inner=intr.mpert)
+    singfac[:, 4] .= repeat(-(intr.nlow:intr.nhigh) .* q[4], inner=intr.mpert)
+    # Loop through resonant harmonics, applying asymptotics at each one
+    for i in 1:length(singp.m)
+        mres, nres = singp.m[i], singp.n[i]
+        ipert_res = 1 + mres - intr.mlow + (nres - intr.nlow) * intr.mpert
+        singfac[ipert_res, 1] = -nres * q[2]
+        singfac[ipert_res, 2] = -nres * q[3] / 2
+        singfac[ipert_res, 3] = -nres * q[4] / 3
+        singfac[ipert_res, 4] = 0
+    end
 
     # Compute factored Hermitian F and its derivatives (lower half only)
-    for jpert in 1:intr.mpert
-        for ipert in jpert:min(intr.mpert, jpert + intr.mband)
-            f_lower[ipert, jpert, 1] = singfac[ipert, 1] * f_lower_interp[ipert, jpert, 1]
-            if ctrl.sing_order ≥ 1
-                f_lower[ipert, jpert, 2] = singfac[ipert, 1] * f_lower_interp[ipert, jpert, 2] +
-                                           singfac[ipert, 2] * f_lower_interp[ipert, jpert, 1]
-            end
-            if ctrl.sing_order ≥ 2
-                f_lower[ipert, jpert, 3] =
-                    singfac[ipert, 1] * f_lower_interp[ipert, jpert, 3] +
-                    2 * singfac[ipert, 2] * f_lower_interp[ipert, jpert, 2] +
-                    singfac[ipert, 3] * f_lower_interp[ipert, jpert, 1]
-            end
-            if ctrl.sing_order ≥ 3
-                f_lower[ipert, jpert, 4] =
-                    singfac[ipert, 1] * f_lower_interp[ipert, jpert, 4] +
-                    3 * singfac[ipert, 2] * f_lower_interp[ipert, jpert, 3] +
-                    3 * singfac[ipert, 3] * f_lower_interp[ipert, jpert, 2] +
-                    singfac[ipert, 4] * f_lower_interp[ipert, jpert, 1]
-            end
-            if ctrl.sing_order ≥ 4
-                f_lower[ipert, jpert, 5] =
-                    4 * singfac[ipert, 2] * f_lower_interp[ipert, jpert, 4] +
-                    6 * singfac[ipert, 3] * f_lower_interp[ipert, jpert, 3] +
-                    4 * singfac[ipert, 4] * f_lower_interp[ipert, jpert, 2]
-            end
-            if ctrl.sing_order ≥ 5
-                f_lower[ipert, jpert, 6] = 10 * singfac[ipert, 3] * f_lower_interp[ipert, jpert, 4] +
-                                           10 * singfac[ipert, 4] * f_lower_interp[ipert, jpert, 3]
-            end
-            if ctrl.sing_order ≥ 6
-                f_lower[ipert, jpert, 7] = 20 * singfac[ipert, 4] * f_lower_interp[ipert, jpert, 4]
+    for ipert_n in 1:intr.npert
+        for jpert_m in 1:intr.mpert
+            for ipert_m in jpert_m:min(intr.mpert, jpert_m + intr.mband)
+                ipert = ipert_m + (ipert_n - 1) * intr.mpert
+                jpert = jpert_m + (ipert_n - 1) * intr.mpert
+                f_lower[ipert, jpert, 1] = singfac[ipert, 1] * f_lower_interp[ipert, jpert, 1]
+                if ctrl.sing_order ≥ 1
+                    f_lower[ipert, jpert, 2] = singfac[ipert, 1] * f_lower_interp[ipert, jpert, 2] +
+                                            singfac[ipert, 2] * f_lower_interp[ipert, jpert, 1]
+                end
+                if ctrl.sing_order ≥ 2
+                    f_lower[ipert, jpert, 3] =
+                        singfac[ipert, 1] * f_lower_interp[ipert, jpert, 3] +
+                        2 * singfac[ipert, 2] * f_lower_interp[ipert, jpert, 2] +
+                        singfac[ipert, 3] * f_lower_interp[ipert, jpert, 1]
+                end
+                if ctrl.sing_order ≥ 3
+                    f_lower[ipert, jpert, 4] =
+                        singfac[ipert, 1] * f_lower_interp[ipert, jpert, 4] +
+                        3 * singfac[ipert, 2] * f_lower_interp[ipert, jpert, 3] +
+                        3 * singfac[ipert, 3] * f_lower_interp[ipert, jpert, 2] +
+                        singfac[ipert, 4] * f_lower_interp[ipert, jpert, 1]
+                end
+                if ctrl.sing_order ≥ 4
+                    f_lower[ipert, jpert, 5] =
+                        4 * singfac[ipert, 2] * f_lower_interp[ipert, jpert, 4] +
+                        6 * singfac[ipert, 3] * f_lower_interp[ipert, jpert, 3] +
+                        4 * singfac[ipert, 4] * f_lower_interp[ipert, jpert, 2]
+                end
+                if ctrl.sing_order ≥ 5
+                    f_lower[ipert, jpert, 6] = 10 * singfac[ipert, 3] * f_lower_interp[ipert, jpert, 4] +
+                                            10 * singfac[ipert, 4] * f_lower_interp[ipert, jpert, 3]
+                end
+                if ctrl.sing_order ≥ 6
+                    f_lower[ipert, jpert, 7] = 20 * singfac[ipert, 4] * f_lower_interp[ipert, jpert, 4]
+                end
             end
         end
     end
@@ -333,21 +339,27 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     # When we wrap the matrix multiplications later with Hermitian(ff),
     # Julia will handle filling the upper half via the Hermitian property
     # internally, just like LAPACK does in Fortran
+    # TODO: I have no idea if this is right or how it will generalize to 3D
     fac0 = 1
-    for n in 0:ctrl.sing_order
+    for order1 in 0:ctrl.sing_order
         fac1 = 1
-        for j in 0:n
-            for jpert in 1:intr.mpert
-                for ipert in jpert:min(intr.mpert, jpert + intr.mband)
-                    for kpert in max(1, ipert - intr.mband):jpert
-                        ff_lower[ipert, jpert, n+1] += fac1 * f_lower[ipert, kpert, j+1] * conj(f_lower[jpert, kpert, n-j+1])
+        for order2 in 0:order1
+            for ipert_n in 1:intr.npert
+                for jpert_m in 1:intr.mpert
+                    for ipert_m in jpert_m:min(intr.mpert, jpert_m + intr.mband)
+                        for kpert_m in max(1, ipert_m - intr.mband):jpert_m
+                            ipert = ipert_m + (ipert_n - 1) * intr.mpert
+                            jpert = jpert_m + (ipert_n - 1) * intr.mpert
+                            kpert = kpert_m + (ipert_n - 1) * intr.mpert
+                            ff_lower[ipert, jpert, order1+1] += fac1 * f_lower[ipert, kpert, order2+1] * conj(f_lower[jpert, kpert, order1-order2+1])
+                        end
                     end
                 end
+                fac1 *= (order1 - order2) / (order2 + 1)
             end
-            fac1 *= (n - j) / (j + 1)
         end
-        @views ff_lower[:, :, n+1] ./= fac0
-        fac0 *= (n + 1)
+        @views ff_lower[:, :, order1+1] ./= fac0
+        fac0 *= (order1 + 1)
     end
 
     # Compute non-Hermitian matrix K
@@ -413,7 +425,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     end
 
     # Compute zeroth-order x1
-    for isol in 1:msol
+    for isol in 1:2*intr.numpert_total
         @views x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
     end
     # f is prefactorized so can just use this calculation to get F⁻¹x
@@ -421,7 +433,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Compute higher-order x1
     for i in 1:ctrl.sing_order
-        for isol in 1:msol
+        for isol in 1:2*intr.numpert_total
             for j in 1:i
                 @views x[:, isol, 1, i+1] .-= Hermitian(ff_lower[:, :, j+1], :L) * x[:, isol, 1, i-j+1]
             end
@@ -432,7 +444,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Compute x2
     for i in 0:ctrl.sing_order
-        for isol in 1:msol
+        for isol in 1:2*intr.numpert_total
             for j in 0:i
                 x[:, isol, 2, i+1] .+= k[:, :, j+1]' * x[:, isol, 1, i-j+1]
             end
