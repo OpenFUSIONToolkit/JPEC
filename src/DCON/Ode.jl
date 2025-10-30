@@ -63,8 +63,6 @@ including solution vectors, tolerances, and flags for the integration process.
     tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert, mpert)
     Afact::Union{Cholesky{ComplexF64,Matrix{ComplexF64}},Nothing} = nothing
     singfac_vec::Vector{Float64} = Vector{Float64}(undef, mpert)
-
-    flag_count::Int = 0         # count of flags raised # TODO: remove this? Only used in ode_test if res_flag = true
 end
 
 # Base struct that handles storage of the ODE solution throughout integration
@@ -94,7 +92,7 @@ and output logic within a callback in the integration.
 
 ### TODOs
 
-Support for `res_flag` and `kin_flag`
+Support for `kin_flag`
 restype functionality if we decide to do this
 
 ### Returns
@@ -132,15 +130,12 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
 
     # If at a rational surface, do the appropriate crossing routine, then integrate again
     while odet.ising != ctrl.ksing && odet.next == "cross"
-        if ctrl.res_flag
-            error("res_flag = true not implemented yet!")
-        elseif ctrl.kin_flag
+        if ctrl.kin_flag
             error("kin_flag = true not implemented yet!")
         else
             ode_ideal_cross!(odet, ctrl, equil, ffit, intr, outp)
         end
 
-        odet.flag_count = 0
         ode_step!(odet, ctrl, equil, ffit, intr, outp)
     end
 
@@ -389,7 +384,7 @@ end
 """
     ode_ideal_cross!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
 
-Handle the crossing of a rational surface during ODE integration if both `res_flag` and `kin_flag` are false.
+Handle the crossing of a rational surface during ODE integration if `kin_flag` is false.
 Performs the same function as `ode_ideal_cross` in the Fortran code. Differences mainly in integration data
 storage logic, but otherwise identical. It normalizes and reinitializes the solution vector at the singularity,
 and updates relevant state variables and updates `odet` for continued integration. It also determines the
@@ -484,12 +479,6 @@ function ode_kin_cross()
     return
 end
 
-# Example stub for resistive crossing
-function ode_resist_cross()
-    # Implement resistive crossing logic here
-    return
-end
-
 """
     ode_step!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
 
@@ -560,7 +549,6 @@ by running LSODE in one step mode in the Fortran code.
 ### TODOs
 
 Check if additional output is needed at the start and end of integration
-Check if ode_test is actually needed for res_flag = true case
 """
 function integrator_callback!(integrator)
     ctrl, equil, ffit, intr, odet, outp = integrator.p
@@ -576,12 +564,15 @@ function integrator_callback!(integrator)
     ode_unorm!(odet, ctrl, intr, outp, false)
     integrator.u .= odet.u # Update integrator.u with normalized odet.u
 
-    # TODO: ode_test if res_flag = False effectively controls whether we print at the end of integration
-    # this then controls the output of ode_output_step and then has a break condition below
-    # Currently, all output logic is handled via psi_saves. There's a chance we will need other pieces
-    # of this ode_test logic (i.e. res_flag = True, compute powers) in the future, but for now this is sufficient
-    # force_output = ode_test(odet, intr, ctrl)
+    # Compute eigenvalues and check for zero crossing
+    # TODO: this logic can be updated - technically, if we save crit to memory,
+    # we could do all these calculations in post processing if a stability calculation
+    # is desired. If we keep it here, I'd rename to `check_for_zero_crossing` (what is
+    # current `ode_output_monitor`). A lot of `ode_output.f` has been deprecated due to
+    # in-memory integration
     ode_output_step(ctrl, equil, intr, odet, outp)
+    # Compute total dW in edge region (if `psiedge < psilim`)
+    # Same as above, this could technically be done in post processing if desired
     ode_record_edge_dW!(odet, ctrl, equil, ffit, intr)
 
     # Grow arrays if needed
@@ -727,14 +718,14 @@ function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp:
                 @warn "unorm storage reached, no longer saving fixfac data. Stability outputs and unorming will be correct, but cannot reconstruct `u`. \n
                 Increase `numunorms_init` in dcon.toml if needed. Automatic resizing will be added in a future version."
             end
-            ode_fixup!(odet, intr, outp, sing_flag, false)
+            ode_fixup!(odet, intr, outp, sing_flag)
             odet.new = true
         end
     end
 end
 
 """
-    ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool, test::Bool)
+    ode_fixup!(odet::OdeState, intr::DconInternal, sing_flag::Bool)
 
 Applies Gaussian reduction to orthogonalize solution vectors in `odet.u`. Performs
 the same function as `ode_fixup` in the Fortran code, except now `fixfac` and other
@@ -744,15 +735,11 @@ the spread in norms exceeds a threshold or when a rational surface is reached.
 ### TODOs
 
 Check if `secondary` logic is needed, currently always false
-Check if `test` logic is needed, currently always false (I don't think it ever is)
-Check if `flag_count` is used anywhere, currently always set to 0
 """
-function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_flag::Bool, test::Bool)
+function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_flag::Bool)
 
     # TODO: seems like secondary is always false in fortran DCON (unless manually changed). is this needed?
     secondary = false
-
-    # TODO: can test be removed if we aren't implementing ode_test_fixup?
 
     # Write to output
     if outp.write_crit_out
@@ -762,7 +749,6 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
             write_output(outp, :crit_out, "   psifac      dpsi        q       singfac     eval1\n")
         end
     end
-    odet.flag_count = 0 # TODO: is this used anywhere?
 
     # Store data for the current fixup
     ifix = odet.ifix
@@ -772,15 +758,13 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
     odet.fixstep[ifix] = odet.step - 1
 
     # Initialize fixfac
-    if !test
-        for isol in 1:odet.msol
-            odet.fixfac[isol, isol, ifix] = 1
-        end
-        # Sort unorm
-        odet.index[1:odet.msol, ifix] .= 1:odet.msol
-        odet.index[1:intr.mpert, ifix] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
-        odet.index[intr.mpert+1:odet.msol, ifix] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
+    for isol in 1:odet.msol
+        odet.fixfac[isol, isol, ifix] = 1
     end
+    # Sort unorm
+    odet.index[1:odet.msol, ifix] .= 1:odet.msol
+    odet.index[1:intr.mpert, ifix] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
+    odet.index[intr.mpert+1:odet.msol, ifix] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
 
     # Triangularize primary solutions
     mask = trues(2, odet.msol)
@@ -788,21 +772,15 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
     for isol in 1:intr.mpert
         ksol = odet.index[isol, ifix]
         mask[2, ksol] = false
-        if !test
-            # Find max location
-            @. @views masked = abs(odet.u[:, ksol, 1]) * mask[1, 1:intr.mpert]
-            @views kpert = argmax(masked)
-            mask[1, kpert] = false
-        end
+        # Find max location
+        @. @views masked = abs(odet.u[:, ksol, 1]) * mask[1, 1:intr.mpert]
+        @views kpert = argmax(masked)
+        mask[1, kpert] = false
         for jsol in 1:odet.msol
             if mask[2, jsol]
-                if !test
-                    odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
-                end
+                odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
                 @. @views odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
-                if !test
-                    odet.u[kpert, jsol, 1] = 0
-                end
+                odet.u[kpert, jsol, 1] = 0
             end
         end
     end
@@ -813,80 +791,18 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
         for isol in intr.mpert+1:odet.msol
             ksol = odet.index[isol, ifix]
             mask[2, ksol] = false
-            if !test
-                @. @views masked = abs(odet.u[:, ksol, 2]) * mask[1, 1:intr.mpert]
-                kpert = argmax(masked)
-                mask[1, kpert] = false
-            end
+            @. @views masked = abs(odet.u[:, ksol, 2]) * mask[1, 1:intr.mpert]
+            kpert = argmax(masked)
+            mask[1, kpert] = false
             for jsol in intr.mpert+1:odet.msol
                 if mask[2, jsol]
-                    if !test
-                        odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 2] / odet.u[kpert, ksol, 2]
-                    end
+                    odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 2] / odet.u[kpert, ksol, 2]
                     @. @views odet.u[:, jsol, :] = odet.u[:, jsol, :] + odet.u[:, ksol, :] * odet.fixfac[ksol, jsol, ifix]
-                    if !test
-                        odet.u[kpert, jsol, 2] = 0
-                    end
+                    odet.u[kpert, jsol, 2] = 0
                 end
             end
         end
     end
-end
-
-"""
-    ode_test(ctrl::DconControl, intr::DconInternal, odet::OdeState)::Bool
-
-Returns `true` if integration is complete or if any stopping criteria are met.
-The Fortran version of this function had more logic for stopping the integration
-which we do not include due to the callback structure of the Julia implementation.
-
-### TODOs
-
-Implement res_flag = true logic
-Determine if this function is ever needed (definitely not for res_flag = false case)
-"""
-function ode_test(ctrl::DconControl, intr::DconInternal, odet::OdeState)::Bool
-
-    # check if we are at end of integration
-    flag = odet.psifac == odet.psimax
-
-    # if not running with res_flag = true this function will exit and return flag here)
-    if !ctrl.res_flag || flag || odet.ising > intr.msing || odet.singfac > ctrl.singfac_max
-        return flag
-    end
-
-    @error "ode_test with res_flag = true not implemented yet!"
-    # TODO: none of this has been checked, wait until we implement res_flag = true
-    # ca_old .= ca           # Save previous surface ca
-    # sing_get_ca(ising, psifac, u, ca)    # Updates global ca
-    # dca = ca .- ca_old
-    # dsingfac = abs((singfac - singfac_old)/singfac)
-    # singfac_old = singfac
-
-    # power = zeros(Float64, msol)
-    # powmax_old = powmax
-    # for isol in 1:msol
-    #     # ca[:,isol,:]::matrix of size (mpert,2)
-    #     # Flatten the relevant slice for norm calculation
-    #     ca_isol = ca[:, isol, :]           # mpert × 2
-    #     dca_isol = dca[:, isol, :]
-    #     norm = abs(sum(conj.(ca_isol) .* ca_isol))
-    #     dnorm = abs(sum(conj.(ca_isol) .* dca_isol))
-    #     power[isol] = dnorm / (norm * dsingfac)
-    # end
-    # powmax = maximum(power)
-
-    # odet.flag_count += 1
-    # if odet.flag_count < 3
-    #     return flag
-    # end
-    # flag = flag || ((singfac < singfac_max) && (powmax > powmax_old))
-
-    # if ising == ksing
-    #     println(err_unit, float(log10(singfac)), "  ", float(log10(powmax)))
-    # end
-
-    # return flag
 end
 
 """

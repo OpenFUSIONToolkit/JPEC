@@ -41,7 +41,7 @@ end
 
         # Save copy of original u and run
         u_orig = copy(odet.u)
-        JPEC.DCON.ode_fixup!(odet, intr, outp, false, false)
+        JPEC.DCON.ode_fixup!(odet, intr, outp, false)
 
         # Very simple tests
         @test !all(odet.u .== u_orig)  # u should have changed
@@ -73,7 +73,7 @@ end
         odet.fixfac = zeros(ComplexF64, odet.msol, odet.msol, ifix)
         intr = JPEC.DCON.DconInternal(; mpert=msol)
 
-        JPEC.DCON.ode_fixup!(odet, intr, outp, false, false)
+        JPEC.DCON.ode_fixup!(odet, intr, outp, false)
 
         u_fortran = load_u_matrix(joinpath(@__DIR__, "test_data", "u_postfixup.dat"))
         # test that the outputs are approximately equivalent (1e-3 seems ok to account for loading differences)
