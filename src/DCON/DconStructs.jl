@@ -93,7 +93,6 @@ end
     numsteps_init::Int = 4000 # used to set initial size of data store in OdeState
     numunorms_init::Int = 100 # used to set initial size of saved unorm data in OdeState
     singfac_min::Float64 = 0.0
-    singfac_max::Float64 = 0.0
     cyl_flag::Bool = false
     set_psilim_via_dmlim::Bool = false # previously sas_flag, if true, determines psilim using outermost rational + dmlim
     dmlim::Float64 = 0.2 # % outside the last rational surface to go out to determine dW if set_psilim_via_dmlim is true
