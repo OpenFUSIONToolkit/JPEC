@@ -116,8 +116,6 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
     # Always integrate once, even if no rational surfaces are crossed
     ode_step!(odet, ctrl, equil, ffit, intr, outp)
     
-    error("at first rational")
-
     # If at a rational surface, do the appropriate crossing routine, then integrate again
     while odet.ising != ctrl.ksing && odet.next == "cross"
         if ctrl.res_flag
@@ -667,13 +665,13 @@ Add resizing logic for unorm arrays when ifix exceeds allocated size
 """
 function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp::DconOutput, sing_flag::Bool)
     # Compute norms of first solution vectors, abort if any are zero
-    for j in 1:intr.mpert
+    for j in 1:intr.mpert * intr.npert
         odet.unorm[j] = @views norm(odet.u[:, j, 1])
     end
-    for j in intr.mpert+1:odet.msol
+    for j in (intr.mpert * intr.npert + 1):odet.msol * intr.npert
         odet.unorm[j] = @views norm(odet.u[:, j, 2])
     end
-    umsol = @view(odet.unorm[1:odet.msol])
+    umsol = @view(odet.unorm[1:odet.msol * intr.npert])
     if minimum(umsol) == 0
         jmax = argmin(umsol)
         error("One of the first solution vector norms unorm(1,$jmax) = 0")
@@ -682,9 +680,9 @@ function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp:
     # Normalize unorm and perform Gaussian reduction if required
     if odet.new
         odet.new = false
-        odet.unorm0[1:odet.msol] .= umsol
+        odet.unorm0[1:odet.msol * intr.npert] .= umsol
     else
-        @views @. odet.unorm[1:odet.msol] = odet.unorm[1:odet.msol] / odet.unorm0[1:odet.msol]
+        @views @. odet.unorm[1:odet.msol * intr.npert] = odet.unorm[1:odet.msol * intr.npert] / odet.unorm0[1:odet.msol * intr.npert]
         uratio = maximum(umsol) / minimum(umsol)
         if uratio > ctrl.ucrit || sing_flag
             # TODO: add resizing logic here as well
@@ -694,6 +692,8 @@ function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp:
                 @warn "unorm storage reached, no longer saving fixfac data. Stability outputs and unorming will be correct, but cannot reconstruct `u`. \n
                 Increase `numunorms_init` in dcon.toml if needed. Automatic resizing will be added in a future version."
             end
+            # println("max u = $(maximum(abs, odet.u))")
+            # error("at fixup, psi = $(odet.psifac), q = $(odet.q), unorm ratio = $uratio")
             ode_fixup!(odet, intr, outp, sing_flag, false)
             odet.new = true
         end

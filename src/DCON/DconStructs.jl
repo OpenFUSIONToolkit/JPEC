@@ -70,6 +70,7 @@ end
     nlow::Int = 0
     nhigh::Int = 0
     npert::Int = 0 # npert = nhigh-nlow+1
+    numpert_total = 0 # numpert_total = mpert*npert
     equil_is_3D::Bool = false # something like this to differentiate between 2D and 3D equilibria when using multi n?
     vac_memory::Bool = true # TODO: most likely just remove, always true in ahg_flag is deprecated
     keq_out::Bool = false

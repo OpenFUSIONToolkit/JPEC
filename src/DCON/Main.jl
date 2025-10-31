@@ -109,7 +109,8 @@ function Main(path::String)
     intr.npert = intr.nhigh - intr.nlow + 1
 
     # Find all singular surfaces in the equilibrium
-    sing_find!(intr, ctrl, equil)
+    sing_find!(intr, equil)
+    display(intr.sing)
 
     # Determine poloidal mode numbers
     if ctrl.cyl_flag
@@ -133,6 +134,7 @@ function Main(path::String)
     end
     intr.mband = intr.mpert - 1 - ctrl.delta_mband
     intr.mband = min(max(intr.mband, 0), intr.mpert - 1)
+    intr.numpert_total = intr.mpert * intr.npert
 
     # Fit equilibrium quantities to Fourier-spline functions.
     if ctrl.mat_flag || ctrl.ode_flag
@@ -142,7 +144,7 @@ function Main(path::String)
             println("     betat = $(equil.params.betat), betan = $(equil.params.betan), betap1 = $(equil.params.betap1)")
             println("     mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
             println("     nlow = $(intr.nlow), nhigh = $(intr.nhigh), npert = $(intr.npert)")
-            println(" Fourier analysis of metric tensor components")
+            println("Fourier analysis of metric tensor components")
         end
 
         if outp.write_dcon_out
@@ -160,7 +162,7 @@ function Main(path::String)
         metric = make_metric(equil; mband=intr.mband, fft_flag=ctrl.fft_flag)
 
         if ctrl.verbose
-            println("Computing F, G, and K Matrices")
+            println("   Computing F, G, and K Matrices")
         end
 
         # Compute matrices and populate FourFitVars struct
