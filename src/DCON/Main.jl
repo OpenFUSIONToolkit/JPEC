@@ -87,23 +87,45 @@ function Main(path::String)
         write_output(outp, :dcon_out, @sprintf("%4s %12s %12s %12s %12s %12s %12s %12s %12s", "ipsi", "psifac", "f", "mu0 p", "dvdpsi", "q", "di", "dr", "ca1"))
     end
 
+    # Determine toroidal mode numbers
+    if ctrl.nn == 0 && ctrl.nn_low == ctrl.nn_high # single n mode
+        if ctrl.nn_low == 0
+            error("Need to specify at least one of nn, or nn_low/nn_high != 0 in dcon.toml")
+        else
+            @warn "nn_low and nn_high specified but equal, running with a single nn = nn_low = nn_high = $(ctrl.nn_low)"
+            intr.nlow = ctrl.nn_low
+            intr.nhigh = ctrl.nn_low
+            ctrl.nn = ctrl.nn_low # TODO: DEBUG ONLY UNTIL ALL CTRL.NNs HAVE BEEN REPLACED
+        end
+    elseif ctrl.nn != 0
+        intr.nlow = intr.nhigh = ctrl.nn
+        if ctrl.nn_low != 0 || ctrl.nn_high != 0
+            @warn "Both nn and nn_low/nn_high specified, proceeding with nn = $(ctrl.nn) only."
+        end
+    else
+        intr.nlow = ctrl.nn_low
+        intr.nhigh = ctrl.nn_high
+    end
+    intr.npert = intr.nhigh - intr.nlow + 1
+
     # Find all singular surfaces in the equilibrium
-    sing_find!(intr, ctrl, equil)
+    sing_find!(intr, equil)
+    display(intr.sing)
 
     # Determine poloidal mode numbers
     if ctrl.cyl_flag
         intr.mlow = ctrl.delta_mlow
         intr.mhigh = ctrl.delta_mhigh
     elseif ctrl.sing_start == 0
-        intr.mlow = min(ctrl.nn * equil.params.qmin, 0) - 4 - ctrl.delta_mlow
-        intr.mhigh = trunc(Int, ctrl.nn * equil.params.qmax) + ctrl.delta_mhigh
+        intr.mlow = min(intr.nlow * equil.params.qmin, 0) - 4 - ctrl.delta_mlow
+        intr.mhigh = trunc(Int, intr.nhigh * equil.params.qmax) + ctrl.delta_mhigh
     else
         intr.mmin = Inf # HUGE in Fortran
         for ising in Int(ctrl.sing_start):intr.msing
             intr.mmin = min(intr.mmin, sing[ising].m)
         end
         intr.mlow = intr.mmin - ctrl.delta_mlow
-        intr.mhigh = trunc(Int, intr.nn * equil.qmax) + ctrl.delta_mhigh
+        intr.mhigh = trunc(Int, intr.nhigh * equil.params.qmax) + ctrl.delta_mhigh
     end
     intr.mpert = intr.mhigh - intr.mlow + 1
     if ctrl.delta_mband >= intr.mpert
@@ -112,6 +134,7 @@ function Main(path::String)
     end
     intr.mband = intr.mpert - 1 - ctrl.delta_mband
     intr.mband = min(max(intr.mband, 0), intr.mpert - 1)
+    intr.numpert_total = intr.mpert * intr.npert
 
     # Fit equilibrium quantities to Fourier-spline functions.
     if ctrl.mat_flag || ctrl.ode_flag
@@ -119,17 +142,18 @@ function Main(path::String)
             println("     q0 = $(equil.params.q0), qmin = $(equil.params.qmin), qmax = $(equil.params.qmax), q95 = $(equil.params.q95)")
             println("     set_psilim_via_dmlim = $(ctrl.set_psilim_via_dmlim), dmlim = $(ctrl.dmlim), qlim = $(intr.qlim), psilim = $(intr.psilim)")
             println("     betat = $(equil.params.betat), betan = $(equil.params.betan), betap1 = $(equil.params.betap1)")
-            println("     nn = $(ctrl.nn), mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
-            println(" Fourier analysis of metric tensor components")
+            println("     mlow = $(intr.mlow), mhigh = $(intr.mhigh), mpert = $(intr.mpert), mband = $(intr.mband)")
+            println("     nlow = $(intr.nlow), nhigh = $(intr.nhigh), npert = $(intr.npert)")
+            println("Fourier analysis of metric tensor components")
         end
 
         if outp.write_dcon_out
-            write_output(outp, :dcon_out, @sprintf("\n   mlow   mhigh   mpert   mband   nn   lim_fl   dmlim      qlim      psilim"))
+            write_output(outp, :dcon_out, @sprintf("\n   mlow   mhigh   mpert   mband   nlow   nhigh   npert   lim_fl   dmlim      qlim      psilim"))
             write_output(
                 outp,
                 :dcon_out,
-                @sprintf("%6d %6d %6d %6d %6d %6s %11.3e %11.3e %11.3e",
-                    intr.mlow, intr.mhigh, intr.mpert, intr.mband, ctrl.nn,
+                @sprintf("%6d %6d %6d %6d %6d %6d %6d %6s %11.3e %11.3e %11.3e",
+                    intr.mlow, intr.mhigh, intr.mpert, intr.mband, intr.nlow, intr.nhigh, intr.npert,
                     string(ctrl.set_psilim_via_dmlim), ctrl.dmlim, intr.qlim, intr.psilim)
             )
         end
@@ -138,7 +162,7 @@ function Main(path::String)
         metric = make_metric(equil; mband=intr.mband, fft_flag=ctrl.fft_flag)
 
         if ctrl.verbose
-            println("Computing F, G, and K Matrices")
+            println("   Computing F, G, and K Matrices")
         end
 
         # Compute matrices and populate FourFitVars struct

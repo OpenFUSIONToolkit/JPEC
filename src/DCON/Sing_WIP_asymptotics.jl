@@ -259,17 +259,17 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Initial allocations
     q = @MVector zeros(Float64, 4)
-    singfac = zeros(Float64, intr.mpert, 4)
-    f_lower_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
-    g_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
-    k_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
-    f_lower = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
-    f0_lower = zeros(ComplexF64, intr.mpert, intr.mpert)
-    ff_lower = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
-    g_lower = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
-    k = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
-    v = zeros(ComplexF64, intr.mpert, 2 * intr.mpert, 2)
-    x = zeros(ComplexF64, intr.mpert, 2 * intr.mpert, 2, ctrl.sing_order + 1)
+    singfac = zeros(Float64, intr.numpert_total, 4)
+    f_lower_interp = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, 4)
+    g_interp = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, 4)
+    k_interp = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, 4)
+    f_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
+    f0_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total)
+    ff_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
+    g_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
+    k = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
+    v = zeros(ComplexF64, intr.numpert_total, 2 * intr.numpert_total, 2)
+    x = zeros(ComplexF64, intr.numpert_total, 2 * intr.numpert_total, 2, ctrl.sing_order + 1)
 
     singp = intr.sing[ising]
 
@@ -431,7 +431,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     end
 
     # Compute zeroth-order x1
-    for isol in 1:2*intr.mpert
+    for isol in 1:2*intr.numpert_total
         @views x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
     end
     # f is prefactorized so can just use this calculation to get F⁻¹x
@@ -439,7 +439,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Compute higher-order x1
     for i in 1:ctrl.sing_order
-        for isol in 1:2*intr.mpert
+        for isol in 1:2*intr.numpert_total
             for j in 1:i
                 @views x[:, isol, 1, i+1] .-= Hermitian(ff_lower[:, :, j+1], :L) * x[:, isol, 1, i-j+1]
             end
@@ -450,7 +450,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Compute x2
     for i in 0:ctrl.sing_order
-        for isol in 1:2*intr.mpert
+        for isol in 1:2*intr.numpert_total
             for j in 0:i
                 # TODO: should the ' be an adjoint here?
                 x[:, isol, 2, i+1] .+= k[:, :, j+1]' * x[:, isol, 1, i-j+1]
@@ -606,7 +606,7 @@ function sing_get_ca(ctrl::DconControl, intr::DconInternal, odet::OdeState)
     temp1[intr.mpert+1:2*intr.mpert, :] .= ua[:, :, 2]
 
     # Built temp2
-    temp2 = zeros(ComplexF64, 2 * intr.mpert, intr.mpert)
+    temp2 = zeros(ComplexF64, 2 * intr.mpert, odet.msol)
     temp2[1:intr.mpert, :] .= odet.u[:, :, 1]
     temp2[intr.mpert+1:2*intr.mpert, :] .= odet.u[:, :, 2]
 
@@ -614,9 +614,9 @@ function sing_get_ca(ctrl::DconControl, intr::DconInternal, odet::OdeState)
     temp2 .= lu(temp1) \ temp2
 
     # Build ca
-    ca = zeros(ComplexF64, intr.mpert, intr.mpert, 2)
-    ca[:, :, 1] .= temp2[1:intr.mpert, :]
-    ca[:, :, 2] .= temp2[intr.mpert+1:2*intr.mpert, :]
+    ca = zeros(ComplexF64, intr.mpert, 2 * intr.mpert, 2)
+    ca[:, 1:odet.msol, 1] .= temp2[1:intr.mpert, :]
+    ca[:, 1:odet.msol, 2] .= temp2[intr.mpert+1:2*intr.mpert, :]
 
     return ca
 end
@@ -650,8 +650,8 @@ more simplistic code with similar performance.
 
 ### Arguments
 
-  - `du::Array{ComplexF64,3}`: Pre-allocated array to hold the derivative result, shape (mpert, mpert, 2), updated in-place
-  - `u::Array{ComplexF64,3}`: Current state array, shape (mpert, mpert, 2)
+  - `du::Array{ComplexF64,3}`: Pre-allocated array to hold the derivative result, shape (mpert, msol, 2), updated in-place
+  - `u::Array{ComplexF64,3}`: Current state array, shape (mpert, msol, 2)
   - `params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, FourFitVars, DconInternal, OdeState, DconOutput}`: Tuple of relevant structs
   - `psieval::Float64`: Current psi value at which to evaluate the derivative
 
@@ -689,12 +689,12 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
         Spl.spline_eval!(odet.gmat, ffit.gmats, psieval)
         
         # Form full matrices from flat representations, either block-diagonal or full
-        amat = reshape(odet.amat, intr.numpert_total, intr.numpert_total)
-        bmat = reshape(odet.bmat, intr.numpert_total, intr.numpert_total)
-        cmat = reshape(odet.cmat, intr.numpert_total, intr.numpert_total)
-        fmat_lower = reshape(odet.fmat_lower, intr.numpert_total, intr.numpert_total)
-        kmat = reshape(odet.kmat, intr.numpert_total, intr.numpert_total)
-        gmat = reshape(odet.gmat, intr.numpert_total, intr.numpert_total)
+        amat = reconstruct_matrix_from_flat(odet.amat, intr.mpert, intr.npert, intr.equil_is_3D)
+        bmat = reconstruct_matrix_from_flat(odet.bmat, intr.mpert, intr.npert, intr.equil_is_3D)
+        cmat = reconstruct_matrix_from_flat(odet.cmat, intr.mpert, intr.npert, intr.equil_is_3D)
+        fmat_lower = reconstruct_matrix_from_flat(odet.fmat_lower, intr.mpert, intr.npert, intr.equil_is_3D)
+        kmat = reconstruct_matrix_from_flat(odet.kmat, intr.mpert, intr.npert, intr.equil_is_3D)
+        gmat = reconstruct_matrix_from_flat(odet.gmat, intr.mpert, intr.npert, intr.equil_is_3D)
 
         # ldiv!(A,B): Compute A \ B in-place and overwriting B to store the result,
         # where A is a factorization object.
@@ -729,9 +729,34 @@ function sing_der!(du::Array{ComplexF64,3}, u::Array{ComplexF64,3},
 
     # ud[1] = Ξ'_Ψ
     @views odet.ud[:, :, 1] .= du1
-    # ud[2] = Ξ_s = - A⁻¹(B * Ξ'_Ψ - C * Ξ_Ψ), equation 18 of Glasser 2016
+    # ud[2] = - A⁻¹(B * Ξ'_Ψ - C * Ξ_Ψ), equation 18 of Glasser 2016
     mul!(odet.tmp, bmat, du1)
     odet.ud[:, :, 2] .= .-odet.tmp
     mul!(odet.tmp, cmat, u1)
     @views odet.ud[:, :, 2] .-= odet.tmp
+end
+
+"""
+Helper: view the i-th diagonal block of a block-diagonal matrix A
+"""
+@inline function block_view(A::Matrix{ComplexF64}, i::Int, mpert::Int)
+    r = (i-1)*mpert + 1 : i*mpert
+    view(A, r, r)
+end
+
+"""
+    reconstruct_matrix_from_flat(flat::Matrix, mpert::Int, npert::Int, equil_is_3D::Bool)
+
+Rebuild the full matrix from its vectorized (flat) form. If the equilibrium is 3D and there is
+toroidal mode coupling, the full matrix is reconstructed. If the equilibrium is axisymmetric,
+the block-diagonal structure is restored.
+"""
+function reconstruct_matrix_from_flat(flat::Vector{ComplexF64}, mpert::Int, npert::Int, equil_is_3D::Bool)
+    if equil_is_3D
+        # assume flat has (mpsi × (mpert^2 * npert^2))
+        return reshape(flat, mpert*npert, mpert*npert)
+    else
+        # assume flat has (mpsi × (mpert^2 * npert))
+        return BlockDiagonal([reshape(flat[1+(i-1)*mpert^2:i*mpert^2], mpert, mpert) for i in 1:npert])
+    end
 end

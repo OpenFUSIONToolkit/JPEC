@@ -7,7 +7,8 @@
 # then creating them all at once after mpert is determined in dcon.jl
 # This wouldn't be as clean, but would allow preallocation. Does this greatly impact performance?
 @kwdef mutable struct SingType
-    m::Int = 0
+    m::Vector{Int} = Int[]
+    n::Vector{Int} = Int[]
     r1::Vector{Int} = [0]
     r2::Vector{Int} = [0, 0]
     psifac::Float64 = 0.0
@@ -47,10 +48,15 @@ end
 
 @kwdef mutable struct DconInternal
     dir_path::String = ""
-    mlow::Int = 0 #Copy of delta_mlow, but with limits enforced
-    mhigh::Int = 0 #Copy of delta_mhigh, but with limits enforced
-    mpert::Int = 0 #mpert = mhigh-mlow+1
-    mband::Int = 0 #mband = mpert-1-delta_mband
+    mlow::Int = 0
+    mhigh::Int = 0
+    mpert::Int = 0 # mpert = mhigh-mlow+1
+    mband::Int = 0 # mband = mpert-1-delta_mband
+    nlow::Int = 0
+    nhigh::Int = 0
+    npert::Int = 0 # npert = nhigh-nlow+1
+    numpert_total = 0 # numpert_total = mpert*npert
+    equil_is_3D::Bool = false # something like this to differentiate between 2D and 3D equilibria when using multi n?
     vac_memory::Bool = true # TODO: most likely just remove, always true in ahg_flag is deprecated
     keq_out::Bool = false
     theta_out::Bool = false
@@ -80,6 +86,8 @@ end
     mthvac::Int = 480
     sing_start::Int = 0
     nn::Int = 0
+    nn_low::Int = 0
+    nn_high::Int = 0
     delta_mlow::Int = 0
     delta_mhigh::Int = 0
     delta_mband::Int = 0
