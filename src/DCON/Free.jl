@@ -25,7 +25,7 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
     ahg_file = "ahg2msc_dcon.out" # Deprecated
 
     # Allocations
-    star = fill(' ', intr.mpert, odet.msol)
+    star = fill(' ', intr.mpert, intr.mpert)
     ep = zeros(ComplexF64, intr.mpert)
     ev = zeros(ComplexF64, intr.mpert)
     et = zeros(ComplexF64, intr.mpert)
@@ -293,7 +293,7 @@ function free_write_msc(psifac::Float64, ctrl::DconControl, equil::Equilibrium.P
 
     # Compute output
     qa = Spl.spline_eval!(equil.sq, psifac)[4]
-    for itheta in 1:equil.config.control.mtheta + 1
+    for itheta in 1:equil.config.control.mtheta+1
         f = Spl.bicube_eval!(equil.rzphi, psifac, theta_norm[itheta])
         rfac[itheta] = sqrt(f[1])
         angle[itheta] = 2π * (theta_norm[itheta] + f[2])
