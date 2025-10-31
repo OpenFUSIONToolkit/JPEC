@@ -1,5 +1,5 @@
 """
-    free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutput; op_netcdf_out::Bool=false)
+    free_run!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput; op_netcdf_out::Bool=false)
 
 Compute the free boundary energies using VACUUM. Performs the same function as `free_run`
 in the Fortran code, except now all data is passed in memory instead of via files.
@@ -13,7 +13,7 @@ Remove ahg and ahb related logic
 Check if normalize is ever false, currently always true, and if not, remove related logic
 """
 
-function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, odet::OdeState, outp::DconOutput; op_netcdf_out::Bool=false)
+function free_run!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput; op_netcdf_out::Bool=false)
 
     # TODO: it looks like vac_memory is always true - remove all ahg things and just assume true?
     vac_memory = true
@@ -173,6 +173,15 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
         VacuumMod.unset_dcon_params()
     end
 
+    # Normalize eigenvectors based on scaled wt
+    coeffs = odet.u[:,:,1,end] \ (wt .* (2π * equil.psio * 1e-3))
+    for istep in 1:odet.step
+        odet.u_store[:, :, 1, istep] .= odet.u_store[:, :, 1, istep] * coeffs
+        odet.u_store[:, :, 2, istep] .= odet.u_store[:, :, 2, istep] * coeffs
+        odet.ud_store[:, :, 1, istep] .= odet.ud_store[:, :, 1, istep] * coeffs
+        odet.ud_store[:, :, 2, istep] .= odet.ud_store[:, :, 2, istep] * coeffs
+    end
+
     # Write to euler.h5
     if outp.write_euler_h5
         # We open in r+ mode to add to the existing file from ode_output_init instead of overwriting it
@@ -183,6 +192,10 @@ function free_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit:
             euler_h5["vacuum/ev"] = ev
             euler_h5["vacuum/et"] = et
             euler_h5["vacuum/wv_farwall_flag"] = ctrl.wv_farwall_flag
+            euler_h5["integration/xi_psi"] = odet.u_store[:, :, 1, :]
+            euler_h5["integration/u2"] = odet.u_store[:, :, 2, :] # TODO: what to name this? These are the "conjugate momenta" of u1
+            euler_h5["integration/dxi_psi"] = odet.ud_store[:, :, 1, :]
+            euler_h5["integration/xi_s"] = odet.ud_store[:, :, 2, :]
         end
     end
 
