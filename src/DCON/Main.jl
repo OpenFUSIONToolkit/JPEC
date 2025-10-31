@@ -197,7 +197,7 @@ function Main(path::String)
         if ctrl.verbose
             println("Computing free boundary energies")
         end
-        plasma1, vacuum1, total1 = free_run(ctrl, equil, ffit, intr, odet, outp; op_netcdf_out=false) # outp.netcdf_out)
+        plasma1, vacuum1, total1 = free_run!(odet, ctrl, equil, ffit, intr, outp; op_netcdf_out=false) # outp.netcdf_out)
     end
 
     # Output results of fixed-boundary stability calculations

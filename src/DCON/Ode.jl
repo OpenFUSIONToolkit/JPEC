@@ -164,8 +164,12 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
             euler_h5["integration/nstep"] = odet.step
             euler_h5["integration/psi"] = odet.psi_store
             euler_h5["integration/q"] = Spl.spline_eval(equil.sq, odet.psi_store, 0)[4]
-            euler_h5["integration/u"] = odet.u_store
-            euler_h5["integration/ud"] = odet.ud_store
+            if !ctrl.vac_flag # we normalize by wt before dumping if calling free_run
+                euler_h5["integration/xi_psi"] = odet.u_store[:, :, 1, :]
+                euler_h5["integration/u2"] = odet.u_store[:, :, 2, :] # TODO: what to name this? These are the "conjugate momenta" of u1
+                euler_h5["integration/dxi_psi"] = odet.ud_store[:, :, 1, :]
+                euler_h5["integration/xi_s"] = odet.ud_store[:, :, 2, :]
+            end
             euler_h5["singular/msing"] = intr.msing
             euler_h5["singular/psi"] = [intr.sing[ising].psifac for ising in 1:intr.msing]
             euler_h5["singular/q"] = [intr.sing[ising].q for ising in 1:intr.msing]
