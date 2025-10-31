@@ -148,10 +148,6 @@ function Main(path::String)
             error("kin_flag not implemented yet")
         end
         sing_scan!(intr, ctrl, equil, ffit, outp)
-        # TODO: implement resist_eval at some point, not urgent for initial functionality.
-        # for ising in 1:msing
-        #  resist_eval(sing[ising])
-        # end
         if ctrl.kin_flag
             # ksing_find()
         end
