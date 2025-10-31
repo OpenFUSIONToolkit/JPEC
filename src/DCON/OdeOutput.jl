@@ -262,7 +262,7 @@ function ode_output_get_crit(psi::Float64, u::Array{ComplexF64,3}, mpert::Int, n
     profiles = Spl.spline_eval!(sq, psi)
     q = profiles[4]
     logpsi = log10(psi)
-    crit = evalsi[indexi[1]]* profiles[3]^2
+    crit = evalsi[indexi[1]] * profiles[3]^2
 
     return q, logpsi, crit
 end

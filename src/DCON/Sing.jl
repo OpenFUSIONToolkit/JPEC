@@ -259,17 +259,17 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Initial allocations
     q = @MVector zeros(Float64, 4)
-    singfac = zeros(Float64, intr.numpert_total, 4)
-    f_lower_interp = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, 4)
-    g_interp = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, 4)
-    k_interp = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, 4)
-    f_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
-    f0_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total)
-    ff_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
-    g_lower = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
-    k = zeros(ComplexF64, intr.numpert_total, intr.numpert_total, ctrl.sing_order + 1)
-    v = zeros(ComplexF64, intr.numpert_total, 2 * intr.numpert_total, 2)
-    x = zeros(ComplexF64, intr.numpert_total, 2 * intr.numpert_total, 2, ctrl.sing_order + 1)
+    singfac = zeros(Float64, intr.mpert, 4)
+    f_lower_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
+    g_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
+    k_interp = zeros(ComplexF64, intr.mpert, intr.mpert, 4)
+    f_lower = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
+    f0_lower = zeros(ComplexF64, intr.mpert, intr.mpert)
+    ff_lower = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
+    g_lower = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
+    k = zeros(ComplexF64, intr.mpert, intr.mpert, ctrl.sing_order + 1)
+    v = zeros(ComplexF64, intr.mpert, 2 * intr.mpert, 2)
+    x = zeros(ComplexF64, intr.mpert, 2 * intr.mpert, 2, ctrl.sing_order + 1)
 
     singp = intr.sing[ising]
 
@@ -431,7 +431,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
     end
 
     # Compute zeroth-order x1
-    for isol in 1:2*intr.numpert_total
+    for isol in 1:2*intr.mpert
         @views x[:, isol, 1, 1] .= v[:, isol, 2] .- k[:, :, 1] * v[:, isol, 1]
     end
     # f is prefactorized so can just use this calculation to get F⁻¹x
@@ -439,7 +439,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Compute higher-order x1
     for i in 1:ctrl.sing_order
-        for isol in 1:2*intr.numpert_total
+        for isol in 1:2*intr.mpert
             for j in 1:i
                 @views x[:, isol, 1, i+1] .-= Hermitian(ff_lower[:, :, j+1], :L) * x[:, isol, 1, i-j+1]
             end
@@ -450,7 +450,7 @@ function sing_mmat!(intr::DconInternal, ctrl::DconControl, equil::Equilibrium.Pl
 
     # Compute x2
     for i in 0:ctrl.sing_order
-        for isol in 1:2*intr.numpert_total
+        for isol in 1:2*intr.mpert
             for j in 0:i
                 # TODO: should the ' be an adjoint here?
                 x[:, isol, 2, i+1] .+= k[:, :, j+1]' * x[:, isol, 1, i-j+1]
@@ -650,8 +650,8 @@ more simplistic code with similar performance.
 
 ### Arguments
 
-  - `du::Array{ComplexF64,3}`: Pre-allocated array to hold the derivative result, shape (mpert, msol, 2), updated in-place
-  - `u::Array{ComplexF64,3}`: Current state array, shape (mpert, msol, 2)
+  - `du::Array{ComplexF64,3}`: Pre-allocated array to hold the derivative result, shape (mpert, mpert, 2), updated in-place
+  - `u::Array{ComplexF64,3}`: Current state array, shape (mpert, mpert, 2)
   - `params::Tuple{DconControl, Equilibrium.PlasmaEquilibrium, FourFitVars, DconInternal, OdeState, DconOutput}`: Tuple of relevant structs
   - `psieval::Float64`: Current psi value at which to evaluate the derivative
 
