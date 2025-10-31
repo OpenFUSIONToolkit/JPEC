@@ -9,9 +9,7 @@ including solution vectors, tolerances, and flags for the integration process.
 # cause issues in ode_resist_cross, there's some logic I don't understand there where msol is increased, will need careful thinking
 @kwdef mutable struct OdeState
     # Initialization parameters
-    mpert::Int                  # poloidal mode number count
-    msol::Int                   # number of solutions
-    npert::Int                  # toroidal mode number count
+    numpert_total::Int                  # poloidal mode number count
     numunorms_init::Int             # initial storage size for unorm data
     msing::Int                   # number of singular surfaces
     numsteps_init::Int             # initial size of data store
@@ -19,13 +17,13 @@ including solution vectors, tolerances, and flags for the integration process.
     # Saved data throughout integration
     step::Int = 1                    # current step of integration (this is like istep in Fortran)
     psi_store::Vector{Float64} = Vector{Float64}(undef, numsteps_init)  # psi at each step of integration
-    u_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert * npert, mpert * npert, 2, numsteps_init) # store of u at each step of integration
-    ud_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert * npert, mpert * npert, 2, numsteps_init) # store of ud at each step of integration
-    ca_r::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, msing) # asymptotic coefficients just right of singular surface
-    ca_l::Array{ComplexF64,4} = Array{ComplexF64}(undef, mpert, 2 * mpert, 2, msing) # asymptotic coefficients just left of singular surface
-    index::Array{Int,2} = zeros(Int, mpert * npert, numunorms_init)                                   # indices for sorting solutions
+    u_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, numpert_total, numpert_total, 2, numsteps_init) # store of u at each step of integration
+    ud_store::Array{ComplexF64,4} = Array{ComplexF64}(undef, numpert_total, numpert_total, 2, numsteps_init) # store of ud at each step of integration
+    ca_r::Array{ComplexF64,4} = Array{ComplexF64}(undef, numpert_total, numpert_total, 2, msing) # asymptotic coefficients just right of singular surface
+    ca_l::Array{ComplexF64,4} = Array{ComplexF64}(undef, numpert_total, numpert_total, 2, msing) # asymptotic coefficients just left of singular surface
+    index::Array{Int,2} = zeros(Int, numpert_total, numunorms_init)                                   # indices for sorting solutions
     sing_flag::Vector{Bool} = falses(numunorms_init)                     # flags for singular solutions
-    fixfac::Array{ComplexF64,3} = zeros(ComplexF64, mpert * npert, mpert * npert, numunorms_init)             # fixup factors for Gaussian reduction
+    fixfac::Array{ComplexF64,3} = zeros(ComplexF64, numpert_total, numpert_total, numunorms_init)             # fixup factors for Gaussian reduction
     fixstep::Vector{Int64} = zeros(Int64, numunorms_init)               # psi values at which unorms were performed
 
     # Used for to find peak dW in the edge
@@ -36,38 +34,38 @@ including solution vectors, tolerances, and flags for the integration process.
     # Data for integrator
     psifac::Float64 = 0.0       # normalized flux coordinate
     q::Float64 = 0.0            # q value at psifac
-    u::Array{ComplexF64,3} = zeros(ComplexF64, mpert * npert, mpert * npert, 2)            # solution vectors
-    ud::Array{ComplexF64,3} = zeros(ComplexF64, mpert * npert, mpert * npert, 2)           # derivative of solution vectors used in GPEC
+    u::Array{ComplexF64,3} = zeros(ComplexF64, numpert_total, numpert_total, 2)            # solution vectors
+    ud::Array{ComplexF64,3} = zeros(ComplexF64, numpert_total, numpert_total, 2)           # derivative of solution vectors used in GPEC
     ising::Int = 0               # index of next singular surface
     psimax::Float64 = 0.0         # maximum psi value for the integrator
     next::String = ""           # next integration action ("cross" or "finish")
     psi_prev::Float64 = 0.0     # previous psi value
     crit_prev::Float64 = 0.0    # previous crit value
-    u_prev::Array{ComplexF64,3} = zeros(ComplexF64, mpert * npert, mpert * npert, 2) # previous solution array
+    u_prev::Array{ComplexF64,3} = zeros(ComplexF64, numpert_total, numpert_total, 2) # previous solution array
     nzero::Int = 0              # count of zero crossings detected
 
     # Used for Gaussian reduction
     new::Bool = true            # flag for computing new unorm0 after a fixup
-    unorm::Vector{Float64} = zeros(Float64, 2 * mpert * npert)                        # norms of solution vectors
-    unorm0::Vector{Float64} = zeros(Float64, 2 * mpert * npert)                       # initial norms of solution vectors
+    unorm::Vector{Float64} = zeros(Float64, numpert_total)                        # norms of solution vectors
+    unorm0::Vector{Float64} = zeros(Float64, numpert_total)                       # initial norms of solution vectors
     ifix::Int = 0                # index for number of unorms performed
 
     # Temporary matrices for sing_der calculations
-    amat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
-    bmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
-    cmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
-    fmat_lower::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
-    kmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
-    gmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, mpert^2 * npert)
-    tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, mpert * npert, mpert * npert)
+    amat::Vector{ComplexF64} = Vector{ComplexF64}(undef, numpert_total^2)
+    bmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, numpert_total^2)
+    cmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, numpert_total^2)
+    fmat_lower::Vector{ComplexF64} = Vector{ComplexF64}(undef, numpert_total^2)
+    kmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, numpert_total^2)
+    gmat::Vector{ComplexF64} = Vector{ComplexF64}(undef, numpert_total^2)
+    tmp::Matrix{ComplexF64} = Matrix{ComplexF64}(undef, numpert_total, numpert_total)
     Afact::Union{Cholesky{ComplexF64, Matrix{ComplexF64}}, Cholesky{ComplexF64, BlockDiagonals.BlockDiagonal{ComplexF64, Matrix{ComplexF64}}}, Nothing} = nothing
-    singfac_vec::Vector{Float64} = Vector{Float64}(undef, mpert * npert)
+    singfac_vec::Vector{Float64} = Vector{Float64}(undef, numpert_total)
 
     flag_count::Int = 0         # count of flags raised # TODO: remove this? Only used in ode_test if res_flag = true
 end
 
 # Initialize function for OdeState with relevant parameters for array initialization
-OdeState(mpert::Int, msol::Int, npert::Int, numsteps_init::Int, numunorms_init::Int, msing::Int) = OdeState(; mpert, msol, npert, numsteps_init, numunorms_init, msing)
+OdeState(numpert_total::Int, numsteps_init::Int, numunorms_init::Int, msing::Int) = OdeState(; numpert_total, numsteps_init, numunorms_init, msing)
 
 """
     `ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, intr::DconInternal)`
@@ -91,7 +89,7 @@ An OdeState struct containing the final state of the ODE solver after integratio
 function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::FourFitVars, intr::DconInternal, outp::DconOutput)
 
     # Initialization
-    odet = OdeState(intr.mpert, intr.mpert, intr.npert, ctrl.numsteps_init, ctrl.numunorms_init, intr.msing)
+    odet = OdeState(intr.numpert_total, ctrl.numsteps_init, ctrl.numunorms_init, intr.msing)
     if ctrl.sing_start <= 0
         ode_axis_init!(odet, ctrl, equil, intr)
     elseif ctrl.sing_start <= intr.msing
@@ -160,7 +158,6 @@ function ode_run(ctrl::DconControl, equil::Equilibrium.PlasmaEquilibrium, ffit::
             # Output psilim and qlim here in case they were changed due to peak edge dW search
             euler_h5["info/psilim"] = intr.psilim
             euler_h5["info/qlim"] = intr.qlim
-            euler_h5["integration/msol"] = odet.msol
             euler_h5["integration/nstep"] = odet.step
             euler_h5["integration/psi"] = odet.psi_store
             euler_h5["integration/q"] = Spl.spline_eval(equil.sq, odet.psi_store, 0)[4]
@@ -290,7 +287,6 @@ function ode_axis_init!(odet::OdeState, ctrl::DconControl, equil::Equilibrium.Pl
             odet.u[ipert + (jpert - 1) * intr.mpert, ipert + (jpert - 1) * intr.mpert, 2] = 1
         end
     end
-    odet.msol = intr.mpert
     odet.u_prev .= odet.u
     odet.psi_prev = odet.psifac
 end
@@ -669,25 +665,19 @@ Add resizing logic for unorm arrays when ifix exceeds allocated size
 """
 function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp::DconOutput, sing_flag::Bool)
     # Compute norms of first solution vectors, abort if any are zero
-    for j in 1:intr.mpert * intr.npert
-        odet.unorm[j] = @views norm(odet.u[:, j, 1])
-    end
-    for j in (intr.mpert * intr.npert + 1):odet.msol * intr.npert
-        odet.unorm[j] = @views norm(odet.u[:, j, 2])
-    end
-    umsol = @view(odet.unorm[1:odet.msol * intr.npert])
-    if minimum(umsol) == 0
-        jmax = argmin(umsol)
+    odet.unorm .= norm.(eachcol(odet.u[:, :, 1]))
+    if minimum(odet.unorm) == 0
+        jmax = argmin(odet.unorm)
         error("One of the first solution vector norms unorm(1,$jmax) = 0")
     end
 
     # Normalize unorm and perform Gaussian reduction if required
     if odet.new
         odet.new = false
-        odet.unorm0[1:odet.msol * intr.npert] .= umsol
+        odet.unorm0 .= odet.unorm
     else
-        @views @. odet.unorm[1:odet.msol * intr.npert] = odet.unorm[1:odet.msol * intr.npert] / odet.unorm0[1:odet.msol * intr.npert]
-        uratio = maximum(umsol) / minimum(umsol)
+        odet.unorm ./= odet.unorm0
+        uratio = maximum(odet.unorm) / minimum(odet.unorm)
         if uratio > ctrl.ucrit || sing_flag
             # TODO: add resizing logic here as well
             if odet.ifix < ctrl.numunorms_init
@@ -696,8 +686,6 @@ function ode_unorm!(odet::OdeState, ctrl::DconControl, intr::DconInternal, outp:
                 @warn "unorm storage reached, no longer saving fixfac data. Stability outputs and unorming will be correct, but cannot reconstruct `u`. \n
                 Increase `numunorms_init` in dcon.toml if needed. Automatic resizing will be added in a future version."
             end
-            # println("max u = $(maximum(abs, odet.u))")
-            # error("at fixup, psi = $(odet.psifac), q = $(odet.q), unorm ratio = $uratio")
             ode_fixup!(odet, intr, outp, sing_flag, false)
             odet.new = true
         end
@@ -743,29 +731,25 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
     odet.fixstep[ifix] = odet.step - 1
 
     # Initialize fixfac
-    if !test
-        for isol in 1:odet.msol
-            odet.fixfac[isol, isol, ifix] = 1
-        end
-        # Sort unorm
-        odet.index[1:odet.msol, ifix] .= 1:odet.msol
-        odet.index[1:intr.mpert, ifix] .= sortperm_subrange(odet.unorm, 1:intr.mpert) # in original Fortran: bubble(unorm, index, 1, mpert)
-        odet.index[intr.mpert+1:odet.msol, ifix] .= sortperm_subrange(odet.unorm, intr.mpert+1:odet.msol) # in original Fortran: bubble(unorm, index, mpert + 1, msol)
+    for isol in 1:intr.numpert_total
+        odet.fixfac[isol, isol, ifix] = 1
     end
+    # Sort unorm in descending order (since we triangularize from largest to smallest)
+    odet.index[:, ifix] = sortperm(odet.unorm; rev=true)
 
     # Triangularize primary solutions
-    mask = trues(2, odet.msol)
-    masked = zeros(typeof(abs(odet.u[1, 1, 1])), intr.mpert)
-    for isol in 1:intr.mpert
+    mask = trues(2, intr.numpert_total)
+    masked = zeros(typeof(abs(odet.u[1, 1, 1])), intr.numpert_total)
+    for isol in 1:intr.numpert_total
         ksol = odet.index[isol, ifix]
         mask[2, ksol] = false
         if !test
             # Find max location
-            @. @views masked = abs(odet.u[:, ksol, 1]) * mask[1, 1:intr.mpert]
+            @. @views masked = abs(odet.u[:, ksol, 1]) * mask[1, 1:intr.numpert_total]
             @views kpert = argmax(masked)
             mask[1, kpert] = false
         end
-        for jsol in 1:odet.msol
+        for jsol in 1:intr.numpert_total
             if mask[2, jsol]
                 if !test
                     odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 1] / odet.u[kpert, ksol, 1]
@@ -773,31 +757,6 @@ function ode_fixup!(odet::OdeState, intr::DconInternal, outp::DconOutput, sing_f
                 @. @views odet.u[:, jsol, :] .= odet.u[:, jsol, :] .+ odet.u[:, ksol, :] .* odet.fixfac[ksol, jsol, ifix]
                 if !test
                     odet.u[kpert, jsol, 1] = 0
-                end
-            end
-        end
-    end
-
-    # Triangularize secondary solutions
-    if odet.msol > intr.mpert && secondary
-        mask .= trues(2, odet.msol)
-        for isol in intr.mpert+1:odet.msol
-            ksol = odet.index[isol, ifix]
-            mask[2, ksol] = false
-            if !test
-                @. @views masked = abs(odet.u[:, ksol, 2]) * mask[1, 1:intr.mpert]
-                kpert = argmax(masked)
-                mask[1, kpert] = false
-            end
-            for jsol in intr.mpert+1:odet.msol
-                if mask[2, jsol]
-                    if !test
-                        odet.fixfac[ksol, jsol, ifix] = -odet.u[kpert, jsol, 2] / odet.u[kpert, ksol, 2]
-                    end
-                    @. @views odet.u[:, jsol, :] = odet.u[:, jsol, :] + odet.u[:, ksol, :] * odet.fixfac[ksol, jsol, ifix]
-                    if !test
-                        odet.u[kpert, jsol, 2] = 0
-                    end
                 end
             end
         end
@@ -948,7 +907,7 @@ function transform_u!(odet::OdeState, intr::DconInternal)
     for ifix in 1:odet.ifix
         gauss[:, :, ifix] = copy(identity)
         mask .= true
-        for isol in 1:odet.msol
+        for isol in 1:intr.mpert
             ksol = odet.index[isol, ifix]
             mask[ksol] = false
             temp = copy(identity)
