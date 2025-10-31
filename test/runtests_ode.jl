@@ -100,7 +100,7 @@ end
         @test odet.unorm[1:intr.mpert] ≈ [1, 1]
 
         # Case 4: Trigger fixup via ucrit
-        odet.unorm0 = ones(2 * intr.mpert)
+        odet.unorm0 = ones(intr.mpert)
         odet.u[:, 1, 1] .= [1000, 0]   # large norm
         odet.u[:, 2, 1] .= [1, 0]      # small norm
         JPEC.DCON.ode_unorm!(odet, ctrl, intr, outp, false)
