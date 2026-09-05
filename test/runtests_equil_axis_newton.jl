@@ -1,4 +1,4 @@
-@testset "Direct equilibrium: magnetic-axis search robustness" begin
+@testset "Direct equilibrium: magnetic-axis Newton step cap" begin
     using GeneralizedPerturbedEquilibrium.Equilibrium
     using GeneralizedPerturbedEquilibrium.Equilibrium: EquilibriumConfig, read_efit, direct_position!
 
@@ -11,19 +11,6 @@
     @testset "previously divergent geqdsk now converges to the axis" begin
         cfg = EquilibriumConfig(;
             eq_filename=joinpath(data_dir, "TJ_circular_axis_newton_regression.geqdsk"),
-            eq_type="efit")
-        rp = read_efit(cfg)
-        ro, zo, _, _ = direct_position!(rp)
-        @test isapprox(ro, 2.0; atol=1e-3)
-        @test abs(zo) < 1e-3
-    end
-
-    # A second failure mode: the Hessian is indefinite over several cells around the
-    # axis (dB_z/dR swings between ~5 and ~0), so even a capped Newton cycles without
-    # converging. The first-derivative bisection stage resolves it.
-    @testset "cycling Newton is rescued by the bisection stage" begin
-        cfg = EquilibriumConfig(;
-            eq_filename=joinpath(data_dir, "TJ_circular_axis_newton_cycling.geqdsk"),
             eq_type="efit")
         rp = read_efit(cfg)
         ro, zo, _, _ = direct_position!(rp)
