@@ -31,21 +31,29 @@ function parse_args(args)
     while i <= length(args)
         a = args[i]
         if a == "--list"
-            opts["list"] = abspath(args[i+1]); i += 2
+            opts["list"] = abspath(args[i+1])
+            i += 2
         elseif a == "--root"
-            opts["root"] = abspath(args[i+1]); i += 2
+            opts["root"] = abspath(args[i+1])
+            i += 2
         elseif a == "--out"
-            opts["out"] = abspath(args[i+1]); i += 2
+            opts["out"] = abspath(args[i+1])
+            i += 2
         elseif a == "--template"
-            opts["template"] = abspath(args[i+1]); i += 2
+            opts["template"] = abspath(args[i+1])
+            i += 2
         elseif a == "--workers"
-            opts["workers"] = parse(Int, args[i+1]); i += 2
+            opts["workers"] = parse(Int, args[i+1])
+            i += 2
         elseif a == "--threads"
-            opts["threads"] = parse(Int, args[i+1]); i += 2
+            opts["threads"] = parse(Int, args[i+1])
+            i += 2
         elseif a == "--timeout"
-            opts["timeout"] = parse(Float64, args[i+1]); i += 2
+            opts["timeout"] = parse(Float64, args[i+1])
+            i += 2
         elseif a == "--limit"
-            opts["limit"] = parse(Int, args[i+1]); i += 2
+            opts["limit"] = parse(Int, args[i+1])
+            i += 2
         else
             error("unknown argument $a")
         end
@@ -77,16 +85,19 @@ function main(args)
     template = corpus_template(opts["template"])
     exeflags = ["--project=$(Base.active_project())", "--threads=$(opts["threads"])"]
 
-    # Worker-side case runner; defined on each worker after it is spawned.
-    worker_setup = quote
+    # Worker-side case runner; the imports are evaluated first so the macros below resolve.
+    worker_imports = quote
         using LinearAlgebra, TOML, Printf
         using GeneralizedPerturbedEquilibrium
+    end
+    worker_setup = quote
         const GPE = GeneralizedPerturbedEquilibrium
         const FFS = GPE.ForceFreeStates
         function read_q_profile(path)
             lines = readlines(path)
             hdr = lines[1]
-            nw = parse(Int, hdr[53:56]); nh = parse(Int, hdr[57:60])
+            nw = parse(Int, hdr[53:56])
+            nh = parse(Int, hdr[57:60])
             nums = Float64[]
             for l in lines[2:end]
                 for m in eachmatch(r"[-+]?\d*\.\d+(?:[eE][-+]?\d+)?", l)
@@ -137,11 +148,26 @@ function main(args)
                 total_steps=odet.total_steps, t_equil, t_prep, t_int, t_free, t_dp,
                 et1=get(et, 1, NaN), et2=get(et, 2, NaN), et3=get(et, 3, NaN), dp, message="")
         end
+        # Errors are turned into a row on the worker: a raised exception would carry method
+        # instances the driver process cannot deserialize.
+        function run_case_safe(geqdsk::String, template::Dict{String,Any})
+            t0 = time()
+            try
+                return run_case(geqdsk, template)
+            catch err
+                msg = first(sprint(showerror, err), 400)
+                return (status="failed", elapsed=time() - t0, nw=0, q0=NaN, qmin=NaN, psi_qmin=NaN, qedge=NaN, N=0, msing=0, surfaces="",
+                    total_steps=0, t_equil=NaN, t_prep=NaN, t_int=NaN, t_free=NaN, t_dp=NaN, et1=NaN, et2=NaN, et3=NaN, dp="", message=msg)
+            end
+        end
+        nothing  # the eval's return value travels back to the driver; a function object would not deserialize there
     end
 
     function spawn_worker()
         pid = only(addprocs(1; exeflags=exeflags))
+        remotecall_fetch(Core.eval, pid, Main, worker_imports)
         remotecall_fetch(Core.eval, pid, Main, worker_setup)
+        remotecall_fetch(Core.eval, pid, Main, :(const TEMPLATE = $template))
         return pid
     end
 
@@ -149,11 +175,15 @@ function main(args)
     println(io, HEADER)
     flush(io)
     write_row(idx, rel, r) = begin
-        println(io, join([idx, rel, r.status, @sprintf("%.1f", r.elapsed), r.nw, @sprintf("%.4f", r.q0), @sprintf("%.4f", r.qmin),
-            @sprintf("%.3f", r.psi_qmin), @sprintf("%.3f", r.qedge), r.N, r.msing, r.surfaces, r.total_steps,
-            @sprintf("%.2f", r.t_equil), @sprintf("%.2f", r.t_prep), @sprintf("%.2f", r.t_int), @sprintf("%.2f", r.t_free),
-            @sprintf("%.2f", r.t_dp), @sprintf("%.8e", r.et1), @sprintf("%.8e", r.et2), @sprintf("%.8e", r.et3), r.dp,
-            replace(r.message, "," => ";", "\n" => " ")], ","))
+        println(
+            io,
+            join(
+                [idx, rel, r.status, @sprintf("%.1f", r.elapsed), r.nw, @sprintf("%.4f", r.q0), @sprintf("%.4f", r.qmin),
+                    @sprintf("%.3f", r.psi_qmin), @sprintf("%.3f", r.qedge), r.N, r.msing, r.surfaces, r.total_steps,
+                    @sprintf("%.2f", r.t_equil), @sprintf("%.2f", r.t_prep), @sprintf("%.2f", r.t_int), @sprintf("%.2f", r.t_free),
+                    @sprintf("%.2f", r.t_dp), @sprintf("%.8e", r.et1), @sprintf("%.8e", r.et2), @sprintf("%.8e", r.et3), r.dp,
+                    replace(r.message, "," => ";", "\n" => " ")], ",")
+        )
         flush(io)
     end
     blank(status, elapsed, msg) = (status, elapsed, nw=0, q0=NaN, qmin=NaN, psi_qmin=NaN, qedge=NaN, N=0, msing=0, surfaces="", total_steps=0,
@@ -172,7 +202,7 @@ function main(args)
             for (idx, rel) in queue
                 path = joinpath(opts["root"], rel)
                 t0 = time()
-                task = @async remotecall_fetch(Main.run_case, pid, path, template)
+                task = @async remotecall_fetch(Core.eval, pid, Main, :(run_case_safe($path, TEMPLATE)))
                 while !istaskdone(task) && time() - t0 < opts["timeout"]
                     sleep(1)
                 end
@@ -180,7 +210,7 @@ function main(args)
                     try
                         fetch(task)
                     catch err
-                        blank("failed", time() - t0, sprint(showerror, err)[1:min(end, 300)])
+                        blank("failed", time() - t0, first(sprint(showerror, err), 300))
                     end
                 else
                     rmprocs(pid; waitfor=5)
