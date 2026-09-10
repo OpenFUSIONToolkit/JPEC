@@ -95,9 +95,11 @@ function main(args)
         const FFS = GPE.ForceFreeStates
         function read_q_profile(path)
             lines = readlines(path)
-            hdr = lines[1]
-            nw = parse(Int, hdr[53:56])
-            nh = parse(Int, hdr[57:60])
+            # nw, nh are the last two integers of the header line; the leading label field is
+            # not column-aligned across EFIT and TokaMaker writers.
+            ints = [parse(Int, m.match) for m in eachmatch(r"(?<![\d.eE+-])\d+(?![\d.eE+-])", lines[1])]
+            length(ints) >= 2 || error("cannot read nw, nh from geqdsk header: $(lines[1])")
+            nw, nh = ints[end-1], ints[end]
             nums = Float64[]
             for l in lines[2:end]
                 for m in eachmatch(r"[-+]?\d*\.\d+(?:[eE][-+]?\d+)?", l)
@@ -163,12 +165,37 @@ function main(args)
         nothing  # the eval's return value travels back to the driver; a function object would not deserialize there
     end
 
+    os_pids = Dict{Int,Int}()
+
     function spawn_worker()
         pid = only(addprocs(1; exeflags=exeflags))
+        os_pids[pid] = remotecall_fetch(getpid, pid)
         remotecall_fetch(Core.eval, pid, Main, worker_imports)
         remotecall_fetch(Core.eval, pid, Main, worker_setup)
         remotecall_fetch(Core.eval, pid, Main, :(const TEMPLATE = $template))
         return pid
+    end
+
+    # A worker stuck inside a solve does not answer the cooperative shutdown and `rmprocs` then
+    # throws; SIGKILL the OS process so one pathological equilibrium cannot end the whole sweep.
+    function kill_worker(pid)
+        try
+            rmprocs(pid; waitfor=5)
+        catch
+            ospid = get(os_pids, pid, 0)
+            if ospid > 0
+                try
+                    run(`kill -9 $ospid`)
+                catch
+                end
+            end
+            try
+                rmprocs(pid; waitfor=0)
+            catch
+            end
+        end
+        delete!(os_pids, pid)
+        return nothing
     end
 
     io = open(opts["out"], "w")
@@ -202,25 +229,28 @@ function main(args)
             for (idx, rel) in queue
                 path = joinpath(opts["root"], rel)
                 t0 = time()
-                task = @async remotecall_fetch(Core.eval, pid, Main, :(run_case_safe($path, TEMPLATE)))
+                # The task must never throw: killing a timed-out worker makes its pending
+                # fetch fail, and an exception here would escape @sync and end the sweep.
+                task = @async try
+                    remotecall_fetch(Core.eval, pid, Main, :(run_case_safe($path, TEMPLATE)))
+                catch err
+                    err
+                end
                 while !istaskdone(task) && time() - t0 < opts["timeout"]
                     sleep(1)
                 end
                 r = if istaskdone(task)
-                    try
-                        fetch(task)
-                    catch err
-                        blank("failed", time() - t0, first(sprint(showerror, err), 300))
-                    end
+                    out = fetch(task)
+                    out isa Exception ? blank("failed", time() - t0, first(sprint(showerror, out), 300)) : out
                 else
-                    rmprocs(pid; waitfor=5)
+                    kill_worker(pid)
                     pid = spawn_worker()
                     blank("timeout", time() - t0, "exceeded $(opts["timeout"]) s")
                 end
                 @lock lock write_row(idx, rel, r)
                 @printf("%3d/%d %-8s %6.1fs  %s\n", idx, length(files), r.status, r.elapsed, rel)
             end
-            rmprocs(pid)
+            kill_worker(pid)
         end
     end
     close(io)
