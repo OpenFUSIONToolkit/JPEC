@@ -10,6 +10,12 @@ Reference: [Logan et al., Phys. Plasmas 20, 122507 (2013)]
 Ports Fortran torque.F90 lines 530-816.
 """
 
+# Guard against a non-terminating spline cell walk; θ grids are O(10²) cells.
+const MAX_SPLINE_CELLS = 100_000
+# Stationary points closer than this in θ are the same root seen from both sides
+# of a cell boundary.
+const EXTREMUM_MERGE_TOL = 1e-12
+
 # ============================================================================
 # BounceData struct
 # ============================================================================
@@ -208,6 +214,12 @@ function compute_bounce_data(
     # Per-surface scratch, reused across all λ.
     scr = BounceScratch(ntheta, mpert)
 
+    # Stationary points of B(θ) bound the intervals on which B is monotone. They
+    # depend only on the surface, so enumerate them once here rather than
+    # rescanning [0,1] for every λ.
+    ext = _b_field_extrema(B_vpar)
+    bpts_buf = Float64[]
+
     # Trapped-passing boundary and λ range
     lmdatpb = bo / bmax
     lmdamax = bo / bmin
@@ -241,7 +253,7 @@ function compute_bounce_data(
 
         # Find bounce points and build θ sub-grid
         _, _, tdt_pts, tdt_wts = _find_bounce_points_and_grid(
-            lmda, bo, sigma, B_vpar, theta_bmax, psi, ntheta)
+            lmda, bo, sigma, B_vpar, theta_bmax, psi, ntheta, ext, bpts_buf)
 
         # Bounce integrals over θ (Fortran lines 674-735)
         wbbar, wdbar, dJdJ_val, wmats_lmda = _bounce_integrate(
@@ -418,20 +430,130 @@ consistent with the bounce-point roots as in Fortran's `vspl`.
 
 
 """
+    BFieldExtrema
+
+Stationary points of the periodic cubic `B_vpar` on θ ∈ [0,1), with `B` cached at
+each one. Consecutive points bound intervals on which `B` is monotone, so every
+interval holds at most one bounce point and supplies a guaranteed bracket.
+Built once per flux surface in `compute_bounce_data` and reused for every λ.
+
+## Fields
+- `theta::Vector{Float64}`: stationary points, sorted ascending, in [0,1)
+- `bval::Vector{Float64}`: `B_vpar` evaluated at each stationary point
+"""
+struct BFieldExtrema
+    theta::Vector{Float64}
+    bval::Vector{Float64}
+end
+
+"""
+Enumerate the stationary points of the cubic `B_vpar` exactly, by walking its cells
+and solving the quadratic dS/dθ = 0 on each. Uses only the public `coeffs`/`CellPoly`
+interface, so it holds for whatever θ grid the surface interpolant was built on.
+"""
+function _b_field_extrema(B_vpar)
+    theta = Float64[]
+    x = 0.0
+    ncell = 0
+    while true
+        cell = coeffs(B_vpar, x)
+        h = cell.xR - cell.xL
+        _, c, b, a = cell.p
+        # S(u) = d + c·u + b·u² + a·u³ ⇒ S'(u) = c + 2b·u + 3a·u², u = θ − xL ∈ [0, h)
+        qa, qb, qc = 3a, 2b, c
+        if abs(qa) <= eps(Float64) * max(abs(qb), abs(qc), 1.0)
+            if qb != 0
+                u = -qc / qb
+                (0.0 <= u < h) && push!(theta, cell.xL + u)
+            end
+        else
+            disc = qb^2 - 4 * qa * qc
+            if disc >= 0
+                sq = sqrt(disc)
+                for u in ((-qb - sq) / (2qa), (-qb + sq) / (2qa))
+                    (0.0 <= u < h) && push!(theta, cell.xL + u)
+                end
+            end
+        end
+        cell.xR >= 1.0 && break
+        x = cell.xR
+        ncell += 1
+        ncell > MAX_SPLINE_CELLS && error("ERROR: _b_field_extrema - cell walk did not reach θ=1")
+    end
+
+    sort!(theta)
+    # A root sitting on a cell boundary can be reported by both neighbouring cells.
+    if length(theta) > 1
+        keep = 1
+        for i in 2:length(theta)
+            if theta[i] - theta[keep] > EXTREMUM_MERGE_TOL
+                keep += 1
+                theta[keep] = theta[i]
+            end
+        end
+        resize!(theta, keep)
+    end
+
+    return BFieldExtrema(theta, [B_vpar(t) for t in theta])
+end
+
+"""
+Bounce points of `v_par(θ) = 1 − (λ/bo)·B(θ)` for a trapped particle, found by
+bracketed solves on the monotone intervals between stationary points of `B`.
+`B = bo/λ` at a bounce point, so an interval brackets one iff `bo/λ` lies strictly
+between its endpoint `B` values — a scalar test against the cached values, with no
+spline evaluation per λ. Returns roots sorted descending, matching the order the
+deepest-well and marginally-trapped logic downstream assumes. An empty or
+single-element result signals a degenerate λ and sends the caller to the fallback.
+"""
+function _bounce_points_from_extrema!(bpts::Vector{Float64}, ext::BFieldExtrema,
+                                      lmda::Float64, bo::Float64, B_vpar)
+    empty!(bpts)
+    k = length(ext.theta)
+    k < 2 && return bpts
+
+    btarget = bo / lmda
+    for i in 1:k
+        j = i == k ? 1 : i + 1
+        fa = ext.bval[i] - btarget
+        fb = ext.bval[j] - btarget
+        fa * fb < 0 || continue
+        # The last interval wraps through the θ = 0/1 seam; _vpar_from_spline takes
+        # mod(θ, 1), so B is continuous across it for the periodic fit.
+        ta = ext.theta[i]
+        tb = i == k ? ext.theta[1] + 1.0 : ext.theta[j]
+        root = Roots.find_zero(θ -> _vpar_from_spline(B_vpar, lmda, bo, θ), (ta, tb), Roots.Brent())
+        push!(bpts, mod(root, 1.0))
+    end
+
+    sort!(bpts; rev=true)
+    return bpts
+end
+
+
+"""
 Find bounce points for trapped/passing particles and build θ sub-grid.
 Returns (t1, t2, theta_points, theta_weights).
 """
 function _find_bounce_points_and_grid(
     lmda::Float64, bo::Float64, sigma::Int,
     B_vpar, theta_bmax::Float64, psi::Float64,
-    ntheta::Int
+    ntheta::Int, ext::BFieldExtrema, bpts_buf::Vector{Float64}
 )
     if sigma == 0  # trapped
         # Bounce points: all roots of v_par(θ) = 1 − (λ/bo)·B_vpar(θ) in (0,1),
         # sorted descending — the same order as Fortran spline_roots, which the
         # marginally-trapped and deepest-well wrap logic below assume.
-        vpar_fn = θ -> _vpar_from_spline(B_vpar, lmda, bo, θ)
-        bpts = sort!(Roots.find_zeros(vpar_fn, 0.0, 1.0); rev=true)
+        bpts = _bounce_points_from_extrema!(bpts_buf, ext, lmda, bo, B_vpar)
+
+        if length(bpts) < 2
+            # Degenerate λ: v_par is tangent to zero at an extremum of B (so no
+            # interval brackets strictly), or B has fewer than two stationary
+            # points. Rare — the λ grid excludes both trapped-passing endpoints —
+            # so fall back to the adaptive whole-interval scan and keep its behaviour.
+            vpar_fn = θ -> _vpar_from_spline(B_vpar, lmda, bo, θ)
+            bpts = sort!(Roots.find_zeros(vpar_fn, 0.0, 1.0); rev=true)
+        end
 
         nbpts = length(bpts)
         if nbpts < 1
