@@ -133,6 +133,83 @@
     end
 
     # =========================================================================
+    # Bounce-point root finding
+    # =========================================================================
+    @testset "bounce-point enumeration" begin
+        # Multi-well periodic B(θ): three distinct wells of unequal depth, so the
+        # deepest-well selection and the wrap through θ = 0/1 are both exercised.
+        xs = collect(range(0.0, 1.0; length=257))
+        B_vals = @. 2.0 + 0.4 * cos(2pi * xs) + 0.12 * cos(4pi * xs + 0.7) + 0.05 * sin(6pi * xs)
+        B_vals[end] = B_vals[1]
+        B_vpar = cubic_interp(xs, B_vals; bc=PeriodicBC())
+        bo = 2.0
+
+        ext = KF._b_field_extrema(B_vpar)
+
+        @testset "stationary points are exact" begin
+            # A periodic function has an even number of stationary points per period.
+            @test iseven(length(ext.theta))
+            @test length(ext.theta) >= 2
+            @test issorted(ext.theta)
+            @test all(0.0 .<= ext.theta .< 1.0)
+            # dB/dθ vanishes at each, and the cached B values match the spline.
+            dB = deriv1(B_vpar)
+            scale = maximum(abs, B_vals)
+            for (θ, b) in zip(ext.theta, ext.bval)
+                @test abs(dB(θ)) < 1e-8 * scale
+                @test b ≈ B_vpar(θ) rtol=1e-14
+            end
+            # Every stationary point of a dense derivative sign scan is accounted for.
+            dense = range(0.0, 1.0; length=20001)
+            dv = [dB(x) for x in dense]
+            nsign = count(i -> dv[i] * dv[i+1] < 0, 1:length(dv)-1)
+            @test length(ext.theta) == nsign
+        end
+
+        @testset "agrees with the adaptive scan across λ" begin
+            # The bracketed solver must reproduce Roots.find_zeros over the whole
+            # trapped range, including λ pushed against both boundaries where the
+            # two roots straddling an extremum are arbitrarily close together.
+            bmax = maximum(ext.bval)
+            bmin = minimum(ext.bval)
+            lmdatpb = bo / bmax
+            lmdamax = bo / bmin
+            lambdas = collect(range(lmdatpb * (1 + 1e-6), lmdamax * (1 - 1e-6); length=200))
+            for eps in (1e-3, 1e-6, 1e-9, 1e-12)
+                push!(lambdas, lmdatpb * (1 + eps))
+                push!(lambdas, lmdamax * (1 - eps))
+            end
+
+            buf = Float64[]
+            for lmda in lambdas
+                new_roots = copy(KF._bounce_points_from_extrema!(buf, ext, lmda, bo, B_vpar))
+                ref_roots = sort!(KF.Roots.find_zeros(θ -> KF._vpar_from_spline(B_vpar, lmda, bo, θ), 0.0, 1.0); rev=true)
+                # Fewer than two roots is the documented degenerate signal, where
+                # the caller falls back to the adaptive scan.
+                length(new_roots) < 2 && continue
+                @test length(new_roots) == length(ref_roots)
+                if length(new_roots) == length(ref_roots)
+                    @test all(abs.(new_roots .- ref_roots) .< 1e-9)
+                end
+                # Roots are returned in the descending order downstream assumes.
+                @test issorted(new_roots; rev=true)
+                # v_par vanishes at each root.
+                for θ in new_roots
+                    @test abs(KF._vpar_from_spline(B_vpar, lmda, bo, θ)) < 1e-10
+                end
+            end
+        end
+
+        @testset "degenerate λ signals the fallback" begin
+            # λ below the trapped-passing boundary puts bo/λ above every B, so no
+            # interval brackets and the caller is told to fall back.
+            buf = Float64[]
+            bmax = maximum(ext.bval)
+            @test length(KF._bounce_points_from_extrema!(buf, ext, 0.5 * bo / bmax, bo, B_vpar)) < 2
+        end
+    end
+
+    # =========================================================================
     # Resonance root solver
     # =========================================================================
     @testset "find_resonance_energies" begin
