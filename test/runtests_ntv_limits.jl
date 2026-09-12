@@ -54,6 +54,10 @@ using LinearAlgebra
         @test all(.!isnan.(curve.current_ntv[curve.delta_ef.<lim.with_ntv]))
         @test all(curve.current_ntv[.!isnan.(curve.current_ntv)] .>= curve.current_linear[.!isnan.(curve.current_ntv)] .- 1e-12)
         @test curve.with_ntv == lim.with_ntv && curve.torque_only == lim.torque_only
+        # A negative torque (the other rotation sense) consumes the budget like a positive one.
+        negative = EF.EFCCoupling("z", c.delta_per_kat, 40.0, -c.torque_full_per_kat2, -c.torque_residual_per_kat2)
+        @test EF.max_correctable_overlap(negative; delta_threshold=δt, torque_budget=T0) == lim
+        @test EF.correction_current(2δt, negative; delta_threshold=δt, torque_budget=T0) == EF.correction_current(2δt, c; delta_threshold=δt, torque_budget=T0)
         no_torque = EF.EFCCoupling("y", c.delta_per_kat, 40.0, 0.0, 0.0)
         @test EF.max_correctable_overlap(no_torque; delta_threshold=δt, torque_budget=T0) == (; with_ntv=Inf, torque_only=Inf)
     end

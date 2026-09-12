@@ -267,7 +267,12 @@ to a largest correctable overlap. `[ErrorFields.NTV]` names the correction array
 evaluates each one's `C_c`, resonant fraction, and NTV torque per kAt² for its whole field and
 for its field with the dominant mode projected out — two plasma-response evaluations of the
 unit-current spectrum followed by the kinetic torque, which needs a `[KineticForces]` section —
-and writes `ErrorFields/NTV/`. Torque budget, threshold and safety factor are analysis choices:
+and writes `ErrorFields/NTV/`. The spectrum is evaluated on the run's `[ForcingTerms]` boundary
+grid and normalized by the magnitude of the array's ampere-turns, `|nw| × max|I|`, so the winding
+sense and current pattern of the deck stay the phase reference; the torques are stored with their
+sign, and the limits consume the budget with their magnitude (the sign depends on the rotation
+and on conventions, so a negative torque is never read as no torque). Torque budget, threshold
+and safety factor are analysis choices:
 
 ```toml
 [ErrorFields.NTV]

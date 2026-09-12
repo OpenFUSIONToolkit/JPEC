@@ -46,8 +46,11 @@ The couplings of one correction coil array, per kilo-ampere-turn of its current 
   - `coil_name`: the array
   - `delta_per_kat`: dominant-mode overlap `|δ|` per kAt (`C_c`)
   - `overlap_percent`: resonant fraction of the array's field, `100·|Vᴴb̃|/‖b̃‖`
-  - `torque_full_per_kat2`: NTV torque of the whole field per kAt², N·m
-  - `torque_residual_per_kat2`: NTV torque of the field with the dominant mode projected out, per kAt², N·m
+  - `torque_full_per_kat2`: NTV torque of the whole field per kAt², N·m, with its sign
+  - `torque_residual_per_kat2`: NTV torque of the field with the dominant mode projected out, per kAt², N·m, with its sign
+
+The sign of an NTV torque depends on the rotation and on conventions; the limits below consume
+the budget with the torque's magnitude and never treat a negative torque as no torque.
 """
 struct EFCCoupling
     coil_name::String
@@ -83,7 +86,7 @@ function correction_current(δ_ef::Real, c::EFCCoupling; delta_threshold::Real, 
     excess = δ_ef - target
     excess <= 0 && return 0.0
     ntv || return excess / c.delta_per_kat
-    a = target * c.torque_residual_per_kat2 / torque_budget
+    a = target * abs(c.torque_residual_per_kat2) / torque_budget
     a == 0 && return excess / c.delta_per_kat
     disc = c.delta_per_kat^2 - 4a * excess
     disc < 0 && return NaN
@@ -100,8 +103,9 @@ exhausts the budget, `C_c √(T_0 / T_full)`.
 """
 function max_correctable_overlap(c::EFCCoupling; delta_threshold::Real, torque_budget::Real, safety_factor::Real=1.0)
     target = safety_factor * delta_threshold
-    with_ntv = c.torque_residual_per_kat2 > 0 ? target + c.delta_per_kat^2 * torque_budget / (4 * target * c.torque_residual_per_kat2) : Inf
-    torque_only = c.torque_full_per_kat2 > 0 ? c.delta_per_kat * sqrt(torque_budget / c.torque_full_per_kat2) : Inf
+    t_res, t_full = abs(c.torque_residual_per_kat2), abs(c.torque_full_per_kat2)
+    with_ntv = t_res > 0 ? target + c.delta_per_kat^2 * torque_budget / (4 * target * t_res) : Inf
+    torque_only = t_full > 0 ? c.delta_per_kat * sqrt(torque_budget / t_full) : Inf
     return (; with_ntv, torque_only)
 end
 

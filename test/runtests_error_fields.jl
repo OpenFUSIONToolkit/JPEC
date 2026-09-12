@@ -216,7 +216,7 @@ include("h5_metadata_check.jl")
             curve = EF.efc_current_curve(c; delta_threshold=risk.threshold_nominal, torque_budget=1.0)
             @test length(curve.delta_ef) == 500 && all(curve.current_linear .>= 0)
             @test GPEC.Analysis.ErrorFields.plot_efc_ntv_limits(h5path; torque_budget=1.0, save_path=joinpath(dir, "ntv.png")) isa Plots.Plot
-            @test_throws ErrorException GPEC.efc_couplings(ffs, sets, rc, dom, GPEC.KineticForces.KineticForcesControl(), nothing)
+            @test_throws ErrorException GPEC.efc_couplings(ffs, sets, rc, dom, cfg, GPEC.KineticForces.KineticForcesControl(), nothing)
 
             # Central differences: doubling the step moves the derivatives at O(h²).
             coarse = EF.compute_coil_sensitivities(sets, rc, ffs.equil, cfg,

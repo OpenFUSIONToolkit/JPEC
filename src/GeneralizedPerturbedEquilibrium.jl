@@ -1090,7 +1090,7 @@ function run_error_fields(
         missing = setdiff(ntv_ctrl.efc_coils, [cs.name for cs in efc_sets])
         isempty(missing) || error("[ErrorFields.NTV] efc_coils not among the run's coil sets: $(join(missing, ", "))")
         ntv_start = time()
-        couplings = efc_couplings(result, efc_sets, rc, dom, kf_ctrl, kinetic_profiles; method=ntv_ctrl.method, verbose=ntv_ctrl.verbose)
+        couplings = efc_couplings(result, efc_sets, rc, dom, cfg, kf_ctrl, kinetic_profiles; method=ntv_ctrl.method, verbose=ntv_ctrl.verbose)
         @info "NTV couplings of $(length(couplings)) correction arrays in $(@sprintf("%.1f", time() - ntv_start)) s"
     end
 
@@ -1113,21 +1113,26 @@ function run_error_fields(
 end
 
 """
-    efc_couplings(ffs, coil_sets, rc, dom, kf_ctrl, kinetic_profiles; mode=1, method="fgar", verbose=false) -> Vector{ErrorFields.EFCCoupling}
+    efc_couplings(ffs, coil_sets, rc, dom, cfg, kf_ctrl, kinetic_profiles; mode=1, method="fgar", verbose=false) -> Vector{ErrorFields.EFCCoupling}
 
 The couplings of each correction coil array in `coil_sets` per kilo-ampere-turn: its
 dominant-mode overlap and resonant fraction from its spectrum on the control surface, and its
 NTV torque for the whole field and for the field with mode `mode` of `dom` projected out. The
 torque is a quadratic form of the applied spectrum, so each is one plasma-response evaluation
 of the unit-current spectrum (injected as forcing modes, nothing written) followed by the
-kinetic torque of `method`; both scale exactly with the square of the current. `rc` must be
-the coupling of `ffs`'s own solve and `kinetic_profiles` its kinetic context.
+kinetic torque of `method`; both scale exactly with the square of the current. `cfg` is the
+run's `[ForcingTerms]` coil configuration, so the boundary grid matches the one the run's
+sensitivities were evaluated on; `rc` must be the coupling of `ffs`'s own solve and
+`kinetic_profiles` its kinetic context. The spectrum is normalized by the magnitude of the
+array's ampere-turns, `|nw| × max|I|`, keeping its winding sense and current pattern as the
+phase reference; the torque is stored with its sign.
 """
 function efc_couplings(
     ffs::ForceFreeStatesResult,
     coil_sets::Vector{ForcingTerms.CoilSet},
     rc::PerturbedEquilibrium.ResonantCoupling,
     dom::PerturbedEquilibrium.DominantCoupling,
+    cfg::ForcingTerms.CoilConfig,
     kf_ctrl::KineticForces.KineticForcesControl,
     kinetic_profiles;
     mode::Int=1,
@@ -1136,7 +1141,6 @@ function efc_couplings(
 )
     kinetic_profiles === nothing && error("efc_couplings needs kinetic profiles: add a [KineticForces] section with a kinetic_file")
     getfield(kf_ctrl, Symbol(method * "_flag")) || error("efc_couplings: KineticForces method \"$method\" is not enabled in the control")
-    cfg = ForcingTerms.CoilConfig(; mtheta_coil=480, nzeta_coil=0)
     grids = [(n, ForcingTerms.CoilForcingGrid(ffs.equil, cfg, n; psi=ffs.psilim)) for n in sort(unique(rc.n_modes))]
     m_low, m_high = extrema(rc.m_modes)
     v = dom.right_singular_vectors[:, mode]
