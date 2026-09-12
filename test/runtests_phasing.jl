@@ -49,6 +49,17 @@ using LinearAlgebra
         @test 0 < v_o <= 100 + 1e-9 && length(ph) == 2
     end
 
+    @testset "winding sense is kept in the map" begin
+        # The same geometry with a negative winding multiplier is the same array wound the other
+        # way: its per-kAt spectrum flips sign, so the map is the original one rotated by 180°.
+        flipped = EF.CoilSensitivities(sens.coil_names, sens.m_modes, sens.n_modes, b_t0, hcat(b1, -b2, b3), sens.shift_sensitivity, sens.tilt_sensitivity,
+            sens.shift_linearity_residual, sens.tilt_linearity_residual, sens.peak_current, [10.0, -5.0, 4.0])
+        m0 = EF.phasing_map(sens, dom, ["L", "M"]; nphase=36)
+        m1 = EF.phasing_map(flipped, dom, ["L", "M"]; nphase=36)
+        @test m1.delta_per_kat ≈ circshift(m0.delta_per_kat, 18)
+        @test m1.delta_per_kat_each ≈ m0.delta_per_kat_each
+    end
+
     @testset "guards" begin
         @test_throws ArgumentError EF.phasing_map(sens, dom, ["L"])
         @test_throws ArgumentError EF.phasing_map(sens, dom, ["L", "X"])

@@ -40,10 +40,17 @@ end
 
 Scan the relative phases of the current patterns of the named coil arrays and evaluate, at
 each grid point, the dominant-mode overlap per kilo-ampere-turn and the resonant fraction of
-the applied field. Each array's spectrum is its stored nominal spectrum divided by its
-ampere-turns (`winding_multiplier × peak_current`); rotating a current pattern by `Δφ`
-multiplies the spectrum by `e^{iΔφ}` (the phase of the pattern itself, `n` times the toroidal
-angle it is rotated through). `nphase` points per phase axis, spanning `[0, 360)` degrees.
+the applied field. Rotating a current pattern by `Δφ` multiplies the spectrum by `e^{iΔφ}` (the
+phase of the pattern itself, `n` times the toroidal angle it is rotated through). `nphase`
+points per phase axis, spanning `[0, 360)` degrees.
+
+Each array's spectrum is its stored nominal spectrum divided by the magnitude of its
+ampere-turns, `|winding_multiplier| × peak_current`. The zero of each phase axis is therefore
+the array's current pattern exactly as the run specified it, with the winding sense of its
+geometry file included: a negative winding multiplier and a negated current pattern each
+remain in the map as the half-turn they physically are. Normalizing by the signed product
+would erase how the device defines positive current in that array, which is device-specific
+information the map must keep.
 """
 function phasing_map(sens::CoilSensitivities, dom::DominantCoupling, coil_names::AbstractVector{<:AbstractString}; mode::Int=1, nphase::Int=180)
     length(coil_names) >= 2 || throw(ArgumentError("phasing_map needs at least two coil arrays"))
@@ -53,7 +60,7 @@ function phasing_map(sens::CoilSensitivities, dom::DominantCoupling, coil_names:
     any(isnothing, idx) && throw(ArgumentError("coil arrays not in the sensitivities: $(join(coil_names[isnothing.(idx)], ", "))"))
     v = dom.right_singular_vectors[:, mode]
     N = length(idx)
-    kat = [sens.winding_multiplier[i] * sens.peak_current[i] / 1e3 for i in idx]
+    kat = [abs(sens.winding_multiplier[i]) * sens.peak_current[i] / 1e3 for i in idx]
     all(>(0), kat) || throw(ArgumentError("every array needs a non-zero current to normalize per kilo-ampere-turn"))
     spectra = [sens.nominal_field[:, i] ./ kat[j] for (j, i) in enumerate(idx)]   # b̃ per kAt
     deltas = [dot(v, b) / sens.b_t0 for b in spectra]                            # δ per kAt
