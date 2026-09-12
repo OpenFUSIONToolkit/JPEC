@@ -166,27 +166,21 @@
             @test length(ext.theta) == nsign
         end
 
-        @testset "agrees with the adaptive scan across λ" begin
-            # The bracketed solver must reproduce Roots.find_zeros over the whole
-            # trapped range, including λ pushed against both boundaries where the
-            # two roots straddling an extremum are arbitrarily close together.
-            bmax = maximum(ext.bval)
-            bmin = minimum(ext.bval)
-            lmdatpb = bo / bmax
-            lmdamax = bo / bmin
-            lambdas = collect(range(lmdatpb * (1 + 1e-6), lmdamax * (1 - 1e-6); length=200))
-            for eps in (1e-3, 1e-6, 1e-9, 1e-12)
-                push!(lambdas, lmdatpb * (1 + eps))
-                push!(lambdas, lmdamax * (1 - eps))
-            end
+        bmax = maximum(ext.bval)
+        bmin = minimum(ext.bval)
+        lmdatpb = bo / bmax
+        lmdamax = bo / bmin
 
+        @testset "agrees with the adaptive scan across λ" begin
+            # Over the bulk of the trapped range the bracketed solver must reproduce
+            # Roots.find_zeros exactly. λ crowded against the boundaries is asserted
+            # separately below: there the two roots straddling an extremum become so
+            # close that whether the adaptive scan still resolves them depends on its
+            # own step heuristics, which is not a contract worth pinning a test to.
             buf = Float64[]
-            for lmda in lambdas
+            for lmda in range(lmdatpb * (1 + 1e-6), lmdamax * (1 - 1e-6); length=200)
                 new_roots = copy(KF._bounce_points_from_extrema!(buf, ext, lmda, bo, B_vpar))
                 ref_roots = sort!(KF.Roots.find_zeros(θ -> KF._vpar_from_spline(B_vpar, lmda, bo, θ), 0.0, 1.0); rev=true)
-                # Fewer than two roots is the documented degenerate signal, where
-                # the caller falls back to the adaptive scan.
-                length(new_roots) < 2 && continue
                 @test length(new_roots) == length(ref_roots)
                 if length(new_roots) == length(ref_roots)
                     @test all(abs.(new_roots .- ref_roots) .< 1e-9)
@@ -198,6 +192,44 @@
                     @test abs(KF._vpar_from_spline(B_vpar, lmda, bo, θ)) < 1e-10
                 end
             end
+        end
+
+        @testset "resolves the pair straddling an extremum" begin
+            # Approaching a boundary, the two bounce points collapse onto the extremum
+            # of B from either side. Assert that directly rather than against another
+            # solver: exactly two roots, one on each side of the extremum, both closing
+            # on it as λ tightens, with v_par vanishing at each.
+            buf = Float64[]
+            θmax = ext.theta[argmax(ext.bval)]
+            θmin = ext.theta[argmin(ext.bval)]
+
+            # Width of the arc between the two roots that encloses θx. θ is periodic,
+            # so the enclosing arc may run through the θ = 0/1 seam — the B maximum of
+            # this fixture sits at θ ≈ 0.999, which exercises exactly that.
+            function enclosing_arc(roots, θx)
+                lo, hi = minimum(roots), maximum(roots)
+                return lo <= θx <= hi ? hi - lo : 1.0 - (hi - lo)
+            end
+
+            prev = Dict(:max => Inf, :min => Inf)
+            for eps in (1e-4, 1e-6, 1e-8, 1e-10, 1e-12)
+                for (key, lmda, θx) in ((:max, lmdatpb * (1 + eps), θmax), (:min, lmdamax * (1 - eps), θmin))
+                    roots = copy(KF._bounce_points_from_extrema!(buf, ext, lmda, bo, B_vpar))
+                    @test length(roots) == 2
+                    length(roots) == 2 || continue
+                    for θ in roots
+                        @test abs(KF._vpar_from_spline(B_vpar, lmda, bo, θ)) < 1e-10
+                    end
+                    # The pair hugs the extremum and closes on it as λ tightens.
+                    arc = enclosing_arc(roots, θx)
+                    @test arc < prev[key]
+                    prev[key] = arc
+                end
+            end
+            # Having closed monotonically from 1e-4 to 1e-12, the pair is now far
+            # tighter than the θ-grid spacing that a node-by-node scan would resolve.
+            @test prev[:max] < 0.5 * (xs[2] - xs[1])
+            @test prev[:min] < 0.5 * (xs[2] - xs[1])
         end
 
         @testset "degenerate λ signals the fallback" begin
