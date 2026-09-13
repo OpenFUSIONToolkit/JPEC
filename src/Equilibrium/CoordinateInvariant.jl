@@ -59,9 +59,9 @@ which is Jacobian-invariant on a given flux surface. Its diagonal is the θ-aver
 √(J|∇ψ|), so `sqrtamat/√jarea` has a diagonal close to (and never above) one; this is the
 matrix Fortran GPEC writes as `J_surf_2` after that division.
 
-Each column is the unit mode e^{+i m_k θ} taken to θ-space with the inverse transform
-(`adjoint(basis)`, no 1/N), weighted pointwise, and brought back with the forward transform
-(`basis/N`), so the round trip is the identity and the convolution structure is correct.
+Each column is the unit mode e^{+i m_k θ} taken to θ-space with `FourierTransforms.inverse`,
+weighted pointwise, and brought back with the forward transform `ft(...)`, the same pair whose
+round trip is the identity, so the convolution structure is correct.
 """
 function compute_sqrtamat(
     equil::PlasmaEquilibrium,
@@ -79,8 +79,8 @@ function compute_sqrtamat(
         e_k .= 0.0
         e_k[k] = 1.0 + 0.0im
 
-        # Inverse FT of the unit mode: f(θ_j) = exp(+i m_k θ_j) (adjoint(basis) * c, see FourierTransforms)
-        theta_vec = adjoint(ft.basis) * e_k
+        # Inverse FT of the unit mode, f(θ_j) = exp(+i m_k θ_j), through the library's own inverse
+        theta_vec = Utilities.FourierTransforms.inverse(ft, e_k)
 
         # Multiply pointwise by √(J·|∇ψ|) in theta-space
         theta_vec .*= sqrt_jdp
