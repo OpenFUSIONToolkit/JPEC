@@ -123,6 +123,7 @@ gpec.toml.
   - `mthvac::Int` - Number of vacuum poloidal grid points (corresponds to `mtheta` in VacuumInput)
   - `nzvac::Int` - Number of vacuum toroidal grid points (corresponds to `nzeta` in VacuumInput3D)
   - `sing_start::Int` - Start integration at the `sing_start`-th singular surface
+  - `frobenius_psi_max::Float64` - Largest starting ψ_N at which the Frobenius start is used. The Frobenius start [Glasser 2016 Eq. 51] is a power series about the magnetic axis that picks the regular solution of every mode; it is only meaningful near the axis, so when the integration starts above this value (an interior start such as `psilow` raised to skip a q < 1 core, or `qlow` above q₀) every solution starts instead with zero displacement and unit "momentum" (U₁ = 0, U₂ = I), the initialization Fortran DCON always uses, and a warning says so. `0` selects the fixed start everywhere, silently. Default 0.01: on a DIII-D case the two starts differ in the innermost resonant coupling by 1 % at ψ_N = 0.01, 4 % at 0.03, 24 % at 0.1 and a factor 2 at 0.3, so the default keeps every axis-started example unchanged and switches anything that starts inside the plasma.
   - `nn_low::Int` - Lower bound for toroidal modes
   - `nn_high::Int` - Upper bound for toroidal modes
   - `delta_mlow::Int` - Expands lower bound of Fourier harmonics by delta_mlow
@@ -220,5 +221,5 @@ gpec.toml.
     gal_rho::Vector{Float64} = Float64[]      # per-surface mass density ρ [kg/m³] (length msing, core→edge); Fortran rmatch `massden`
     gal_rotation::Vector{Float64} = Float64[] # per-surface rotation frequency f [Hz] (length msing, core→edge); forced eigenvalue γ_s = 2πi·n·f. Fortran rmatch `rotation`
     gal_gamma::Float64 = 5 / 3       # ratio of specific heats Γ for the resistive-layer coefficients (resist_eval G term)
-    fixed_axis::Bool = false
+    frobenius_psi_max::Float64 = 0.01
 end
